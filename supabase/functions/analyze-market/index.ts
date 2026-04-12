@@ -165,14 +165,23 @@ serve(async (req) => {
         console.log(`${portal.name}: ${results.length} results`);
 
         for (const r of results) {
-          if (r.markdown || r.description) {
+          const content = r.markdown || r.description || r.excerpt || "";
+          if (content || r.title) {
             allSearchResults.push({
               portal,
-              markdown: r.markdown || r.description || "",
+              markdown: content,
               url: r.url || "",
               title: r.title || "",
             });
           }
+        }
+        
+        // Log first result for debugging
+        if (results.length > 0) {
+          const first = results[0];
+          console.log(`First result keys: ${Object.keys(first).join(", ")}`);
+          console.log(`First result title: ${first.title?.substring(0, 100)}`);
+          console.log(`First result markdown (first 300): ${first.markdown?.substring(0, 300)}`);
         }
       } catch (err) {
         console.error(`Search error for ${portal.name}:`, err);
