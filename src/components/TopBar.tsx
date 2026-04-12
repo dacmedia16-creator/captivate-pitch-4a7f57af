@@ -15,7 +15,7 @@ export function TopBar() {
   const { signOut } = useAuth();
 
   return (
-    <header className="sticky top-0 z-30 flex h-12 items-center gap-4 bg-background/70 backdrop-blur-xl px-4 <header className="sticky top-0 z-30 flex h-12 items-center gap-4 bg-background/70 backdrop-blur-xl px-4 shadow-[0_1px_3px_0_hsl(216_50%_12%/0.04)]">">
+    <header className="sticky top-0 z-30 flex h-12 items-center gap-4 bg-background/70 backdrop-blur-xl px-4 shadow-[0_1px_3px_0_hsl(216_50%_12%/0.04)]">
       <SidebarTrigger className="text-muted-foreground hover:text-foreground" />
 
       <div className="flex-1" />
