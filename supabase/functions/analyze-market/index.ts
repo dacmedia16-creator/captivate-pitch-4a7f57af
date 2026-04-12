@@ -180,15 +180,6 @@ serve(async (req) => {
             });
           }
         }
-        
-        // Log first result for debugging
-        if (results.length > 0) {
-          const first = results[0];
-          console.log(`First result keys: ${Object.keys(first).join(", ")}`);
-          console.log(`First result title: ${first.title?.substring(0, 100)}`);
-          console.log(`First result description: ${first.description?.substring(0, 300)}`);
-          console.log(`First result markdown (first 500): ${first.markdown?.substring(0, 500)}`);
-        }
       } catch (err) {
         console.error(`Search error for ${portal.name}:`, err);
       }
