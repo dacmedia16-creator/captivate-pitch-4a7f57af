@@ -521,6 +521,7 @@ export default function MarketStudyResult() {
                     <th className="text-center py-2 px-2">Score</th>
                     <th className="text-center py-2 px-2">Ajustes</th>
                     <th className="text-center py-2 px-2">Status</th>
+                    <th className="text-center py-2 px-2">Fonte</th>
                     <th className="text-center py-2 pl-2">Ações</th>
                   </tr>
                 </thead>
