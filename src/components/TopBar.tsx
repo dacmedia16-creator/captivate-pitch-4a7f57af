@@ -1,10 +1,18 @@
-import { Bell, Search } from "lucide-react";
+import { Bell, Search, LogOut } from "lucide-react";
 import { useRole } from "@/contexts/RoleContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 export function TopBar() {
-  const { userName, companyName, role } = useRole();
+  const { userName, companyName } = useRole();
+  const { signOut } = useAuth();
 
   return (
     <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b border-border/50 bg-background/80 backdrop-blur-lg px-4">
@@ -21,15 +29,25 @@ export function TopBar() {
         <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-accent" />
       </Button>
 
-      <div className="flex items-center gap-3 pl-2 border-l border-border/50">
-        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-bold">
-          {userName.charAt(0)}
-        </div>
-        <div className="hidden sm:flex flex-col">
-          <span className="text-sm font-medium leading-none">{userName}</span>
-          <span className="text-[11px] text-muted-foreground leading-none mt-0.5">{companyName}</span>
-        </div>
-      </div>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button className="flex items-center gap-3 pl-2 border-l border-border/50 hover:opacity-80 transition-opacity">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-bold">
+              {userName.charAt(0)}
+            </div>
+            <div className="hidden sm:flex flex-col">
+              <span className="text-sm font-medium leading-none">{userName}</span>
+              <span className="text-[11px] text-muted-foreground leading-none mt-0.5">{companyName}</span>
+            </div>
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem onClick={signOut} className="text-destructive">
+            <LogOut className="mr-2 h-4 w-4" />
+            Sair
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </header>
   );
 }
