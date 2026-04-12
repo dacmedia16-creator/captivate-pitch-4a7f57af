@@ -33,6 +33,8 @@ import AgentPresentations from "@/pages/agent/AgentPresentations";
 import AgentNewPresentation from "@/pages/agent/AgentNewPresentation";
 import AgentProfile from "@/pages/agent/AgentProfile";
 import AgentMarketStudy from "@/pages/agent/AgentMarketStudy";
+import PresentationEditor from "@/pages/agent/PresentationEditor";
+import PresentationMode from "@/pages/agent/PresentationMode";
 
 import NotFound from "@/pages/NotFound";
 
@@ -56,6 +58,8 @@ const App = () => (
               <Route path="/dashboard" element={<AppLayout><RoleGuard allowedRoles={["agent"]}><AgentDashboard /></RoleGuard></AppLayout>} />
               <Route path="/presentations" element={<AppLayout><RoleGuard allowedRoles={["agent"]}><AgentPresentations /></RoleGuard></AppLayout>} />
               <Route path="/presentations/new" element={<AppLayout><RoleGuard allowedRoles={["agent"]}><AgentNewPresentation /></RoleGuard></AppLayout>} />
+              <Route path="/presentations/:id/edit" element={<AppLayout><RoleGuard allowedRoles={["agent"]}><PresentationEditor /></RoleGuard></AppLayout>} />
+              <Route path="/presentations/:id/present" element={<RoleGuard allowedRoles={["agent"]}><PresentationMode /></RoleGuard>} />
               <Route path="/profile" element={<AppLayout><RoleGuard allowedRoles={["agent"]}><AgentProfile /></RoleGuard></AppLayout>} />
               <Route path="/market-study" element={<AppLayout><RoleGuard allowedRoles={["agent"]}><AgentMarketStudy /></RoleGuard></AppLayout>} />
 
