@@ -149,23 +149,20 @@ serve(async (req) => {
       );
     }
 
-    // Limit portals to avoid timeout
-    const limitedPortals = searchablePortals.slice(0, 3);
-    if (searchablePortals.length > 3) {
-      limitations.push(`Limitado a 3 de ${searchablePortals.length} portais para respeitar timeout`);
-    }
+    // Usar todos os portais configurados — sem limite
+    const limitedPortals = searchablePortals;
 
     const maxResults = Math.min(Number(filters.maxComparables) || 15, 20);
     const resultsPerPortal = Math.min(Math.ceil(maxResults / limitedPortals.length), 8);
 
     // ==========================================
-    // FASE 1: Busca ampla por portal (Firecrawl Search)
+    // FASE 1: Busca ampla por portal (Firecrawl Search) — em paralelo
     // ==========================================
-    console.log(`[FASE 1] Buscando em ${limitedPortals.length} portais...`);
+    console.log(`[FASE 1] Buscando em ${limitedPortals.length} portais em paralelo...`);
     
     const allUrls: Array<{ url: string; title: string; portal: PortalInfo; snippet: string }> = [];
 
-    for (const portal of limitedPortals) {
+    const portalSearchResults = await Promise.allSettled(limitedPortals.map(async (portal) => {
       const query = buildSearchQuery(property, portal, filters);
       console.log(`[FASE 1] ${portal.name}: "${query}"`);
 
@@ -195,13 +192,10 @@ serve(async (req) => {
         if (!searchRes.ok) {
           const errText = await searchRes.text();
           console.error(`[FASE 1] ${portal.name} error: ${searchRes.status}`);
-          if (searchRes.status === 402) {
-            limitations.push(`Firecrawl: créditos insuficientes`);
-          } else {
-            limitations.push(`${portal.name}: erro na busca (${searchRes.status})`);
-          }
-          portalResults.push(portalResult);
-          continue;
+          const limitation = searchRes.status === 402
+            ? `Firecrawl: créditos insuficientes`
+            : `${portal.name}: erro na busca (${searchRes.status})`;
+          return { portalResult, urls: [] as any[], limitation };
         }
 
         const searchData = await searchRes.json();
@@ -209,22 +203,26 @@ serve(async (req) => {
         portalResult.urls_found = results.length;
         console.log(`[FASE 1] ${portal.name}: ${results.length} URLs encontradas`);
 
-        for (const r of results) {
-          if (r.url) {
-            allUrls.push({
-              url: r.url,
-              title: r.title || "",
-              portal,
-              snippet: r.description || "",
-            });
-          }
-        }
+        const urls = results.filter((r: any) => r.url).map((r: any) => ({
+          url: r.url,
+          title: r.title || "",
+          portal,
+          snippet: r.description || "",
+        }));
+        return { portalResult, urls, limitation: null as string | null };
       } catch (err) {
         console.error(`[FASE 1] ${portal.name} exception:`, err);
-        limitations.push(`${portal.name}: falha na conexão`);
+        return { portalResult, urls: [] as any[], limitation: `${portal.name}: falha na conexão` };
       }
+    }));
 
-      portalResults.push(portalResult);
+    for (const result of portalSearchResults) {
+      if (result.status === "fulfilled") {
+        const { portalResult, urls, limitation } = result.value;
+        portalResults.push(portalResult);
+        allUrls.push(...urls);
+        if (limitation) limitations.push(limitation);
+      }
     }
 
     console.log(`[FASE 1] Total: ${allUrls.length} URLs coletadas`);
