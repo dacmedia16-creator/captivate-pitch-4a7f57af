@@ -1,45 +1,61 @@
 
 
-# Fase 3 — Skeletons de Performance
+# Auditoria: Dados de Marca Não Usados nos Slides
 
-## Estratégia
+## Problemas Encontrados
 
-Criar 3 componentes skeleton dedicados em `src/components/skeletons/`, um para cada página. Cada skeleton replica a estrutura visual exata da página real usando o `Skeleton` existente. Os spinners `Loader2` nas 3 páginas serão substituídos pelo skeleton correspondente.
+Após análise do fluxo `agency_profiles` → `useGeneratePresentation` → layouts, identifiquei **3 problemas**:
 
-## Arquivos a criar
+### 1. `regional_numbers` nunca é renderizado nos slides
+O campo é salvo corretamente no content da seção `about_regional` (ex: `"500+ imóveis vendidos | R$ 2bi em VGV | 15 anos de mercado"`), mas **nenhum dos 3 layouts** renderiza `c.regional_numbers`. O dado existe no JSON mas é ignorado na renderização.
 
-### 1. `src/components/skeletons/AgentDashboardSkeleton.tsx`
-Replica:
-- Header: skeleton de título (h1 largo) + texto de apoio + botão retangular à direita
-- Grid 5 colunas: 5 cards de métrica com skeleton de ícone + número + label
-- Grid 2 colunas: 2 cards glass com header (título skeleton) + 4-5 linhas de item (dot + texto + badge)
+### 2. Apresentações antigas não têm `image_url` nas seções about_*
+O código de geração (`useGeneratePresentation.ts`) foi corrigido recentemente para incluir `image_url` (linhas 79-85), mas todas as apresentações já geradas **não possuem esse campo** no content JSON. Confirmado no banco: as seções `about_global` e `about_national` têm apenas `logo_url` + `text`, sem `image_url`.
 
-### 2. `src/components/skeletons/AgentPresentationsSkeleton.tsx`
-Replica:
-- Header: título + texto + botão à direita
-- TabsList com 2 tabs skeleton
-- 4 cards de apresentação: cada um com título + subtexto + badge + 2 botões icon
+### 3. `about_regional` não inclui `image_url` nas apresentações antigas
+Mesmo problema — o campo `about_regional_image_url` foi adicionado depois e não está no content das apresentações existentes.
 
-### 3. `src/components/skeletons/PresentationEditorSkeleton.tsx`
-Replica o layout flex de 3 painéis:
-- Toolbar: barra horizontal com skeletons de botões
-- Sidebar esquerda (w-56): 6-8 retângulos de slide thumbnail
-- Centro: retângulo grande (slide preview) dentro do container
-- Painel direito (w-72): campos de edição skeleton (labels + inputs)
+## Plano de Correção
+
+### 1. Adicionar renderização de `regional_numbers` nos 3 layouts
+Nos blocos genéricos (que renderizam `about_regional`), adicionar após `c.text`:
+```tsx
+{c.regional_numbers && (
+  <div className="flex flex-wrap gap-6 mt-4">
+    {c.regional_numbers.split("|").map((item, i) => (
+      <div key={i} className="text-center">
+        <p className="font-bold text-lg" style={{ color: primary }}>{item.trim()}</p>
+      </div>
+    ))}
+  </div>
+)}
+```
+**Arquivos**: `LayoutExecutivo.tsx`, `LayoutPremium.tsx`, `LayoutImpactoComercial.tsx`
+
+### 2. Corrigir apresentações existentes (sem regenerar)
+Criar um script/migração SQL que atualiza o content JSON das seções `about_global`, `about_national` e `about_regional` existentes, injetando os campos `image_url` a partir da tabela `agency_profiles` do mesmo tenant.
+
+```sql
+UPDATE presentation_sections ps
+SET content = ps.content || jsonb_build_object('image_url', ap.about_global_image_url)
+FROM presentations p, agency_profiles ap
+WHERE ps.presentation_id = p.id
+  AND ap.tenant_id = p.tenant_id
+  AND ps.section_key = 'about_global'
+  AND ap.about_global_image_url IS NOT NULL
+  AND (ps.content->>'image_url') IS NULL;
+```
+(Repetir para `about_national` e `about_regional`)
+
+### 3. Sem outras alterações
+- Geração de **novas** apresentações já inclui `image_url` corretamente
+- `branch_photo_url` já funciona no `about_regional`
+- `logo_url`, `company_name`, cores — tudo OK
+- Não alterar RLS, auth ou lógica de negócio
 
 ## Arquivos a editar
-
-### 4. `src/pages/agent/AgentDashboard.tsx` (linha 60-62)
-Substituir o bloco `if (isLoading)` de `Loader2` por `<AgentDashboardSkeleton />`
-
-### 5. `src/pages/agent/AgentPresentations.tsx` (linha 78-80)
-Substituir o bloco `if (isLoading)` de `Loader2` por `<AgentPresentationsSkeleton />`
-
-### 6. `src/pages/agent/PresentationEditor.tsx` (linha 137-139)
-Substituir o bloco `if (loadingPres || loadingSections)` de `Loader2` por `<PresentationEditorSkeleton />`
-
-## Regras
-- Zero alteração em lógica de negócio, queries, auth ou RLS
-- Usa exclusivamente o `Skeleton` de `@/components/ui/skeleton`
-- Responsivo: grids adaptam entre mobile e desktop igual à página real
+1. `src/components/layouts/LayoutExecutivo.tsx` — adicionar `regional_numbers`
+2. `src/components/layouts/LayoutPremium.tsx` — adicionar `regional_numbers`
+3. `src/components/layouts/LayoutImpactoComercial.tsx` — adicionar `regional_numbers`
+4. Migração SQL — backfill `image_url` nas seções existentes
 
