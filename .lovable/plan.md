@@ -1,60 +1,80 @@
 
 
-# Completar o Fluxo do Estudo de Mercado na Apresentação
+# Adicionar Campos Completos do Imóvel ao Wizard da Apresentação
 
 ## Problema
 
-O `handleGenerate` em `AgentNewPresentation.tsx` cria o estudo de mercado com comparáveis, ajustes e resultado, mas falta:
+O `StepPropertyData` (wizard) tem campos básicos, mas falta vários campos que o `SubjectPropertyForm` (estudo de mercado antigo) tinha e que são essenciais para o motor de similaridade e ajustes:
 
-1. **Chamada ao `generate-market-summary`** — a edge function que gera resumo executivo, justificativa e insights por IA nunca é invocada. O campo `executive_summary` fica com texto genérico e `justification` + `market_insights` ficam vazios.
-2. **Estudo só é criado com comparáveis** — se nenhum portal for selecionado ou o scraping falhar, nenhum `market_study` é criado. Deveria ao menos criar o estudo com status "draft" ou "sem dados".
+| Campo | SubjectPropertyForm | StepPropertyData |
+|-------|:---:|:---:|
+| conservation_state | Yes | No |
+| construction_standard | Yes | No |
+| differentials (checkboxes) | Yes | No (só texto livre) |
+| condominium_fee | Yes | No |
+| iptu | Yes | No |
+| pricing_objective | Yes | No |
+| living_rooms | Yes | No |
+| powder_rooms | Yes | No |
+| state | Yes | No |
+| area_useful | Yes | No |
 
 ## Solução
 
-### 1. Chamar `generate-market-summary` após salvar o resultado
+### 1. Expandir `PropertyData` e `StepPropertyData`
+
+**Arquivo:** `src/components/wizard/StepPropertyData.tsx`
+
+Adicionar ao `PropertyData`:
+- `state: string`
+- `area_useful: string`
+- `living_rooms: string`
+- `powder_rooms: string`
+- `construction_standard: string`
+- `conservation_state: string`
+- `differentials: string[]` (array de checkboxes — Piscina, Área Gourmet, etc.)
+- `condominium_fee: string`
+- `iptu: string`
+- `pricing_objective: string`
+
+Adicionar à UI:
+- No card "Localização": campo Estado
+- No card "Características": campos Área útil, Salas, Lavabos, Padrão construtivo (substituir o select "Padrão" atual), Estado de conservação
+- Novo card "Diferenciais" com checkboxes (mesma lista do SubjectPropertyForm: Piscina, Área Gourmet, Escritório, etc.)
+- No card "Detalhes": campos Valor do condomínio, IPTU anual, Objetivo de precificação (select)
+
+### 2. Atualizar `emptyProperty` no `AgentNewPresentation`
 
 **Arquivo:** `src/pages/agent/AgentNewPresentation.tsx`
 
-Após o `supabase.from("market_study_results").insert(...)` (linha ~351), adicionar:
+Adicionar os novos campos ao `emptyProperty` com valores padrão vazios.
 
-```typescript
-// Gerar resumo por IA
-try {
-  const { data: aiSummary } = await supabase.functions.invoke("generate-market-summary", {
-    body: {
-      subject: subjectForScoring,
-      comparables: studyComparables,
-      result: { ...result, avg_price_per_sqm: Math.round(avgPriceSqm) },
-    },
-  });
+### 3. Passar campos completos ao `subjectForScoring` e ao `market_study_subject_properties`
 
-  if (aiSummary?.executive_summary) {
-    await supabase.from("market_study_results")
-      .update({
-        executive_summary: aiSummary.executive_summary,
-        justification: aiSummary.justification,
-        market_insights: aiSummary.market_insights,
-      })
-      .eq("market_study_id", study.id);
-  }
-} catch (aiErr) {
-  console.warn("AI summary generation failed (non-fatal):", aiErr);
-}
-```
+**Arquivo:** `src/pages/agent/AgentNewPresentation.tsx`
 
-### 2. Criar estudo mesmo sem comparáveis
+Atualizar o `subjectForScoring` e o insert de `market_study_subject_properties` para incluir:
+- `conservation_state`
+- `construction_standard`
+- `differentials`
+- `condominium_fee`
+- `iptu`
+- `pricing_objective`
+- `living_rooms`
+- `powder_rooms`
+- `state`
+- `area_useful`
 
-Mover a criação do `market_study` para fora do bloco `if (generatedComparables.length > 0)`, logo após o scraping. Se não houver comparáveis, o estudo fica com status `"completed"` mas sem dados — o `MarketStudyResult` já lida com listas vazias.
+### 4. Salvar novos campos na tabela `presentations` (se existirem as colunas)
 
-### 3. Passar `owner_expected_price` no subject para o AI
-
-O `subjectForScoring` atual não inclui `owner_expected_price`, que é essencial para o prompt do `generate-market-summary`. Adicionar esse campo.
+As colunas `condominium_fee`, `iptu`, `construction_standard`, `conservation_state`, `differentials`, `pricing_objective`, `state`, `living_rooms`, `powder_rooms` NÃO existem na tabela `presentations`. Esses campos serão salvos apenas no `market_study_subject_properties` (que já tem todas essas colunas).
 
 ## Arquivos
 
 | Arquivo | Ação |
 |---------|------|
-| `src/pages/agent/AgentNewPresentation.tsx` | Modificar — adicionar chamada `generate-market-summary`, mover criação do estudo para fora do if de comparáveis, incluir `owner_expected_price` no subject |
+| `src/components/wizard/StepPropertyData.tsx` | Modificar — expandir PropertyData + adicionar campos à UI |
+| `src/pages/agent/AgentNewPresentation.tsx` | Modificar — emptyProperty + subjectForScoring + subject_properties insert |
 
-Nenhuma migração necessária.
+Nenhuma migração necessária — `market_study_subject_properties` já tem todas as colunas.
 
