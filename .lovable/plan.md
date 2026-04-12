@@ -1,26 +1,32 @@
 
 
-# Expandir Lista de Diferenciais do Imóvel
+# Remover Limite de Portais na Edge Function
 
-Adicionar mais opções de diferenciais à lista `DIFFERENTIALS` em `SubjectPropertyForm.tsx`.
+## Problema
+A edge function `analyze-market-deep` tem um `slice(0, 3)` fixo que limita a busca a apenas 3 portais, ignorando Imóvel Web e Kenlo.
 
 ## Alteração
 
-**`src/components/market-study/SubjectPropertyForm.tsx`** (linha 38-42) — expandir o array `DIFFERENTIALS`:
+**`supabase/functions/analyze-market-deep/index.ts`** (linhas 152-156):
+
+Remover o `slice(0, 3)` e usar todos os portais configurados. Ajustar `resultsPerPortal` proporcionalmente para não estourar créditos do Firecrawl.
 
 ```typescript
-const DIFFERENTIALS = [
-  "Piscina", "Área Gourmet", "Escritório", "Energia Solar", "Automação",
-  "Planejados", "Vista Privilegiada", "Esquina", "Quintal Amplo", "Varanda",
-  "Elevador", "Mobiliado", "Quadra", "Churrasqueira", "Sauna", "Academia",
-  "Salão de Festas", "Playground", "Brinquedoteca", "Portaria 24h",
-  "Jardim", "Lavabo", "Despensa", "Closet", "Aquecimento Central",
-  "Ar Condicionado", "Lareira", "Depósito", "Coworking", "Pet Place",
-  "Bicicletário", "Spa",
-];
+// Antes:
+const limitedPortals = searchablePortals.slice(0, 3);
+if (searchablePortals.length > 3) {
+  limitations.push(`Limitado a 3 de ${searchablePortals.length} portais`);
+}
+
+// Depois:
+const limitedPortals = searchablePortals; // Sem limite de portais
 ```
 
-Novos itens: Quadra, Churrasqueira, Sauna, Academia, Salão de Festas, Playground, Brinquedoteca, Portaria 24h, Jardim, Lavabo, Despensa, Closet, Aquecimento Central, Ar Condicionado, Lareira, Depósito, Coworking, Pet Place, Bicicletário, Spa.
+Paralelizar as buscas da FASE 1 com `Promise.allSettled` ao invés do `for...of` sequencial (linha 168), para que mais portais não multipliquem o tempo de execução.
 
-Ajustar o grid para `md:grid-cols-5` para acomodar mais itens.
+## Arquivo afetado
+
+| Arquivo | Ação |
+|---------|------|
+| `supabase/functions/analyze-market-deep/index.ts` | Remover slice, paralelizar buscas |
 
