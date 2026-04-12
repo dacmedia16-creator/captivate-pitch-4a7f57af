@@ -75,12 +75,8 @@ export default function PresentationEditor() {
   const handleDuplicate = async () => {
     if (!presentation) return;
     const { data: newPres, error } = await supabase.from("presentations").insert({
-      ...presentation,
-      id: undefined,
-      title: (presentation.title || "Apresentação") + " (cópia)",
-      share_token: crypto.randomUUID(),
-      created_at: undefined,
-      updated_at: undefined,
+      ...presentation, id: undefined, title: (presentation.title || "Apresentação") + " (cópia)",
+      share_token: crypto.randomUUID(), created_at: undefined, updated_at: undefined,
     } as any).select().single();
     if (error || !newPres) { toast.error("Erro ao duplicar"); return; }
     const newSections = localSections.map(s => ({ ...s, id: undefined, presentation_id: newPres.id, created_at: undefined, updated_at: undefined }));
@@ -93,9 +89,7 @@ export default function PresentationEditor() {
   const handleSaveAsTemplate = async () => {
     if (!presentation || !profile?.tenant_id) return;
     await supabase.from("presentation_templates").insert({
-      tenant_id: profile.tenant_id,
-      broker_id: profile.id,
-      name: presentation.title || "Modelo sem nome",
+      tenant_id: profile.tenant_id, broker_id: profile.id, name: presentation.title || "Modelo sem nome",
       layout: presentation.selected_layout,
       structure: localSections.map(s => ({ section_key: s.section_key, title: s.title, content: s.content, sort_order: s.sort_order, is_visible: s.is_visible })) as any,
     });
@@ -105,14 +99,9 @@ export default function PresentationEditor() {
   const handleGenerateAI = async () => {
     setGeneratingAI(true);
     try {
-      const { data, error } = await supabase.functions.invoke("generate-presentation-text", {
-        body: { presentation_id: id },
-      });
+      const { data, error } = await supabase.functions.invoke("generate-presentation-text", { body: { presentation_id: id } });
       if (error) throw error;
-      if (data?.error) {
-        toast.error(data.error);
-        return;
-      }
+      if (data?.error) { toast.error(data.error); return; }
       await logAudit("ai_text_generated", "presentation", id!);
       queryClient.invalidateQueries({ queryKey: ["presentation-sections", id] });
       toast.success("Textos gerados com IA!");
@@ -126,17 +115,13 @@ export default function PresentationEditor() {
   const handleExportPDF = async () => {
     setExportingPDF(true);
     try {
-      const { data, error } = await supabase.functions.invoke("export-pdf", {
-        body: { presentation_id: id },
-      });
+      const { data, error } = await supabase.functions.invoke("export-pdf", { body: { presentation_id: id } });
       if (error) throw error;
       if (data?.url) {
         window.open(data.url, "_blank");
         await logAudit("pdf_exported", "presentation", id!);
         toast.success("PDF exportado!");
-      } else {
-        toast.error(data?.error || "Erro ao exportar");
-      }
+      } else { toast.error(data?.error || "Erro ao exportar"); }
     } catch (e: any) {
       toast.error(e.message || "Erro ao exportar PDF");
     } finally {
@@ -153,26 +138,21 @@ export default function PresentationEditor() {
   return (
     <div className="flex flex-col h-[calc(100vh-4rem)]">
       <EditorToolbar
-        presentationId={id!}
-        shareToken={presentation?.share_token || null}
-        onSaveAsTemplate={handleSaveAsTemplate}
-        onDuplicate={handleDuplicate}
+        presentationId={id!} shareToken={presentation?.share_token || null}
+        onSaveAsTemplate={handleSaveAsTemplate} onDuplicate={handleDuplicate}
         onPresent={() => navigate(`/presentations/${id}/present`)}
-        onSave={() => saveMutation.mutate()}
-        saving={saveMutation.isPending}
-        onGenerateAI={handleGenerateAI}
-        generatingAI={generatingAI}
-        onExportPDF={handleExportPDF}
-        exportingPDF={exportingPDF}
+        onSave={() => saveMutation.mutate()} saving={saveMutation.isPending}
+        onGenerateAI={handleGenerateAI} generatingAI={generatingAI}
+        onExportPDF={handleExportPDF} exportingPDF={exportingPDF}
       />
       <div className="flex flex-1 overflow-hidden">
         <SlidesSidebar sections={localSections} selectedId={selectedId} onSelect={setSelectedId} onToggleVisibility={toggleVisibility} />
-        <div className="flex-1 overflow-y-auto bg-muted/50 p-6 flex items-start justify-center">
-          <div className="w-full max-w-3xl">
+        <div className="flex-1 overflow-y-auto subtle-grid-bg p-8 flex items-start justify-center">
+          <div className="w-full max-w-3xl slide-frame rounded-xl bg-white">
             {selected ? (
               <SectionRenderer section={selected} layout={presentation?.selected_layout || "executivo"} branding={branding || undefined} />
             ) : (
-              <p className="text-muted-foreground text-center">Nenhum slide selecionado</p>
+              <p className="text-muted-foreground text-center p-12">Nenhum slide selecionado</p>
             )}
           </div>
         </div>
