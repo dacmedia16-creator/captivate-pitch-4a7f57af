@@ -103,7 +103,11 @@ export default function CompanyPortals() {
                     </div>
                     <div>
                       <p className="font-semibold text-sm">{portal.portal_name}</p>
-                      <p className="text-xs text-muted-foreground">{portal.portal_code}</p>
+                      {portal.base_url ? (
+                        <a href={portal.base_url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline">{portal.base_url}</a>
+                      ) : (
+                        <p className="text-xs text-muted-foreground">{portal.portal_code}</p>
+                      )}
                     </div>
                   </div>
                   <Switch checked={portal.is_enabled} onCheckedChange={() => handleToggle(portal)} />
