@@ -77,7 +77,22 @@ export default function MarketStudyResult() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["market-study", id] }),
   });
 
-  const handleRecalculate = async () => {
+  const deleteComparable = useMutation({
+    mutationFn: async (compId: string) => {
+      // Delete associated adjustments first
+      await supabase.from("market_study_adjustments").delete().eq("comparable_id", compId);
+      const { error } = await supabase.from("market_study_comparables").delete().eq("id", compId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["market-study", id] });
+      toast.success("Comparável excluído");
+      setDeleteTarget(null);
+    },
+    onError: () => toast.error("Erro ao excluir comparável"),
+  });
+
+
     if (!study) return;
     setRecalculating(true);
     try {
