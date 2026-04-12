@@ -11,11 +11,51 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const supabaseAdmin = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-      { auth: { autoRefreshToken: false, persistSession: false } }
-    );
+    // --- AUTH: Require super_admin ---
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const authClient = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
+
+    const token = authHeader.replace("Bearer ", "");
+    const { data: claims, error: claimsErr } = await authClient.auth.getClaims(token);
+    if (claimsErr || !claims?.claims?.sub) {
+      return new Response(JSON.stringify({ error: "Invalid token" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const userId = claims.claims.sub;
+
+    // Check super_admin role
+    const supabaseAdmin = createClient(supabaseUrl, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+
+    const { data: roleCheck } = await supabaseAdmin
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", userId)
+      .eq("role", "super_admin")
+      .single();
+
+    if (!roleCheck) {
+      return new Response(JSON.stringify({ error: "Forbidden: super_admin required" }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    // --- END AUTH ---
 
     // 1. Create tenant
     const { data: tenant, error: tenantErr } = await supabaseAdmin
@@ -183,13 +223,13 @@ Deno.serve(async (req) => {
       { section_key: "global", title: "Presença Global", sort_order: 2, content: { texto: "Líder global em soluções imobiliárias premium com presença em mais de 50 países, conectando compradores e vendedores ao redor do mundo com excelência e confiança." } },
       { section_key: "nacional", title: "Atuação Nacional", sort_order: 3, content: { texto: "Referência nacional em captação e venda de imóveis de alto padrão, com escritórios nas principais capitais e uma rede de mais de 2.000 corretores certificados." } },
       { section_key: "regional", title: "Presença Regional", sort_order: 4, content: { texto: "Atuação consolidada nas principais regiões metropolitanas do país.", numeros: "500+ imóveis vendidos | R$ 2bi em VGV | 15 anos de mercado" } },
-      { section_key: "imovel", title: "O Imóvel", sort_order: 5, content: { descricao: "Apartamento de alto padrão com 220m² no coração dos Jardins. Acabamento premium com varanda gourmet, 4 dormitórios (2 suítes), 3 banheiros e 3 vagas de garagem. Vista panorâmica e piscina privativa no terraço.", tipo: "Apartamento", area: "220 m²", quartos: "4", vagas: "3", padrao: "Alto Padrão" } },
+      { section_key: "imovel", title: "O Imóvel", sort_order: 5, content: { descricao: "Apartamento de alto padrão com 220m² no coração dos Jardins.", tipo: "Apartamento", area: "220 m²", quartos: "4", vagas: "3", padrao: "Alto Padrão" } },
       { section_key: "marketing", title: "Plano de Marketing", sort_order: 6, content: { intro: "Estratégia completa de divulgação para maximizar a exposição do seu imóvel:", acoes: "Tour Virtual 360° • Fotografia Profissional • Anúncios Premium nos principais portais • Divulgação para base qualificada de compradores • Open House exclusivo" } },
-      { section_key: "diferenciais", title: "Diferenciais Competitivos", sort_order: 7, content: { intro: "Por que escolher a Imobiliária Premium Demo:", lista: "IA para Precificação — análise inteligente com dados reais • Marketing 360° — estratégia completa multicanal • Atendimento Premium — acompanhamento personalizado em todas as etapas" } },
-      { section_key: "resultados", title: "Resultados Comprovados", sort_order: 8, content: { vendas: "500+ imóveis vendidos nos últimos 5 anos", vgv: "R$ 2 bilhões em volume geral de vendas", tempo: "Tempo médio de venda: 45 dias da captação ao fechamento" } },
-      { section_key: "estudo_mercado", title: "Estudo de Mercado", sort_order: 9, content: { resumo: "Análise comparativa de mercado baseada em imóveis similares na região dos Jardins, São Paulo. Dados coletados de portais como Viva Real, ZAP e OLX.", comparaveis: "6 imóveis comparáveis analisados na região" } },
-      { section_key: "cenarios_preco", title: "Cenários de Preço", sort_order: 10, content: { aspiracional: "R$ 3.450.000 — Preço aspiracional (+15%)", mercado: "R$ 3.000.000 — Preço de mercado (mediana)", venda_rapida: "R$ 2.550.000 — Venda acelerada (-15%)" } },
-      { section_key: "fechamento", title: "Próximos Passos", sort_order: 11, content: { texto: "Estamos prontos para iniciar a comercialização do seu imóvel com a estratégia mais completa do mercado. Entre em contato para agendar uma reunião e definir os próximos passos.", contato: "Carlos Lima — CRECI-SP 123456 — corretor1@demo.com" } },
+      { section_key: "diferenciais", title: "Diferenciais Competitivos", sort_order: 7, content: { intro: "Por que escolher a Imobiliária Premium Demo:", lista: "IA para Precificação • Marketing 360° • Atendimento Premium" } },
+      { section_key: "resultados", title: "Resultados Comprovados", sort_order: 8, content: { vendas: "500+ imóveis vendidos nos últimos 5 anos", vgv: "R$ 2 bilhões em volume geral de vendas", tempo: "Tempo médio de venda: 45 dias" } },
+      { section_key: "estudo_mercado", title: "Estudo de Mercado", sort_order: 9, content: { resumo: "Análise comparativa baseada em imóveis similares na região dos Jardins." } },
+      { section_key: "cenarios_preco", title: "Cenários de Preço", sort_order: 10, content: { aspiracional: "R$ 3.450.000", mercado: "R$ 3.000.000", venda_rapida: "R$ 2.550.000" } },
+      { section_key: "fechamento", title: "Próximos Passos", sort_order: 11, content: { texto: "Estamos prontos para iniciar a comercialização do seu imóvel.", contato: "Carlos Lima — CRECI-SP 123456 — corretor1@demo.com" } },
     ];
 
     for (const sec of sectionData) {

@@ -13,20 +13,54 @@ serve(async (req) => {
     const { presentation_id } = await req.json();
     if (!presentation_id) throw new Error("presentation_id is required");
 
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
-
-    const authHeader = req.headers.get("authorization");
-    let userId: string | null = null;
-    if (authHeader) {
-      const token = authHeader.replace("Bearer ", "");
-      const { data: { user } } = await supabase.auth.getUser(token);
-      userId = user?.id || null;
+    // --- AUTH: Require authenticated user ---
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
+
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+    const authClient = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
+
+    const token = authHeader.replace("Bearer ", "");
+    const { data: claims, error: claimsErr } = await authClient.auth.getClaims(token);
+    if (claimsErr || !claims?.claims?.sub) {
+      return new Response(JSON.stringify({ error: "Invalid token" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const userId = claims.claims.sub as string;
+
+    // Use service role for data access but validate ownership
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     const { data: pres } = await supabase.from("presentations").select("*").eq("id", presentation_id).single();
     if (!pres) throw new Error("Presentation not found");
+
+    // --- OWNERSHIP CHECK ---
+    const { data: userProfile } = await supabase.from("profiles").select("tenant_id").eq("id", userId).single();
+    const { data: userRole } = await supabase.from("user_roles").select("role").eq("user_id", userId).single();
+    const isSuperAdmin = userRole?.role === "super_admin";
+    const isOwner = pres.broker_id === userId;
+    const isSameTenant = userProfile?.tenant_id === pres.tenant_id;
+
+    if (!isSuperAdmin && !isOwner && !isSameTenant) {
+      return new Response(JSON.stringify({ error: "Forbidden: you don't have access to this presentation" }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    // --- END AUTH ---
 
     const { data: sections } = await supabase
       .from("presentation_sections")
