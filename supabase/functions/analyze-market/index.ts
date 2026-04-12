@@ -194,7 +194,14 @@ serve(async (req) => {
       )
       .join("\n\n");
 
-    const systemPrompt = `Você é um especialista em mercado imobiliário brasileiro. Analise os resultados de busca de portais imobiliários e extraia dados estruturados de cada imóvel encontrado.
+    const systemPrompt = `Você é um especialista em mercado imobiliário brasileiro. Analise os resultados de busca de portais imobiliários e extraia dados estruturados de cada imóvel individual encontrado.
+
+IMPORTANTE:
+- Os resultados podem ser páginas de LISTAGEM contendo VÁRIOS imóveis. Extraia CADA imóvel individualmente.
+- Preços estão geralmente no formato "R$ 1.200.000" ou "1200000". Converta para número inteiro (sem pontos ou vírgula).
+- Áreas estão geralmente como "120 m²" ou "120m2". Extraia apenas o número.
+- Se não conseguir determinar o preço ou área de um imóvel específico, use 0.
+- Extraia o máximo de imóveis possível dos resultados.
 
 Dados do imóvel de referência para comparação:
 - Tipo: ${property.property_type || "Não informado"}
@@ -205,7 +212,7 @@ Dados do imóvel de referência para comparação:
 - Padrão: ${property.property_standard || "Não informado"}
 - Preço esperado: ${property.owner_expected_price ? `R$ ${Number(property.owner_expected_price).toLocaleString("pt-BR")}` : "Não informado"}
 
-Extraia APENAS imóveis que sejam comparáveis relevantes (mesmo tipo, região similar). Ignore anúncios duplicados ou irrelevantes.`;
+Extraia imóveis que sejam comparáveis relevantes (mesmo tipo, região similar). Ignore anúncios duplicados.`;
 
     console.log("Calling Lovable AI for extraction...");
 
