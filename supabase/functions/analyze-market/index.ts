@@ -40,10 +40,16 @@ interface Filters {
   minPrice?: string;
   maxPrice?: string;
   maxComparables?: string;
+  preferSameCondominium?: boolean;
 }
 
-function buildSearchQuery(property: PropertyData, portal: PortalInfo): string {
+function buildSearchQuery(property: PropertyData, portal: PortalInfo, filters?: Filters): string {
   const parts: string[] = [];
+
+  // When preferSameCondominium is on, prioritize condominium name in query
+  if (filters?.preferSameCondominium && property.condominium) {
+    parts.push(property.condominium);
+  }
 
   if (property.property_type) parts.push(property.property_type);
   if (property.bedrooms) parts.push(`${property.bedrooms} quartos`);
@@ -73,13 +79,15 @@ function computeSimilarity(
   compPriceSqm: number,
   basePriceSqm: number,
   compBedrooms: number,
-  baseBedrooms: number
+  baseBedrooms: number,
+  sameCondominium?: boolean
 ): number {
   if (!baseArea || !basePriceSqm) return 75;
   const areaDiff = Math.abs(compArea - baseArea) / baseArea;
   const priceDiff = Math.abs(compPriceSqm - basePriceSqm) / basePriceSqm;
   const bedroomDiff = Math.abs(compBedrooms - baseBedrooms);
-  const score = 100 - (areaDiff * 40 + priceDiff * 40 + bedroomDiff * 5);
+  let score = 100 - (areaDiff * 40 + priceDiff * 40 + bedroomDiff * 5);
+  if (sameCondominium) score += 10;
   return Math.max(50, Math.min(98, Math.round(score)));
 }
 

@@ -17,6 +17,7 @@ export interface MarketStudyData {
   maxPrice: string;
   minComparables: string;
   maxComparables: string;
+  preferSameCondominium: boolean;
 }
 
 interface StepMarketStudyProps {
@@ -121,6 +122,22 @@ export function StepMarketStudy({ data, onChange }: StepMarketStudyProps) {
           <div className="space-y-2">
             <Label>Preço máximo (R$)</Label>
             <Input type="number" value={data.maxPrice} onChange={e => onChange({ ...data, maxPrice: e.target.value })} />
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="glass-card">
+        <CardHeader><CardTitle className="text-lg">Preferências avançadas</CardTitle></CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between p-3 rounded-lg border border-border">
+            <div className="flex flex-col gap-0.5">
+              <span className="font-medium">Priorizar imóveis no mesmo condomínio</span>
+              <span className="text-xs text-muted-foreground">Quando ativo, busca e rankeia primeiro imóveis do mesmo condomínio do imóvel avaliado</span>
+            </div>
+            <Switch
+              checked={data.preferSameCondominium}
+              onCheckedChange={(checked) => onChange({ ...data, preferSameCondominium: checked })}
+            />
           </div>
         </CardContent>
       </Card>
