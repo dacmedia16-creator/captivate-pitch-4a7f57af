@@ -1,40 +1,15 @@
 import {
-  LayoutDashboard,
-  Building2,
-  Users,
-  Settings,
-  Presentation,
-  PlusCircle,
-  UserCircle,
-  BarChart3,
-  Palette,
-  FileText,
-  Globe,
-  Sparkles,
-  Megaphone,
+  LayoutDashboard, Building2, Users, Settings, Presentation, PlusCircle,
+  UserCircle, BarChart3, Palette, FileText, Globe, Sparkles, Megaphone,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useRole, UserRole } from "@/contexts/RoleContext";
-import { useLocation } from "react-router-dom";
 import {
-  Sidebar,
-  SidebarContent,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarGroupLabel,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-  SidebarHeader,
-  SidebarFooter,
-  useSidebar,
+  Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel,
+  SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarHeader, SidebarFooter, useSidebar,
 } from "@/components/ui/sidebar";
 
-interface NavItem {
-  title: string;
-  url: string;
-  icon: React.ComponentType<{ className?: string }>;
-}
+interface NavItem { title: string; url: string; icon: React.ComponentType<{ className?: string }>; }
 
 const superAdminNav: NavItem[] = [
   { title: "Dashboard", url: "/admin/dashboard", icon: LayoutDashboard },
@@ -61,17 +36,8 @@ const agentNav: NavItem[] = [
   { title: "Estudo de Mercado", url: "/market-study", icon: BarChart3 },
 ];
 
-const navByRole: Record<UserRole, NavItem[]> = {
-  super_admin: superAdminNav,
-  admin: adminNav,
-  agent: agentNav,
-};
-
-const roleLabels: Record<UserRole, string> = {
-  super_admin: "Super Admin",
-  admin: "Admin Imobiliária",
-  agent: "Corretor",
-};
+const navByRole: Record<UserRole, NavItem[]> = { super_admin: superAdminNav, admin: adminNav, agent: agentNav };
+const roleLabels: Record<UserRole, string> = { super_admin: "Super Admin", admin: "Admin Imobiliária", agent: "Corretor" };
 
 export function AppSidebar() {
   const { role } = useRole();
@@ -83,17 +49,13 @@ export function AppSidebar() {
     <Sidebar collapsible="icon">
       <SidebarHeader className="p-4">
         <div className="flex items-center gap-2.5">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg gold-gradient">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg gold-gradient shadow-md">
             <Sparkles className="h-5 w-5 text-sidebar-primary-foreground" />
           </div>
           {!collapsed && (
             <div className="flex flex-col">
-              <span className="text-sm font-bold text-sidebar-accent-foreground tracking-tight">
-                Listing Studio
-              </span>
-              <span className="text-[10px] font-medium text-sidebar-primary tracking-widest uppercase">
-                AI
-              </span>
+              <span className="text-sm font-bold text-sidebar-accent-foreground tracking-tight">Listing Studio</span>
+              <span className="text-[10px] font-medium text-gradient-gold tracking-widest uppercase">AI</span>
             </div>
           )}
         </div>
@@ -101,17 +63,15 @@ export function AppSidebar() {
 
       <SidebarContent>
         {!collapsed && (
-          <div className="px-3 mb-2">
-            <div className="rounded-lg bg-sidebar-accent px-3 py-2 text-xs font-medium text-sidebar-accent-foreground">
+          <div className="px-3 mb-3">
+            <div className="rounded-lg bg-sidebar-accent/60 px-3 py-2 text-[10px] font-semibold text-sidebar-accent-foreground/70 uppercase tracking-widest">
               {roleLabels[role]}
             </div>
           </div>
         )}
 
         <SidebarGroup>
-          <SidebarGroupLabel className="text-sidebar-foreground/50 text-[10px] tracking-widest uppercase">
-            Menu
-          </SidebarGroupLabel>
+          <SidebarGroupLabel className="text-sidebar-foreground/40 text-[10px] tracking-widest uppercase">Menu</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {items.map((item) => (
@@ -120,11 +80,11 @@ export function AppSidebar() {
                     <NavLink
                       to={item.url}
                       end
-                      className="text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
-                      activeClassName="bg-sidebar-accent text-sidebar-primary font-semibold"
+                      className="text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-all duration-200 rounded-lg"
+                      activeClassName="bg-sidebar-accent text-sidebar-primary font-semibold border-l-2 border-sidebar-primary"
                     >
                       <item.icon className="h-4 w-4" />
-                      {!collapsed && <span>{item.title}</span>}
+                      {!collapsed && <span className="text-[13px]">{item.title}</span>}
                     </NavLink>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -136,11 +96,9 @@ export function AppSidebar() {
 
       <SidebarFooter className="p-3">
         {!collapsed && (
-          <div className="flex items-center gap-2 rounded-lg bg-sidebar-accent/50 px-3 py-2">
-            <Globe className="h-4 w-4 text-sidebar-primary" />
-            <span className="text-[11px] text-sidebar-foreground/70">
-              Powered by AI
-            </span>
+          <div className="flex items-center gap-2 rounded-lg bg-sidebar-accent/30 px-3 py-2">
+            <Globe className="h-3.5 w-3.5 text-sidebar-primary" />
+            <span className="text-[10px] text-sidebar-foreground/50 tracking-wide">Powered by AI</span>
           </div>
         )}
       </SidebarFooter>

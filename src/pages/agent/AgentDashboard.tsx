@@ -6,10 +6,17 @@ import { MetricCard } from "@/components/shared/MetricCard";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatusBadge } from "@/components/shared/StatusBadge";
-import { PlusCircle, Presentation, FileDown, BarChart3, BookTemplate, Loader2 } from "lucide-react";
+import { PlusCircle, Presentation, FileDown, BarChart3, BookTemplate, Loader2, ArrowRight } from "lucide-react";
+
+function getGreeting() {
+  const h = new Date().getHours();
+  if (h < 12) return "Bom dia";
+  if (h < 18) return "Boa tarde";
+  return "Boa noite";
+}
 
 export default function AgentDashboard() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const navigate = useNavigate();
   const uid = user?.id;
 
@@ -18,7 +25,6 @@ export default function AgentDashboard() {
     queryFn: async () => {
       const now = new Date();
       const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-
       const [total, monthly, exports, studies, templates] = await Promise.all([
         supabase.from("presentations").select("id", { count: "exact", head: true }).eq("broker_id", uid!),
         supabase.from("presentations").select("id", { count: "exact", head: true }).eq("broker_id", uid!).gte("created_at", monthStart),
@@ -26,14 +32,7 @@ export default function AgentDashboard() {
         supabase.from("market_analysis_jobs").select("id", { count: "exact", head: true }),
         supabase.from("presentation_templates").select("id", { count: "exact", head: true }),
       ]);
-
-      return {
-        total: total.count || 0,
-        monthly: monthly.count || 0,
-        exports: exports.count || 0,
-        studies: studies.count || 0,
-        templates: templates.count || 0,
-      };
+      return { total: total.count || 0, monthly: monthly.count || 0, exports: exports.count || 0, studies: studies.count || 0, templates: templates.count || 0 };
     },
     enabled: !!uid,
   });
@@ -60,14 +59,16 @@ export default function AgentDashboard() {
     return <div className="flex items-center justify-center min-h-[60vh]"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
   }
 
+  const firstName = profile?.full_name?.split(" ")[0] || "Corretor";
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Meu Painel</h1>
-          <p className="text-muted-foreground">Gerencie suas apresentações e acompanhe seus resultados.</p>
+          <h1 className="text-3xl font-bold tracking-tight">{getGreeting()}, {firstName}</h1>
+          <p className="text-muted-foreground mt-1 text-sm">Gerencie suas apresentações e acompanhe seus resultados.</p>
         </div>
-        <Button onClick={() => navigate("/presentations/new")} className="gold-gradient text-primary-foreground">
+        <Button onClick={() => navigate("/presentations/new")} className="gold-gradient text-primary-foreground shadow-md hover:shadow-lg transition-shadow">
           <PlusCircle className="h-4 w-4 mr-2" /> Nova Apresentação
         </Button>
       </div>
@@ -82,40 +83,52 @@ export default function AgentDashboard() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Card className="glass-card">
-          <CardHeader><CardTitle className="text-lg">Apresentações recentes</CardTitle></CardHeader>
-          <CardContent>
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base font-sans font-semibold">Apresentações recentes</CardTitle>
+              <Button variant="ghost" size="sm" className="text-xs text-muted-foreground" onClick={() => navigate("/presentations")}>
+                Ver todas <ArrowRight className="h-3 w-3 ml-1" />
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="pt-0">
             {recentPresentations?.length ? (
-              <div className="space-y-3">
+              <div className="space-y-1">
                 {recentPresentations.map(p => (
-                  <div key={p.id} className="flex items-center justify-between p-3 rounded-lg hover:bg-muted/50 cursor-pointer transition-colors" onClick={() => navigate(`/presentations/${p.id}/edit`)}>
-                    <div>
-                      <p className="font-medium text-sm">{p.title || "Sem título"}</p>
-                      <p className="text-xs text-muted-foreground">{[p.neighborhood, p.city].filter(Boolean).join(", ")}</p>
+                  <div key={p.id} className="flex items-center justify-between p-3 rounded-lg hover:bg-muted/40 cursor-pointer transition-all group" onClick={() => navigate(`/presentations/${p.id}/edit`)}>
+                    <div className="flex items-center gap-3">
+                      <div className="h-2 w-2 rounded-full bg-accent/60 group-hover:bg-accent transition-colors" />
+                      <div>
+                        <p className="font-medium text-sm">{p.title || "Sem título"}</p>
+                        <p className="text-[11px] text-muted-foreground">{[p.neighborhood, p.city].filter(Boolean).join(", ")}</p>
+                      </div>
                     </div>
                     <StatusBadge status={p.status} />
                   </div>
                 ))}
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground">Nenhuma apresentação ainda.</p>
+              <p className="text-sm text-muted-foreground py-4 text-center">Nenhuma apresentação ainda.</p>
             )}
           </CardContent>
         </Card>
 
         <Card className="glass-card">
-          <CardHeader><CardTitle className="text-lg">Rascunhos</CardTitle></CardHeader>
-          <CardContent>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base font-sans font-semibold">Rascunhos</CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0">
             {drafts?.length ? (
-              <div className="space-y-3">
+              <div className="space-y-1">
                 {drafts.map(d => (
-                  <div key={d.id} className="flex items-center justify-between p-3 rounded-lg hover:bg-muted/50 cursor-pointer transition-colors" onClick={() => navigate(`/presentations/${d.id}/edit`)}>
+                  <div key={d.id} className="flex items-center justify-between p-3 rounded-lg hover:bg-muted/40 cursor-pointer transition-all" onClick={() => navigate(`/presentations/${d.id}/edit`)}>
                     <p className="font-medium text-sm">{d.title || "Sem título"}</p>
-                    <span className="text-xs text-muted-foreground">{new Date(d.created_at).toLocaleDateString("pt-BR")}</span>
+                    <span className="text-[11px] text-muted-foreground">{new Date(d.created_at).toLocaleDateString("pt-BR")}</span>
                   </div>
                 ))}
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground">Nenhum rascunho.</p>
+              <p className="text-sm text-muted-foreground py-4 text-center">Nenhum rascunho.</p>
             )}
           </CardContent>
         </Card>

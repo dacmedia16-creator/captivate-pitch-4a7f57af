@@ -2,9 +2,15 @@ import { SectionData } from "@/components/layouts/SectionRenderer";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Switch } from "@/components/ui/switch";
-import { Button } from "@/components/ui/button";
-import { Save } from "lucide-react";
+import { Separator } from "@/components/ui/separator";
+import { Building, User, Globe, MapPin, Home, Target, Award, TrendingUp, BarChart3, DollarSign, Phone } from "lucide-react";
+
+const sectionIcons: Record<string, any> = {
+  cover: Building, broker_intro: User, about_global: Globe, about_national: Globe,
+  about_regional: MapPin, property_summary: Home, marketing_plan: Target,
+  differentials: Award, results: TrendingUp, market_study_placeholder: BarChart3,
+  pricing_scenarios: DollarSign, closing: Phone,
+};
 
 interface EditPanelProps {
   section: SectionData | null;
@@ -14,13 +20,14 @@ interface EditPanelProps {
 export function EditPanel({ section, onUpdate }: EditPanelProps) {
   if (!section) {
     return (
-      <div className="w-80 border-l border-border bg-card flex items-center justify-center p-6">
-        <p className="text-muted-foreground text-sm text-center">Selecione um slide para editar</p>
+      <div className="w-80 border-l border-border/40 bg-card/50 flex items-center justify-center p-6">
+        <p className="text-muted-foreground text-xs text-center">Selecione um slide para editar</p>
       </div>
     );
   }
 
   const content = section.content || {};
+  const Icon = sectionIcons[section.section_key] || Building;
 
   const handleFieldChange = (field: string, value: any) => {
     const updated = { ...content, [field]: value };
@@ -94,10 +101,15 @@ export function EditPanel({ section, onUpdate }: EditPanelProps) {
   };
 
   return (
-    <div className="w-80 border-l border-border bg-card overflow-y-auto">
-      <div className="p-4 border-b border-border">
-        <h3 className="font-semibold text-sm">{section.title}</h3>
-        <p className="text-xs text-muted-foreground mt-1">{section.section_key}</p>
+    <div className="w-80 border-l border-border/40 bg-card/50 overflow-y-auto">
+      <div className="p-4 border-b border-border/30">
+        <div className="flex items-center gap-2 mb-1">
+          <div className="h-6 w-6 rounded-md bg-accent/10 flex items-center justify-center">
+            <Icon className="h-3.5 w-3.5 text-accent" />
+          </div>
+          <h3 className="font-semibold text-sm font-sans">{section.title}</h3>
+        </div>
+        <p className="text-[10px] text-muted-foreground uppercase tracking-wider">{section.section_key}</p>
       </div>
       <div className="p-4 space-y-4">
         {renderFields()}
@@ -108,8 +120,8 @@ export function EditPanel({ section, onUpdate }: EditPanelProps) {
 
 function Field({ label, value, onChange, type = "text" }: { label: string; value: any; onChange: (v: string) => void; type?: string }) {
   return (
-    <div className="space-y-1.5">
-      <Label className="text-xs">{label}</Label>
+    <div className="space-y-1">
+      <Label className="text-[11px] text-muted-foreground uppercase tracking-wider">{label}</Label>
       <Input type={type} value={value || ""} onChange={e => onChange(e.target.value)} className="h-8 text-sm" />
     </div>
   );
@@ -117,8 +129,8 @@ function Field({ label, value, onChange, type = "text" }: { label: string; value
 
 function TextAreaField({ label, value, onChange, rows = 4 }: { label: string; value: any; onChange: (v: string) => void; rows?: number }) {
   return (
-    <div className="space-y-1.5">
-      <Label className="text-xs">{label}</Label>
+    <div className="space-y-1">
+      <Label className="text-[11px] text-muted-foreground uppercase tracking-wider">{label}</Label>
       <Textarea value={value || ""} onChange={e => onChange(e.target.value)} rows={rows} className="text-sm" />
     </div>
   );
