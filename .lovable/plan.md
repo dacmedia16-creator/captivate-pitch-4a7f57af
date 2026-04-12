@@ -1,51 +1,45 @@
 
 
-# Aumentar tipografia dos slides e alinhar com referencia visual RE/MAX
+# Aumentar tamanho das letras nos slides
 
 ## Problema
-As fontes dos slides ficaram muito pequenas apos a refatoracao. O ScaledSlide renderiza a 1920x1080 e escala para o container, mas os tamanhos de fonte nos temas estao pequenos demais (title: 28px, label: 10px, metric: 30px). As imagens de referencia mostram tipografia muito mais bold e grande -- titulos em 60-80px, metricas em 80-120px, labels em 16-20px.
+Mesmo com os tamanhos atuais (72px cover, 48px headings, 64px metrics), as letras aparecem pequenas porque o slide de 1920x1080 e escalado para caber no container do editor. A solucao e aumentar ainda mais os tamanhos para que fiquem legiveis mesmo apos a reducao de escala.
 
-## O que sera feito
+## Mudancas propostas
 
-### 1. Aumentar font sizes nos 3 temas
-Ajustar os tokens de tipografia para proporcoes adequadas a 1920x1080:
+### Novos tamanhos de fonte
 
-| Token | Atual | Novo |
-|-------|-------|------|
-| `cover.titleSize` | 48px | 72px |
-| `heading.titleSize` | 28px | 48px |
-| `metric.size` | 30px | 64px |
-| `metric.labelSize` | 10px | 16px |
-| `divider.width` | 40px | 60px |
+| Elemento | Atual | Novo |
+|----------|-------|------|
+| Cover title | 72px | 84px |
+| Heading title | 48px | 56px |
+| Metric numbers | 64px | 72px |
+| Slide label | 16px | 18px |
+| Slide body | 22px | 26px |
+| Broker name | 56px | 64px |
+| Closing title | 56px | 64px |
+| Closing broker | 40px | 48px |
+| Card titles | 24px | 28px |
+| Body/descriptions | 19-20px | 24px |
+| Contact info | 22px | 26px |
+| StatBar metrics | 48px | 56px |
+| StatBar labels | 14px | 18px |
+| Stats inline | 42px | 52px |
+| CRECI | 18px | 22px |
 
-Arquivos: `theme-executivo.ts`, `theme-premium.ts`, `theme-impacto.ts`
-
-### 2. Aumentar CSS base classes
-No `index.css`, aumentar `.slide-label` de 10px para 16px, e ajustar `.slide-body` para proporcoes maiores.
-
-### 3. Aumentar inline font sizes nos layouts
-Nos 3 arquivos de layout, aumentar todos os `fontSize` inline:
-- Broker intro: nome 42px -> 56px, bio 18px -> 24px, CRECI 14px -> 18px
-- Property summary: titulo 36px -> 48px, highlights 17px -> 22px
-- Closing: titulo 42px -> 56px, nome 28px -> 40px, contatos 17px -> 22px
-- Generic sections: body text 15-17px -> 20-24px, card titles 18px -> 24px
-- Stat bar numbers: 28px -> 48px
-- Labels/badges: 12px -> 16px
-
-Arquivos: `LayoutExecutivo.tsx`, `LayoutPremium.tsx`, `LayoutImpactoComercial.tsx`
-
-### 4. Aumentar padding e espacamentos
-Ajustar `p-14` e `gap` values para proporcoes corretas a 1920x1080 (p-16 a p-20, gaps maiores).
-
-## Arquivos modificados
-- `src/components/layouts/themes/theme-executivo.ts`
-- `src/components/layouts/themes/theme-premium.ts`
-- `src/components/layouts/themes/theme-impacto.ts`
-- `src/components/layouts/LayoutExecutivo.tsx`
-- `src/components/layouts/LayoutPremium.tsx`
-- `src/components/layouts/LayoutImpactoComercial.tsx`
-- `src/index.css`
+### Arquivos modificados
+1. **`src/index.css`** -- `.slide-label` 16px->18px, `.slide-body` 22px->26px
+2. **`src/components/layouts/themes/theme-executivo.ts`** -- cover 84px, heading 56px, metric 72px, label 18px
+3. **`src/components/layouts/themes/theme-premium.ts`** -- mesmos ajustes
+4. **`src/components/layouts/themes/theme-impacto.ts`** -- mesmos ajustes
+5. **`src/components/layouts/LayoutExecutivo.tsx`** -- todos os fontSize inline aumentados
+6. **`src/components/layouts/LayoutPremium.tsx`** -- mesmos ajustes
+7. **`src/components/layouts/LayoutImpactoComercial.tsx`** -- mesmos ajustes
+8. **`src/components/layouts/slide-components/SlideStatBar.tsx`** -- metric 56px, label 18px
+9. **`src/components/layouts/slide-components/SlideMetricRow.tsx`** -- defaults atualizados
+10. **`src/components/layouts/slide-components/SlideScenarios.tsx`** -- defaults atualizados
+11. **`src/components/layouts/slide-components/SlideItemList.tsx`** -- font sizes aumentados
 
 ## Risco
-Nenhum. Apenas ajuste de tamanhos visuais, sem mudanca de logica.
+Nenhum. Apenas ajuste de tamanhos visuais.
 
