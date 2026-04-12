@@ -50,23 +50,23 @@ export function LayoutPremium({ section, branding, theme, colors }: Props) {
       <div className="w-full h-full flex" style={{ fontFamily: FONT }}>
         <div className="flex-1 p-16 flex flex-col justify-center" style={{ background: `linear-gradient(160deg, ${deep} 0%, ${primary} 100%)` }}>
           <SlideLabel color="rgba(255,255,255,0.45)">Seu consultor</SlideLabel>
-          <h2 className="slide-title text-white mt-5 mb-3" style={{ fontSize: "56px" }}>{c.name}</h2>
-          {c.creci && <p className="text-white/25 tracking-widest mb-10" style={{ fontSize: "18px" }}>CRECI {c.creci}</p>}
+          <h2 className="slide-title text-white mt-5 mb-3" style={{ fontSize: "64px" }}>{c.name}</h2>
+          {c.creci && <p className="text-white/25 tracking-widest mb-10" style={{ fontSize: "22px" }}>CRECI {c.creci}</p>}
           <div className="w-20 h-[3px] rounded-full mb-10" style={{ backgroundColor: accent }} />
           {c.short_bio && <p className="slide-body text-white/50 max-w-[550px]">{c.short_bio}</p>}
-          {c.education && <p className="text-white/35 mt-4" style={{ fontSize: "20px" }}>🎓 {c.education}</p>}
-          {c.service_regions && <p className="text-white/35 mt-3" style={{ fontSize: "20px" }}>📍 {c.service_regions}</p>}
-          {c.vgv_summary && <p className="text-white/25 italic mt-8" style={{ fontSize: "19px" }}>{c.vgv_summary}</p>}
+          {c.education && <p className="text-white/35 mt-4" style={{ fontSize: "24px" }}>🎓 {c.education}</p>}
+          {c.service_regions && <p className="text-white/35 mt-3" style={{ fontSize: "24px" }}>📍 {c.service_regions}</p>}
+          {c.vgv_summary && <p className="text-white/25 italic mt-8" style={{ fontSize: "22px" }}>{c.vgv_summary}</p>}
           <div className="flex gap-10 mt-12">
             {c.years_in_market && (
               <div>
-                <p className="slide-metric text-white" style={{ fontSize: "52px" }}>{c.years_in_market}</p>
+                <p className="slide-metric text-white" style={{ fontSize: "56px" }}>{c.years_in_market}</p>
                 <p className="slide-label text-white/30 mt-3">Anos</p>
               </div>
             )}
             {c.specialties && (
               <div>
-                <p className="font-semibold text-white" style={{ fontSize: "22px" }}>{c.specialties}</p>
+                <p className="font-semibold text-white" style={{ fontSize: "26px" }}>{c.specialties}</p>
                 <p className="slide-label text-white/30 mt-3">Especialidades</p>
               </div>
             )}
@@ -89,7 +89,7 @@ export function LayoutPremium({ section, branding, theme, colors }: Props) {
         <SlideImageGrid images={c.images} gap="1px" />
         <div className="p-16 space-y-8">
           <SlideLabel color={accent}>O imóvel</SlideLabel>
-          <h2 className="slide-title" style={{ fontSize: "48px", color: primary }}>{section.title}</h2>
+          <h2 className="slide-title" style={{ fontSize: "56px", color: primary }}>{section.title}</h2>
           <SlideDivider theme={theme} colors={colors} />
           <SlideMetricRow
             items={[
@@ -131,13 +131,13 @@ export function LayoutPremium({ section, branding, theme, colors }: Props) {
         <SlideLabel color={accent}>Precificação sugerida</SlideLabel>
         <h2 className="slide-title mt-4" style={{ fontSize: theme.heading.titleSize, color: primary }}>{section.title}</h2>
         {c.owner_expected_price && (
-          <p className="mt-4 mb-10" style={{ fontSize: "22px", color: colors.textLight }}>
+          <p className="mt-4 mb-10" style={{ fontSize: "26px", color: colors.textLight }}>
             Valor pretendido: <span className="font-bold" style={{ color: accent }}>R$ {Number(c.owner_expected_price).toLocaleString("pt-BR")}</span>
           </p>
         )}
         <SlideDivider theme={theme} colors={colors} />
         <div className="mt-10">
-          <SlideScenarios scenarios={c.scenarios || []} colors={colors} metricSize="64px" />
+          <SlideScenarios scenarios={c.scenarios || []} colors={colors} metricSize="72px" />
         </div>
       </div>
     );
@@ -154,10 +154,10 @@ export function LayoutPremium({ section, branding, theme, colors }: Props) {
           <div className="h-3 w-3 rounded-full" style={{ backgroundColor: accent }} />
           <div className="h-px w-28" style={{ backgroundColor: "rgba(255,255,255,0.12)" }} />
         </div>
-        <h2 className="slide-title text-white mb-6 relative z-10" style={{ fontSize: "56px" }}>{theme.closing.headline}</h2>
-        <p className="text-white/35 font-light max-w-[600px] mb-16 leading-relaxed relative z-10" style={{ fontSize: "24px" }}>{theme.closing.subline}</p>
-        <p className="font-bold relative z-10" style={{ fontSize: "40px", color: accent }}>{c.broker_name}</p>
-        <div className="space-y-3 text-white/40 mt-5 relative z-10" style={{ fontSize: "22px" }}>
+        <h2 className="slide-title text-white mb-6 relative z-10" style={{ fontSize: "64px" }}>{theme.closing.headline}</h2>
+        <p className="text-white/35 font-light max-w-[600px] mb-16 leading-relaxed relative z-10" style={{ fontSize: "28px" }}>{theme.closing.subline}</p>
+        <p className="font-bold relative z-10" style={{ fontSize: "48px", color: accent }}>{c.broker_name}</p>
+        <div className="space-y-3 text-white/40 mt-5 relative z-10" style={{ fontSize: "26px" }}>
           {c.broker_phone && <p>{c.broker_phone}</p>}
           {c.broker_email && <p>{c.broker_email}</p>}
         </div>
@@ -185,8 +185,8 @@ export function LayoutPremium({ section, branding, theme, colors }: Props) {
                 <div className="mx-auto w-20 h-20 rounded-full flex items-center justify-center" style={{ background: `linear-gradient(135deg, ${accent}15, ${accent}05)` }}>
                   <Icon className="h-10 w-10" style={{ color: accent }} />
                 </div>
-                <h3 className="font-bold" style={{ fontSize: "24px", color: primary }}>{obj.title}</h3>
-                {obj.description && <p className="leading-relaxed" style={{ fontSize: "20px", color: textMuted }}>{obj.description}</p>}
+                <h3 className="font-bold" style={{ fontSize: "28px", color: primary }}>{obj.title}</h3>
+                {obj.description && <p className="leading-relaxed" style={{ fontSize: "24px", color: textMuted }}>{obj.description}</p>}
               </div>
             );
           })}
@@ -207,8 +207,8 @@ export function LayoutPremium({ section, branding, theme, colors }: Props) {
         <div className="grid grid-cols-3 gap-10 mb-14">
           {props.map((p: any, i: number) => (
             <div key={i} className="border-l-[4px] pl-8 py-4" style={{ borderColor: accent }}>
-              <h3 className="font-bold text-white mb-4" style={{ fontSize: "24px" }}>{p.title}</h3>
-              {p.description && <p className="leading-relaxed text-white/50" style={{ fontSize: "20px" }}>{p.description}</p>}
+              <h3 className="font-bold text-white mb-4" style={{ fontSize: "28px" }}>{p.title}</h3>
+              {p.description && <p className="leading-relaxed text-white/50" style={{ fontSize: "24px" }}>{p.description}</p>}
             </div>
           ))}
         </div>
@@ -243,9 +243,9 @@ export function LayoutPremium({ section, branding, theme, colors }: Props) {
               <div className="w-14 h-14 rounded-full flex items-center justify-center shrink-0" style={{ background: `linear-gradient(135deg, ${doc.required ? accent + "15" : primary + "10"}, transparent)` }}>
                 {doc.required ? <CheckCircle className="h-7 w-7" style={{ color: accent }} /> : <FileText className="h-7 w-7" style={{ color: primary }} />}
               </div>
-              <p className="font-semibold flex-1" style={{ fontSize: "22px", color: primary }}>{doc.title}</p>
+              <p className="font-semibold flex-1" style={{ fontSize: "26px", color: primary }}>{doc.title}</p>
               <span className="font-bold uppercase tracking-wider px-5 py-2 rounded-full" style={{
-                fontSize: "16px",
+                fontSize: "18px",
                 backgroundColor: doc.required ? accent + "12" : primary + "08",
                 color: doc.required ? accent : primary,
               }}>
@@ -281,7 +281,7 @@ export function LayoutPremium({ section, branding, theme, colors }: Props) {
               <div className={hasVisual ? "grid grid-cols-2 gap-12 items-start" : ""}>
                 <div className="space-y-6">
                   {c.text && <p className="slide-body whitespace-pre-wrap max-w-[650px]" style={{ color: textMuted }}>{c.text}</p>}
-                  {stats?.presence_text && <p className="font-bold tracking-wider uppercase mt-4" style={{ fontSize: "20px", color: accent }}>{stats.presence_text}</p>}
+                  {stats?.presence_text && <p className="font-bold tracking-wider uppercase mt-4" style={{ fontSize: "24px", color: accent }}>{stats.presence_text}</p>}
                   {statItems.length > 0 && (
                     <div className="flex flex-wrap gap-6 mt-6">
                       {statItems.map((s, i) => (
@@ -289,8 +289,8 @@ export function LayoutPremium({ section, branding, theme, colors }: Props) {
                           borderRadius: theme.card.borderRadius,
                           border: theme.card.border ? `1px solid ${accent}20` : "none",
                         }}>
-                          <p className="slide-metric" style={{ fontSize: "42px", color: primary }}>{typeof s.value === "number" ? s.value.toLocaleString("pt-BR") : s.value}</p>
-                          <p className="uppercase tracking-wider mt-2" style={{ fontSize: "14px", color: colors.textLight }}>{s.label}</p>
+                          <p className="slide-metric" style={{ fontSize: "52px", color: primary }}>{typeof s.value === "number" ? s.value.toLocaleString("pt-BR") : s.value}</p>
+                          <p className="uppercase tracking-wider mt-2" style={{ fontSize: "18px", color: colors.textLight }}>{s.label}</p>
                         </div>
                       ))}
                     </div>
@@ -299,7 +299,7 @@ export function LayoutPremium({ section, branding, theme, colors }: Props) {
                     <div className="flex flex-wrap gap-6 mt-6">
                       {c.regional_numbers.split("|").map((item: string, i: number) => (
                         <div key={i} className="px-8 py-5 rounded" style={{ backgroundColor: accent + "10" }}>
-                          <p className="font-bold" style={{ fontSize: "22px", color: primary }}>{item.trim()}</p>
+                          <p className="font-bold" style={{ fontSize: "26px", color: primary }}>{item.trim()}</p>
                         </div>
                       ))}
                     </div>
@@ -337,10 +337,10 @@ export function LayoutPremium({ section, branding, theme, colors }: Props) {
           <div className="grid grid-cols-2 gap-x-12 gap-y-8">
             {c.actions.map((a: any, i: number) => (
               <div key={i} className="flex items-baseline gap-5">
-                <span className="slide-metric" style={{ fontSize: "30px", color: accent }}>{String(i + 1).padStart(2, "0")}</span>
+                <span className="slide-metric" style={{ fontSize: "36px", color: accent }}>{String(i + 1).padStart(2, "0")}</span>
                 <div>
-                  <h4 className="font-semibold" style={{ fontSize: "22px", color: primary }}>{a.title}</h4>
-                  {a.description && <p className="mt-3 leading-relaxed" style={{ fontSize: "19px", color: colors.textLight }}>{a.description}</p>}
+                  <h4 className="font-semibold" style={{ fontSize: "26px", color: primary }}>{a.title}</h4>
+                  {a.description && <p className="mt-3 leading-relaxed" style={{ fontSize: "22px", color: colors.textLight }}>{a.description}</p>}
                 </div>
               </div>
             ))}
@@ -348,7 +348,7 @@ export function LayoutPremium({ section, branding, theme, colors }: Props) {
         )}
 
         {c.items && <SlideItemList items={c.items} colors={colors} />}
-        {c.scenarios && <SlideScenarios scenarios={c.scenarios} colors={colors} metricSize="56px" />}
+        {c.scenarios && <SlideScenarios scenarios={c.scenarios} colors={colors} metricSize="64px" />}
 
         {!c.text && !c.actions && !c.items && !c.scenarios && (
           <p className="italic" style={{ fontSize: "22px", color: "#D1D5DB" }}>Conteúdo não preenchido</p>

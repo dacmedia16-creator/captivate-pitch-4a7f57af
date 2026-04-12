@@ -14,14 +14,14 @@ export const themePremium: SlideTheme = {
   },
   cover: {
     overlay: (primary, deep) => `linear-gradient(135deg, ${deep}ee 0%, ${primary}cc 50%, ${primary}88 100%)`,
-    titleSize: "72px",
+    titleSize: "84px",
     locationStyle: "dash",
     barType: "gradient",
     logoPosition: "top-left",
   },
   heading: {
     textTransform: "none",
-    titleSize: "48px",
+    titleSize: "56px",
   },
   divider: {
     width: "100%",
@@ -34,8 +34,8 @@ export const themePremium: SlideTheme = {
     shadow: false,
   },
   metric: {
-    size: "64px",
-    labelSize: "16px",
+    size: "72px",
+    labelSize: "18px",
     labelTracking: "0.20em",
   },
   closing: {

@@ -11,7 +11,7 @@ interface SlideScenariosProps {
   metricSize?: string;
 }
 
-export function SlideScenarios({ scenarios, colors, metricSize = "64px" }: SlideScenariosProps) {
+export function SlideScenarios({ scenarios, colors, metricSize = "72px" }: SlideScenariosProps) {
   if (!scenarios?.length) return null;
 
   const palette = [colors.accent, colors.primary, "#16a34a"];
