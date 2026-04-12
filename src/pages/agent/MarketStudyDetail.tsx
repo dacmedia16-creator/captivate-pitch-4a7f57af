@@ -13,6 +13,7 @@ import { Loader2, Check, X, Plus, TrendingUp, TrendingDown, Minus, Calculator } 
 import { toast } from "sonner";
 import { calculateMarketPrices, useSaveMarketReport, type MarketCalcResult } from "@/hooks/useMarketCalculations";
 import { logAudit } from "@/hooks/useAuditLog";
+import { MarketPriceBarChart, MarketScatterChart, MarketStats, type ComparableChartData } from "@/components/charts/MarketCharts";
 
 function formatBRL(value: number | null) {
   if (!value) return "—";
@@ -171,6 +172,39 @@ export default function MarketStudyDetail() {
             </CardContent>
           </Card>
         </div>
+      )}
+
+      {/* Charts */}
+      {comparables && comparables.length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Card className="glass-card">
+            <CardHeader className="pb-2"><CardTitle className="text-sm">Preços dos Comparáveis</CardTitle><CardDescription className="text-xs">Comparação com valor pretendido</CardDescription></CardHeader>
+            <CardContent>
+              <MarketPriceBarChart
+                comparables={comparables.filter(c => c.price && c.area).map(c => ({ title: c.title || "", price: c.price!, area: c.area!, price_per_sqm: c.price_per_sqm || 0 }))}
+                ownerExpectedPrice={pres?.owner_expected_price}
+              />
+            </CardContent>
+          </Card>
+          <Card className="glass-card">
+            <CardHeader className="pb-2"><CardTitle className="text-sm">Preço/m² vs Área</CardTitle><CardDescription className="text-xs">Dispersão dos comparáveis</CardDescription></CardHeader>
+            <CardContent>
+              <MarketScatterChart
+                comparables={comparables.filter(c => c.price && c.area).map(c => ({ title: c.title || "", price: c.price!, area: c.area!, price_per_sqm: c.price_per_sqm || 0 }))}
+              />
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Stats */}
+      {report && (
+        <MarketStats
+          avgPrice={report.avg_price}
+          medianPrice={report.median_price}
+          avgPricePerSqm={report.avg_price_per_sqm}
+          totalComparables={comparables?.length}
+        />
       )}
 
       {/* Actions bar */}
