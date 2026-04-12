@@ -237,6 +237,16 @@ export default function CompanyBranding() {
               <Textarea value={agencyForm.about_regional} onChange={(e) => set("about_regional", e.target.value)} rows={6} placeholder="Conteúdo regional..." />
               <div className="space-y-2"><Label>Números regionais</Label><Textarea value={agencyForm.regional_numbers} onChange={(e) => set("regional_numbers", e.target.value)} rows={4} placeholder="Dados e métricas regionais..." /></div>
               <div className="space-y-2"><Label>Imagem do slide</Label><ImageUploader value={agencyForm.about_regional_image_url} onChange={(v) => set("about_regional_image_url", v)} folder="agency" /></div>
+              <div className="border-t pt-4 space-y-4">
+                <p className="text-sm font-semibold">Estatísticas Regionais</p>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1"><Label>Ranking</Label><Input value={agencyForm.about_regional_stats?.rank || ""} onChange={(e) => set("about_regional_stats", { ...(agencyForm.about_regional_stats || {}), rank: e.target.value })} /></div>
+                  <div className="space-y-1"><Label>Agências</Label><Input type="number" value={agencyForm.about_regional_stats?.agencies || ""} onChange={(e) => set("about_regional_stats", { ...(agencyForm.about_regional_stats || {}), agencies: Number(e.target.value) || 0 })} /></div>
+                  <div className="space-y-1"><Label>Corretores</Label><Input type="number" value={agencyForm.about_regional_stats?.brokers || ""} onChange={(e) => set("about_regional_stats", { ...(agencyForm.about_regional_stats || {}), brokers: Number(e.target.value) || 0 })} /></div>
+                  <div className="space-y-1"><Label>Franquias</Label><Input type="number" value={agencyForm.about_regional_stats?.franchises || ""} onChange={(e) => set("about_regional_stats", { ...(agencyForm.about_regional_stats || {}), franchises: Number(e.target.value) || 0 })} /></div>
+                </div>
+                <div className="space-y-1"><Label>Texto de presença</Label><Input value={agencyForm.about_regional_stats?.presence_text || ""} onChange={(e) => set("about_regional_stats", { ...(agencyForm.about_regional_stats || {}), presence_text: e.target.value })} /></div>
+              </div>
               <Button onClick={() => saveAgency.mutate()} disabled={saveAgency.isPending}><Save className="h-4 w-4 mr-1" />Salvar</Button>
             </CardContent>
           </Card>
