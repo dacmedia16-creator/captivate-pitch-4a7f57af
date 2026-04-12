@@ -93,27 +93,25 @@ export default function AgentNewPresentation() {
 
       if (presError || !pres) throw presError || new Error("Erro ao criar apresentação");
 
-      // Save photos
-      if (propertyData.photos.length > 0) {
-        const images = propertyData.photos.map((url, i) => ({
-          presentation_id: pres.id,
-          image_url: url,
-          sort_order: i,
-        }));
-        await supabase.from("presentation_images").insert(images);
-      }
+      // Save photos and market job in parallel
+      const photosPromise = propertyData.photos.length > 0
+        ? supabase.from("presentation_images").insert(
+            propertyData.photos.map((url, i) => ({ presentation_id: pres.id, image_url: url, sort_order: i }))
+          )
+        : Promise.resolve(null);
 
-      // Save market analysis job if portals selected, generate simulated comparables
-      let marketReport: any = null;
-      let generatedComparables: any[] = [];
-      let marketCalc: any = null;
+      let portalSourcesPromise: Promise<any> = Promise.resolve(null);
       if (marketData.selectedPortals.length > 0) {
-        // Fetch portal names for simulation
-        const { data: portalSources } = await supabase
+        portalSourcesPromise = supabase
           .from("portal_sources")
           .select("id, name")
           .in("id", marketData.selectedPortals);
+      }
 
+      const [, portalSourcesRes] = await Promise.all([photosPromise, portalSourcesPromise]);
+
+      // Market analysis (sequential because each step depends on previous)
+      if (marketData.selectedPortals.length > 0) {
         const { data: job, error: jobError } = await supabase.from("market_analysis_jobs").insert({
           presentation_id: pres.id,
           tenant_id: profile.tenant_id,
@@ -131,9 +129,8 @@ export default function AgentNewPresentation() {
         }).select().single();
 
         if (job && !jobError) {
-          const portals = (portalSources || []).map(p => ({ id: p.id, name: p.name }));
+          const portals = (portalSourcesRes?.data || []).map((p: any) => ({ id: p.id, name: p.name }));
           generatedComparables = generateSimulatedComparables(job.id, propertyData, portals);
-          await supabase.from("market_comparables").insert(generatedComparables);
 
           marketCalc = calculateMarketPrices(generatedComparables.map(c => ({
             price: c.price,
@@ -141,24 +138,27 @@ export default function AgentNewPresentation() {
             is_approved: c.is_approved,
           })));
 
-          const { data: report } = await supabase.from("market_reports").insert({
-            market_analysis_job_id: job.id,
-            avg_price: marketCalc.avg_price,
-            median_price: marketCalc.median_price,
-            avg_price_per_sqm: marketCalc.avg_price_per_sqm,
-            suggested_market_price: marketCalc.suggested_market_price,
-            suggested_aspirational_price: marketCalc.suggested_aspirational_price,
-            suggested_fast_sale_price: marketCalc.suggested_fast_sale_price,
-            confidence_level: "medium",
-            summary: `Análise baseada em ${generatedComparables.length} comparáveis simulados.`,
-          }).select().single();
+          // Insert comparables and report in parallel
+          const [, reportRes] = await Promise.all([
+            supabase.from("market_comparables").insert(generatedComparables),
+            supabase.from("market_reports").insert({
+              market_analysis_job_id: job.id,
+              avg_price: marketCalc.avg_price,
+              median_price: marketCalc.median_price,
+              avg_price_per_sqm: marketCalc.avg_price_per_sqm,
+              suggested_market_price: marketCalc.suggested_market_price,
+              suggested_aspirational_price: marketCalc.suggested_aspirational_price,
+              suggested_fast_sale_price: marketCalc.suggested_fast_sale_price,
+              confidence_level: "medium",
+              summary: `Análise baseada em ${generatedComparables.length} comparáveis simulados.`,
+            }).select().single(),
+            supabase.from("market_analysis_jobs").update({
+              status: "completed",
+              finished_at: new Date().toISOString(),
+            }).eq("id", job.id),
+          ]);
 
-          marketReport = report;
-
-          await supabase.from("market_analysis_jobs").update({
-            status: "completed",
-            finished_at: new Date().toISOString(),
-          }).eq("id", job.id);
+          marketReport = reportRes?.data;
         }
       }
 
@@ -172,44 +172,40 @@ export default function AgentNewPresentation() {
         brokerId: user.id,
       });
 
-      // Update pricing_scenarios and market_study_placeholder sections
+      // Update pricing_scenarios and market_study_placeholder sections in parallel
       if (marketReport) {
-        // Update pricing_scenarios
-        await supabase.from("presentation_sections")
-          .update({
-            content: {
-              owner_expected_price: propertyData.owner_expected_price ? Number(propertyData.owner_expected_price) : null,
-              scenarios: [
-                { label: "Preço aspiracional", value: marketReport.suggested_aspirational_price },
-                { label: "Preço de mercado", value: marketReport.suggested_market_price },
-                { label: "Preço de venda rápida", value: marketReport.suggested_fast_sale_price },
-              ],
-            } as any,
-          })
-          .eq("presentation_id", pres.id)
-          .eq("section_key", "pricing_scenarios");
-
-        // Update market_study_placeholder with chart data
         const chartComparables = generatedComparables.map((c: any) => ({
-          title: c.title,
-          price: c.price,
-          area: c.area,
-          price_per_sqm: c.price_per_sqm,
+          title: c.title, price: c.price, area: c.area, price_per_sqm: c.price_per_sqm,
         }));
 
-        await supabase.from("presentation_sections")
-          .update({
-            content: {
-              comparables: chartComparables,
-              owner_expected_price: propertyData.owner_expected_price ? Number(propertyData.owner_expected_price) : null,
-              avg_price: marketCalc?.avg_price,
-              median_price: marketCalc?.median_price,
-              avg_price_per_sqm: marketCalc?.avg_price_per_sqm,
-              status: "completed",
-            } as any,
-          })
-          .eq("presentation_id", pres.id)
-          .eq("section_key", "market_study_placeholder");
+        await Promise.all([
+          supabase.from("presentation_sections")
+            .update({
+              content: {
+                owner_expected_price: propertyData.owner_expected_price ? Number(propertyData.owner_expected_price) : null,
+                scenarios: [
+                  { label: "Preço aspiracional", value: marketReport.suggested_aspirational_price },
+                  { label: "Preço de mercado", value: marketReport.suggested_market_price },
+                  { label: "Preço de venda rápida", value: marketReport.suggested_fast_sale_price },
+                ],
+              } as any,
+            })
+            .eq("presentation_id", pres.id)
+            .eq("section_key", "pricing_scenarios"),
+          supabase.from("presentation_sections")
+            .update({
+              content: {
+                comparables: chartComparables,
+                owner_expected_price: propertyData.owner_expected_price ? Number(propertyData.owner_expected_price) : null,
+                avg_price: marketCalc?.avg_price,
+                median_price: marketCalc?.median_price,
+                avg_price_per_sqm: marketCalc?.avg_price_per_sqm,
+                status: "completed",
+              } as any,
+            })
+            .eq("presentation_id", pres.id)
+            .eq("section_key", "market_study_placeholder"),
+        ]);
       }
     } catch (err: any) {
       toast.error("Erro ao gerar: " + (err.message || "erro desconhecido"));

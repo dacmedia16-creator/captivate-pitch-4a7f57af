@@ -20,8 +20,10 @@ export default function AgentDashboard() {
   const navigate = useNavigate();
   const uid = user?.id;
 
+  const tenantId = profile?.tenant_id;
+
   const { data: stats, isLoading } = useQuery({
-    queryKey: ["agent-stats", uid],
+    queryKey: ["agent-stats", uid, tenantId],
     queryFn: async () => {
       const now = new Date();
       const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
@@ -29,12 +31,12 @@ export default function AgentDashboard() {
         supabase.from("presentations").select("id", { count: "exact", head: true }).eq("broker_id", uid!),
         supabase.from("presentations").select("id", { count: "exact", head: true }).eq("broker_id", uid!).gte("created_at", monthStart),
         supabase.from("export_history").select("id", { count: "exact", head: true }).eq("created_by", uid!),
-        supabase.from("market_analysis_jobs").select("id", { count: "exact", head: true }),
-        supabase.from("presentation_templates").select("id", { count: "exact", head: true }),
+        supabase.from("market_analysis_jobs").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId!),
+        supabase.from("presentation_templates").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId!),
       ]);
       return { total: total.count || 0, monthly: monthly.count || 0, exports: exports.count || 0, studies: studies.count || 0, templates: templates.count || 0 };
     },
-    enabled: !!uid,
+    enabled: !!uid && !!tenantId,
   });
 
   const { data: recentPresentations } = useQuery({

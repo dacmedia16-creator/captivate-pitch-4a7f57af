@@ -65,23 +65,29 @@ serve(async (req) => {
     }
     // --- END AUTH ---
 
-    // Fetch branding
-    const { data: branding } = await supabase.from("agency_profiles").select("*").eq("tenant_id", pres.tenant_id).single();
+    // Fetch branding, broker, profile, and jobs in parallel
+    const [brandingRes, brokerRes, brokerProfileRes, jobsRes] = await Promise.all([
+      supabase.from("agency_profiles").select("*").eq("tenant_id", pres.tenant_id).single(),
+      supabase.from("broker_profiles").select("*").eq("user_id", pres.broker_id).single(),
+      supabase.from("profiles").select("full_name, email, phone").eq("id", pres.broker_id).single(),
+      supabase.from("market_analysis_jobs").select("id").eq("presentation_id", presentation_id),
+    ]);
 
-    // Fetch broker
-    const { data: broker } = await supabase.from("broker_profiles").select("*").eq("user_id", pres.broker_id).single();
-    const { data: brokerProfile } = await supabase.from("profiles").select("full_name, email, phone").eq("id", pres.broker_id).single();
+    const branding = brandingRes.data;
+    const broker = brokerRes.data;
+    const brokerProfile = brokerProfileRes.data;
+    const jobs = jobsRes.data;
 
-    // Fetch approved comparables
-    const { data: jobs } = await supabase.from("market_analysis_jobs").select("id").eq("presentation_id", presentation_id);
     let comparables: any[] = [];
     let report: any = null;
     if (jobs && jobs.length > 0) {
       const jobId = jobs[0].id;
-      const { data: comps } = await supabase.from("market_comparables").select("*").eq("market_analysis_job_id", jobId).eq("is_approved", true);
-      comparables = comps || [];
-      const { data: rep } = await supabase.from("market_reports").select("*").eq("market_analysis_job_id", jobId).single();
-      report = rep;
+      const [compsRes, repRes] = await Promise.all([
+        supabase.from("market_comparables").select("*").eq("market_analysis_job_id", jobId).eq("is_approved", true),
+        supabase.from("market_reports").select("*").eq("market_analysis_job_id", jobId).single(),
+      ]);
+      comparables = compsRes.data || [];
+      report = repRes.data;
     }
 
     // Build AI prompt

@@ -51,9 +51,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (profileRes.data) {
         setProfile(profileRes.data);
 
+        // Fetch tenant name in parallel (non-blocking for UI)
         if (profileRes.data.tenant_id) {
-          const { data: tenantData } = await supabase.from("tenants").select("name").eq("id", profileRes.data.tenant_id).single();
-          setTenantName(tenantData?.name ?? null);
+          supabase.from("tenants").select("name").eq("id", profileRes.data.tenant_id).single()
+            .then(({ data: tenantData }) => setTenantName(tenantData?.name ?? null));
         }
       }
 
