@@ -1,6 +1,7 @@
 import { LayoutExecutivo } from "./LayoutExecutivo";
 import { LayoutPremium } from "./LayoutPremium";
 import { LayoutImpactoComercial } from "./LayoutImpactoComercial";
+import { getTheme, resolveColors } from "./themes";
 
 export interface SectionData {
   id: string;
@@ -18,12 +19,15 @@ interface SectionRendererProps {
 }
 
 export function SectionRenderer({ section, layout, branding }: SectionRendererProps) {
+  const theme = getTheme(layout);
+  const colors = resolveColors(theme, branding ?? undefined);
+
   switch (layout) {
     case "premium":
-      return <LayoutPremium section={section} branding={branding} />;
+      return <LayoutPremium section={section} branding={branding} theme={theme} colors={colors} />;
     case "impacto":
-      return <LayoutImpactoComercial section={section} branding={branding} />;
+      return <LayoutImpactoComercial section={section} branding={branding} theme={theme} colors={colors} />;
     default:
-      return <LayoutExecutivo section={section} branding={branding} />;
+      return <LayoutExecutivo section={section} branding={branding} theme={theme} colors={colors} />;
   }
 }

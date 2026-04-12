@@ -2,38 +2,34 @@ import { SectionData } from "./SectionRenderer";
 import { MarketPriceBarChart, MarketStats } from "@/components/charts/MarketCharts";
 import { BrazilPresenceMap } from "@/components/charts/BrazilPresenceMap";
 import { Key, BarChart3, ClipboardCheck, FileText, CheckCircle } from "lucide-react";
+import { SlideTheme, ResolvedColors } from "./themes/theme.types";
+import { SlideLabel, SlideDivider, SlideMetricRow, SlideImageGrid, SlideScenarios, SlideItemList, SlideStatBar } from "./slide-components";
 
 interface Props {
   section: SectionData;
   branding?: { primary_color?: string | null; secondary_color?: string | null; logo_url?: string | null };
+  theme: SlideTheme;
+  colors: ResolvedColors;
 }
 
-const FONT = "'Gotham', 'Montserrat', sans-serif";
-const BLUE = "#003DA5";
-const DEEP = "#001F5C";
-const RED = "#DC1431";
-
-export function LayoutImpactoComercial({ section, branding }: Props) {
+export function LayoutImpactoComercial({ section, branding, theme, colors }: Props) {
   const c = section.content || {};
-  const primary = branding?.primary_color || BLUE;
-  const accent = branding?.secondary_color || RED;
-
-  const SectionLabel = ({ children, light }: { children: React.ReactNode; light?: boolean }) => (
-    <p className="slide-label font-bold" style={{ color: light ? "rgba(255,255,255,0.5)" : accent }}>{children}</p>
-  );
+  const { primary, accent, deep, textMuted } = colors;
+  const FONT = theme.font;
+  const textTransform = theme.heading.textTransform as any;
 
   /* ═══════ COVER ═══════ */
   if (section.section_key === "cover") {
     return (
-      <div className="relative min-h-[500px] overflow-hidden flex flex-col justify-end text-white" style={{ fontFamily: FONT }}>
+      <div className="relative w-full h-full overflow-hidden flex flex-col justify-end text-white" style={{ fontFamily: FONT }}>
         {c.cover_image && <img src={c.cover_image} alt="" className="absolute inset-0 w-full h-full object-cover" />}
-        <div className="absolute inset-0" style={{ background: `linear-gradient(180deg, transparent 5%, ${DEEP}99 40%, ${DEEP} 100%)` }} />
-        {c.logo_url && <img src={c.logo_url} alt="" className="absolute top-6 right-8 h-8 object-contain opacity-80" />}
-        <div className="relative z-10 p-10 pb-12">
-          <div className="w-16 h-1 mb-5" style={{ backgroundColor: accent }} />
-          <h1 className="slide-title text-[52px] text-white uppercase leading-[1] max-w-lg">{c.title}</h1>
-          <p className="text-[13px] font-bold tracking-[0.3em] uppercase mt-5" style={{ color: accent }}>{[c.neighborhood, c.city].filter(Boolean).join(" · ")}</p>
-          {c.broker_name && <p className="text-[12px] text-white/35 mt-3 tracking-wide">{c.broker_name} | {c.agency_name}</p>}
+        <div className="absolute inset-0" style={{ background: theme.cover.overlay(primary, deep) }} />
+        {c.logo_url && <img src={c.logo_url} alt="" className="absolute top-10 right-12 h-12 object-contain opacity-80" />}
+        <div className="relative z-10 p-14 pb-16">
+          <div className="w-20 h-1 mb-6" style={{ backgroundColor: accent }} />
+          <h1 className="slide-title text-white uppercase leading-[1] max-w-[900px]" style={{ fontSize: theme.cover.titleSize }}>{c.title}</h1>
+          <p className="font-bold tracking-[0.3em] uppercase mt-6" style={{ fontSize: "17px", color: accent }}>{[c.neighborhood, c.city].filter(Boolean).join(" · ")}</p>
+          {c.broker_name && <p className="text-white/35 mt-4 tracking-wide" style={{ fontSize: "16px" }}>{c.broker_name} | {c.agency_name}</p>}
         </div>
       </div>
     );
@@ -42,26 +38,26 @@ export function LayoutImpactoComercial({ section, branding }: Props) {
   /* ═══════ BROKER INTRO ═══════ */
   if (section.section_key === "broker_intro") {
     return (
-      <div className="min-h-[500px] bg-white flex" style={{ fontFamily: FONT }}>
-        <div className="flex-1 p-10 flex flex-col justify-center">
-          <SectionLabel>Seu consultor</SectionLabel>
-          <h2 className="slide-title text-[38px] mt-3 uppercase" style={{ color: primary }}>{c.name}</h2>
-          {c.creci && <p className="text-[11px] tracking-[0.25em] mt-1 mb-6" style={{ color: "#9CA3AF" }}>CRECI {c.creci}</p>}
-          <div className="w-10 h-1 mb-5" style={{ backgroundColor: accent }} />
-          {c.short_bio && <p className="slide-body max-w-sm" style={{ color: "#6B7280" }}>{c.short_bio}</p>}
-          {c.education && <p className="text-[12px] mt-2" style={{ color: "#9CA3AF" }}>🎓 {c.education}</p>}
-          {c.service_regions && <p className="text-[12px] mt-1" style={{ color: "#9CA3AF" }}>📍 {c.service_regions}</p>}
-          <div className="flex gap-5 mt-8">
+      <div className="w-full h-full bg-white flex" style={{ fontFamily: FONT }}>
+        <div className="flex-1 p-14 flex flex-col justify-center">
+          <SlideLabel color={accent} bold>Seu consultor</SlideLabel>
+          <h2 className="slide-title mt-4 uppercase" style={{ fontSize: "42px", color: primary }}>{c.name}</h2>
+          {c.creci && <p className="tracking-[0.25em] mt-2 mb-8" style={{ fontSize: "14px", color: colors.textLight }}>CRECI {c.creci}</p>}
+          <div className="w-14 h-1 mb-6" style={{ backgroundColor: accent }} />
+          {c.short_bio && <p className="slide-body max-w-[500px]" style={{ fontSize: "18px", color: textMuted }}>{c.short_bio}</p>}
+          {c.education && <p className="mt-3" style={{ fontSize: "16px", color: colors.textLight }}>🎓 {c.education}</p>}
+          {c.service_regions && <p className="mt-2" style={{ fontSize: "16px", color: colors.textLight }}>📍 {c.service_regions}</p>}
+          <div className="flex gap-6 mt-10">
             {c.years_in_market && (
-              <div className="px-6 py-4 text-white" style={{ backgroundColor: accent }}>
-                <p className="slide-metric text-[28px]">{c.years_in_market}</p>
-                <p className="text-[9px] uppercase tracking-[0.25em] opacity-80 mt-1">Anos</p>
+              <div className="px-8 py-5 text-white" style={{ backgroundColor: accent }}>
+                <p className="slide-metric" style={{ fontSize: "36px" }}>{c.years_in_market}</p>
+                <p className="uppercase tracking-[0.25em] opacity-80 mt-2" style={{ fontSize: "12px" }}>Anos</p>
               </div>
             )}
             {c.specialties && (
-              <div className="px-6 py-4 border-2" style={{ borderColor: primary, color: primary }}>
-                <p className="text-[13px] font-bold">{c.specialties}</p>
-                <p className="text-[9px] uppercase tracking-[0.25em] opacity-50 mt-1">Especialidade</p>
+              <div className="px-8 py-5 border-2" style={{ borderColor: primary, color: primary }}>
+                <p className="font-bold" style={{ fontSize: "17px" }}>{c.specialties}</p>
+                <p className="uppercase tracking-[0.25em] opacity-50 mt-2" style={{ fontSize: "12px" }}>Especialidade</p>
               </div>
             )}
           </div>
@@ -78,27 +74,26 @@ export function LayoutImpactoComercial({ section, branding }: Props) {
   /* ═══════ PROPERTY SUMMARY ═══════ */
   if (section.section_key === "property_summary") {
     return (
-      <div className="min-h-[500px] bg-white" style={{ fontFamily: FONT }}>
-        {c.images?.length > 0 && <img src={c.images[0]} alt="" className="w-full h-56 object-cover" />}
-        <div className="p-10 space-y-5">
-          <SectionLabel>O imóvel</SectionLabel>
-          <h2 className="slide-title text-[32px] uppercase" style={{ color: primary }}>{c.title || section.title}</h2>
-          <div className="w-10 h-1" style={{ backgroundColor: accent }} />
-          <div className="flex gap-8 py-2">
-            {[
+      <div className="w-full h-full bg-white" style={{ fontFamily: FONT }}>
+        {c.images?.length > 0 && <img src={c.images[0]} alt="" className="w-full object-cover" style={{ height: 420 }} />}
+        <div className="p-14 space-y-6">
+          <SlideLabel color={accent} bold>O imóvel</SlideLabel>
+          <h2 className="slide-title uppercase" style={{ fontSize: "36px", color: primary }}>{c.title || section.title}</h2>
+          <div className="w-14 h-1" style={{ backgroundColor: accent }} />
+          <SlideMetricRow
+            items={[
               { label: "M²", value: c.area_total },
               { label: "QUARTOS", value: c.bedrooms },
               { label: "SUÍTES", value: c.suites },
               { label: "VAGAS", value: c.parking_spots },
-            ].filter(i => i.value).map((item, i) => (
-              <div key={i}>
-                <p className="slide-metric text-[34px]" style={{ color: primary }}>{item.value}</p>
-                <p className="slide-label" style={{ color: "#9CA3AF" }}>{item.label}</p>
-              </div>
-            ))}
-          </div>
+            ]}
+            colors={colors}
+            metricSize={theme.metric.size}
+            labelSize={theme.metric.labelSize}
+            labelTracking={theme.metric.labelTracking}
+          />
           {c.highlights && (
-            <p className="slide-body border-l-4 pl-5" style={{ borderColor: accent, color: "#6B7280" }}>{c.highlights}</p>
+            <p className="slide-body border-l-4 pl-6" style={{ borderColor: accent, color: textMuted, fontSize: "17px" }}>{c.highlights}</p>
           )}
         </div>
       </div>
@@ -108,16 +103,16 @@ export function LayoutImpactoComercial({ section, branding }: Props) {
   /* ═══════ DIFFERENTIALS ═══════ */
   if (section.section_key === "differentials") {
     return (
-      <div className="min-h-[500px] text-white p-10" style={{ backgroundColor: DEEP, fontFamily: FONT }}>
-        <SectionLabel light>Por que nos escolher</SectionLabel>
-        <h2 className="slide-title text-[30px] text-white uppercase mt-2 mb-8">{section.title || "Nossos diferenciais"}</h2>
-        <div className="grid grid-cols-2 gap-x-10 gap-y-6">
+      <div className="w-full h-full text-white p-14" style={{ backgroundColor: deep, fontFamily: FONT }}>
+        <SlideLabel color="rgba(255,255,255,0.5)" bold>Por que nos escolher</SlideLabel>
+        <h2 className="slide-title text-white uppercase mt-3 mb-10" style={{ fontSize: "34px" }}>{section.title || "Nossos diferenciais"}</h2>
+        <div className="grid grid-cols-2 gap-x-12 gap-y-8">
           {(c.items || []).map((item: any, i: number) => (
-            <div key={i} className="flex items-start gap-4 py-4 border-b border-white/10 last:border-0">
-              <span className="slide-metric text-[24px] shrink-0" style={{ color: accent }}>{String(i + 1).padStart(2, "0")}</span>
+            <div key={i} className="flex items-start gap-5 py-5 border-b border-white/10 last:border-0">
+              <span className="slide-metric shrink-0" style={{ fontSize: "28px", color: accent }}>{String(i + 1).padStart(2, "0")}</span>
               <div>
-                <h4 className="font-bold text-[14px]" style={{ color: accent }}>{item.title}</h4>
-                {item.description && <p className="text-[12px] text-white/45 mt-1 leading-relaxed">{item.description}</p>}
+                <h4 className="font-bold" style={{ fontSize: "17px", color: accent }}>{item.title}</h4>
+                {item.description && <p className="text-white/45 mt-2 leading-relaxed" style={{ fontSize: "15px" }}>{item.description}</p>}
               </div>
             </div>
           ))}
@@ -129,23 +124,23 @@ export function LayoutImpactoComercial({ section, branding }: Props) {
   /* ═══════ RESULTS ═══════ */
   if (section.section_key === "results") {
     return (
-      <div className="min-h-[500px] bg-white p-10" style={{ fontFamily: FONT }}>
-        <SectionLabel>Resultados comprovados</SectionLabel>
-        <h2 className="slide-title text-[28px] uppercase mt-2 mb-8" style={{ color: primary }}>{section.title}</h2>
-        <div className="flex gap-6 mb-8">
+      <div className="w-full h-full bg-white p-14" style={{ fontFamily: FONT }}>
+        <SlideLabel color={accent} bold>Resultados comprovados</SlideLabel>
+        <h2 className="slide-title uppercase mt-3 mb-10" style={{ fontSize: theme.heading.titleSize, color: primary }}>{section.title}</h2>
+        <div className="flex gap-8 mb-10">
           {(c.items || []).slice(0, 3).map((item: any, i: number) => (
-            <div key={i} className="flex-1 py-6 text-center" style={{ backgroundColor: primary + "08" }}>
-              {item.metric_value && <p className="slide-metric text-[38px]" style={{ color: accent }}>{item.metric_value}</p>}
-              <p className="text-[12px] font-bold mt-2 uppercase tracking-[0.2em]" style={{ color: primary }}>{item.title}</p>
+            <div key={i} className="flex-1 py-8 text-center" style={{ backgroundColor: primary + "08" }}>
+              {item.metric_value && <p className="slide-metric" style={{ fontSize: "44px", color: accent }}>{item.metric_value}</p>}
+              <p className="font-bold mt-3 uppercase tracking-[0.2em]" style={{ fontSize: "14px", color: primary }}>{item.title}</p>
             </div>
           ))}
         </div>
         {c.testimonials?.length > 0 && (
-          <div className="space-y-4">
+          <div className="space-y-5">
             {c.testimonials.slice(0, 2).map((t: any, i: number) => (
-              <div key={i} className="py-5 border-t border-gray-100">
-                <p className="slide-body italic" style={{ color: "#6B7280" }}>"{t.content}"</p>
-                <p className="text-[13px] font-bold mt-3" style={{ color: primary }}>{t.author_name}</p>
+              <div key={i} className="py-6 border-t border-gray-100">
+                <p className="slide-body italic" style={{ fontSize: "17px", color: textMuted }}>"{t.content}"</p>
+                <p className="font-bold mt-4" style={{ fontSize: "16px", color: primary }}>{t.author_name}</p>
               </div>
             ))}
           </div>
@@ -157,12 +152,12 @@ export function LayoutImpactoComercial({ section, branding }: Props) {
   /* ═══════ MARKET STUDY ═══════ */
   if (section.section_key === "market_study_placeholder" && c.comparables?.length > 0) {
     return (
-      <div className="min-h-[500px] bg-white p-10" style={{ fontFamily: FONT }}>
-        <SectionLabel>Análise de mercado</SectionLabel>
-        <h2 className="slide-title text-[28px] uppercase mt-2 mb-6" style={{ color: primary }}>{section.title}</h2>
-        <div className="w-10 h-1 mb-6" style={{ backgroundColor: accent }} />
+      <div className="w-full h-full bg-white p-14" style={{ fontFamily: FONT }}>
+        <SlideLabel color={accent} bold>Análise de mercado</SlideLabel>
+        <h2 className="slide-title uppercase mt-3 mb-8" style={{ fontSize: theme.heading.titleSize, color: primary }}>{section.title}</h2>
+        <div className="w-14 h-1 mb-8" style={{ backgroundColor: accent }} />
         <MarketStats avgPrice={c.avg_price} medianPrice={c.median_price} avgPricePerSqm={c.avg_price_per_sqm} totalComparables={c.comparables.length} compact primaryColor={primary} accentColor={accent} />
-        <div className="mt-6">
+        <div className="mt-8">
           <MarketPriceBarChart comparables={c.comparables} ownerExpectedPrice={c.owner_expected_price} compact primaryColor={primary} accentColor={accent} />
         </div>
       </div>
@@ -172,14 +167,14 @@ export function LayoutImpactoComercial({ section, branding }: Props) {
   /* ═══════ CLOSING ═══════ */
   if (section.section_key === "closing") {
     return (
-      <div className="min-h-[500px] flex flex-col items-center justify-center text-center text-white p-12" style={{ backgroundColor: DEEP, fontFamily: FONT }}>
-        {c.logo_url && <img src={c.logo_url} alt="" className="h-12 object-contain mb-10 opacity-70" />}
-        <h2 className="slide-title text-[38px] text-white uppercase mb-3">Vamos fechar negócio?</h2>
-        <p className="text-white/35 text-[14px] font-light mb-8">Entre em contato agora mesmo.</p>
-        <div className="px-10 py-4 text-[18px] font-bold tracking-wider text-white" style={{ backgroundColor: accent }}>
+      <div className="w-full h-full flex flex-col items-center justify-center text-center text-white p-16" style={{ backgroundColor: deep, fontFamily: FONT }}>
+        {c.logo_url && <img src={c.logo_url} alt="" className="h-16 object-contain mb-14 opacity-70" />}
+        <h2 className="slide-title text-white uppercase mb-4" style={{ fontSize: "44px" }}>{theme.closing.headline}</h2>
+        <p className="text-white/35 font-light mb-10" style={{ fontSize: "18px" }}>{theme.closing.subline}</p>
+        <div className="px-12 py-5 font-bold tracking-wider text-white" style={{ fontSize: "22px", backgroundColor: accent }}>
           {c.broker_name}
         </div>
-        <div className="space-y-1 text-[13px] text-white/40 mt-6">
+        <div className="space-y-2 text-white/40 mt-8" style={{ fontSize: "17px" }}>
           {c.broker_phone && <p>{c.broker_phone}</p>}
           {c.broker_email && <p>{c.broker_email}</p>}
         </div>
@@ -192,20 +187,20 @@ export function LayoutImpactoComercial({ section, branding }: Props) {
     const objectives = c.objectives || [];
     const iconMap: Record<string, any> = { key: Key, chart: BarChart3, checklist: ClipboardCheck };
     return (
-      <div className="min-h-[500px] bg-white p-10 flex flex-col justify-center" style={{ fontFamily: FONT }}>
-        <SectionLabel>Nosso compromisso</SectionLabel>
-        <h2 className="slide-title text-[28px] uppercase mt-2 mb-8" style={{ color: primary }}>{section.title}</h2>
-        <div className="w-10 h-1 mb-8" style={{ backgroundColor: accent }} />
-        <div className="grid grid-cols-3 gap-6">
+      <div className="w-full h-full bg-white p-14 flex flex-col justify-center" style={{ fontFamily: FONT }}>
+        <SlideLabel color={accent} bold>Nosso compromisso</SlideLabel>
+        <h2 className="slide-title uppercase mt-3 mb-10" style={{ fontSize: theme.heading.titleSize, color: primary }}>{section.title}</h2>
+        <div className="w-14 h-1 mb-10" style={{ backgroundColor: accent }} />
+        <div className="grid grid-cols-3 gap-8">
           {objectives.map((obj: any, i: number) => {
             const Icon = iconMap[obj.icon] || Key;
             return (
-              <div key={i} className="text-center space-y-4 p-6" style={{ backgroundColor: primary + "06" }}>
-                <div className="mx-auto w-14 h-14 flex items-center justify-center" style={{ backgroundColor: accent }}>
-                  <Icon className="h-7 w-7 text-white" />
+              <div key={i} className="text-center space-y-5 p-8" style={{ backgroundColor: primary + "06" }}>
+                <div className="mx-auto w-16 h-16 flex items-center justify-center" style={{ backgroundColor: accent }}>
+                  <Icon className="h-8 w-8 text-white" />
                 </div>
-                <h3 className="font-bold text-[15px] uppercase tracking-wider" style={{ color: primary }}>{obj.title}</h3>
-                {obj.description && <p className="text-[12px] leading-relaxed" style={{ color: "#6B7280" }}>{obj.description}</p>}
+                <h3 className="font-bold uppercase tracking-wider" style={{ fontSize: "18px", color: primary }}>{obj.title}</h3>
+                {obj.description && <p className="leading-relaxed" style={{ fontSize: "15px", color: textMuted }}>{obj.description}</p>}
               </div>
             );
           })}
@@ -219,32 +214,28 @@ export function LayoutImpactoComercial({ section, branding }: Props) {
     const props = c.value_propositions || [];
     const stats = c.global_stats || {};
     return (
-      <div className="min-h-[500px] text-white p-10" style={{ backgroundColor: DEEP, fontFamily: FONT }}>
-        <SectionLabel light>Proposta de valor</SectionLabel>
-        <h2 className="slide-title text-[28px] text-white uppercase mt-2 mb-8">{section.title}</h2>
-        <div className="w-10 h-1 mb-8" style={{ backgroundColor: accent }} />
-        <div className="grid grid-cols-3 gap-6 mb-10">
+      <div className="w-full h-full text-white p-14" style={{ backgroundColor: deep, fontFamily: FONT }}>
+        <SlideLabel color="rgba(255,255,255,0.5)" bold>Proposta de valor</SlideLabel>
+        <h2 className="slide-title text-white uppercase mt-3 mb-10" style={{ fontSize: theme.heading.titleSize }}>{section.title}</h2>
+        <div className="w-14 h-1 mb-10" style={{ backgroundColor: accent }} />
+        <div className="grid grid-cols-3 gap-8 mb-12">
           {props.map((p: any, i: number) => (
-            <div key={i} className="py-4 border-t-2" style={{ borderColor: accent }}>
-              <h3 className="font-bold text-[15px] uppercase tracking-wider mb-2" style={{ color: accent }}>{p.title}</h3>
-              {p.description && <p className="text-[12px] leading-relaxed text-white/50">{p.description}</p>}
+            <div key={i} className="py-5 border-t-2" style={{ borderColor: accent }}>
+              <h3 className="font-bold uppercase tracking-wider mb-3" style={{ fontSize: "18px", color: accent }}>{p.title}</h3>
+              {p.description && <p className="leading-relaxed text-white/50" style={{ fontSize: "15px" }}>{p.description}</p>}
             </div>
           ))}
         </div>
-        {(stats.countries > 0 || stats.units > 0 || stats.brokers > 0) && (
-          <div className="flex gap-6">
-            {[
-              { label: "PAÍSES", value: stats.countries },
-              { label: "UNIDADES", value: stats.units?.toLocaleString("pt-BR") },
-              { label: "CORRETORES", value: stats.brokers?.toLocaleString("pt-BR") },
-            ].filter(s => s.value && s.value !== "0").map((s, i) => (
-              <div key={i} className="flex-1 text-center py-6" style={{ backgroundColor: accent }}>
-                <p className="slide-metric text-[34px] text-white">{s.value}</p>
-                <p className="text-[9px] uppercase tracking-[0.25em] text-white/80 mt-1">{s.label}</p>
-              </div>
-            ))}
-          </div>
-        )}
+        <SlideStatBar
+          items={[
+            { label: "PAÍSES", value: stats.countries },
+            { label: "UNIDADES", value: stats.units?.toLocaleString("pt-BR") },
+            { label: "CORRETORES", value: stats.brokers?.toLocaleString("pt-BR") },
+          ]}
+          colors={colors}
+          variant="accent-block"
+          borderRadius="0px"
+        />
       </div>
     );
   }
@@ -253,18 +244,19 @@ export function LayoutImpactoComercial({ section, branding }: Props) {
   if (section.section_key === "required_documentation") {
     const docs = c.documents || [];
     return (
-      <div className="min-h-[500px] bg-white p-10" style={{ fontFamily: FONT }}>
-        <SectionLabel>Documentação</SectionLabel>
-        <h2 className="slide-title text-[28px] uppercase mt-2 mb-8" style={{ color: primary }}>{section.title}</h2>
-        <div className="w-10 h-1 mb-8" style={{ backgroundColor: accent }} />
-        <div className="space-y-3">
+      <div className="w-full h-full bg-white p-14" style={{ fontFamily: FONT }}>
+        <SlideLabel color={accent} bold>Documentação</SlideLabel>
+        <h2 className="slide-title uppercase mt-3 mb-10" style={{ fontSize: theme.heading.titleSize, color: primary }}>{section.title}</h2>
+        <div className="w-14 h-1 mb-10" style={{ backgroundColor: accent }} />
+        <div className="space-y-4">
           {docs.map((doc: any, i: number) => (
-            <div key={i} className="flex items-center gap-4 p-4 border-b border-gray-100 last:border-0">
-              <div className="w-10 h-10 flex items-center justify-center shrink-0" style={{ backgroundColor: doc.required ? accent : primary + "15" }}>
-                {doc.required ? <CheckCircle className="h-5 w-5 text-white" /> : <FileText className="h-5 w-5" style={{ color: primary }} />}
+            <div key={i} className="flex items-center gap-5 p-5 border-b border-gray-100 last:border-0">
+              <div className="w-12 h-12 flex items-center justify-center shrink-0" style={{ backgroundColor: doc.required ? accent : primary + "15" }}>
+                {doc.required ? <CheckCircle className="h-6 w-6 text-white" /> : <FileText className="h-6 w-6" style={{ color: primary }} />}
               </div>
-              <p className="font-bold text-[14px] flex-1 uppercase tracking-wider" style={{ color: primary }}>{doc.title}</p>
-              <span className="text-[10px] font-bold uppercase tracking-[0.2em] px-3 py-1" style={{
+              <p className="font-bold flex-1 uppercase tracking-wider" style={{ fontSize: "17px", color: primary }}>{doc.title}</p>
+              <span className="font-bold uppercase tracking-[0.2em] px-4 py-1.5" style={{
+                fontSize: "12px",
                 backgroundColor: doc.required ? accent + "15" : primary + "08",
                 color: doc.required ? accent : primary,
               }}>
@@ -285,37 +277,37 @@ export function LayoutImpactoComercial({ section, branding }: Props) {
       { label: "AGÊNCIAS", value: stats.agencies },
       { label: "CORRETORES", value: stats.brokers },
       { label: "FRANQUIAS", value: stats.franchises },
-    ].filter(s => s.label && s.value) : [];
+    ].filter((s): s is { label: string; value: any } => !!s.label && !!s.value) : [];
 
     return (
-      <div className="min-h-[500px] bg-white p-10" style={{ fontFamily: FONT }}>
-        <SectionLabel>{section.section_key.replace(/_/g, " ")}</SectionLabel>
-        <h2 className="slide-title text-[28px] uppercase mt-2 mb-4" style={{ color: primary }}>{section.title}</h2>
-        <div className="w-10 h-1 mb-6" style={{ backgroundColor: accent }} />
+      <div className="w-full h-full bg-white p-14" style={{ fontFamily: FONT }}>
+        <SlideLabel color={accent} bold>{section.section_key.replace(/_/g, " ")}</SlideLabel>
+        <h2 className="slide-title uppercase mt-3 mb-5" style={{ fontSize: theme.heading.titleSize, color: primary }}>{section.title}</h2>
+        <div className="w-14 h-1 mb-8" style={{ backgroundColor: accent }} />
 
         {(() => {
           const displayImage = c.branch_photo_url || c.image_url;
           const hasVisual = displayImage || (section.section_key === "about_national" && stats?.presence_states?.length);
           return (
-            <div className={hasVisual ? "grid grid-cols-2 gap-8 items-start" : ""}>
-              <div className="space-y-4">
-                {c.text && <p className="slide-body whitespace-pre-wrap max-w-xl" style={{ color: "#6B7280" }}>{c.text}</p>}
-                {stats?.presence_text && <p className="text-[13px] font-bold tracking-[0.25em] uppercase mt-2" style={{ color: accent }}>{stats.presence_text}</p>}
+            <div className={hasVisual ? "grid grid-cols-2 gap-10 items-start" : ""}>
+              <div className="space-y-5">
+                {c.text && <p className="slide-body whitespace-pre-wrap max-w-[600px]" style={{ fontSize: "17px", color: textMuted }}>{c.text}</p>}
+                {stats?.presence_text && <p className="font-bold tracking-[0.25em] uppercase mt-3" style={{ fontSize: "16px", color: accent }}>{stats.presence_text}</p>}
                 {statItems.length > 0 && (
-                  <div className="flex flex-wrap gap-3 mt-4">
+                  <div className="flex flex-wrap gap-4 mt-5">
                     {statItems.map((s, i) => (
-                      <div key={i} className="px-5 py-4 text-center" style={{ backgroundColor: primary + "08" }}>
-                        <p className="slide-metric text-[26px]" style={{ color: primary }}>{typeof s.value === "number" ? s.value.toLocaleString("pt-BR") : s.value}</p>
-                        <p className="text-[9px] uppercase tracking-[0.25em] mt-1" style={{ color: "#9CA3AF" }}>{s.label}</p>
+                      <div key={i} className="px-6 py-5 text-center" style={{ backgroundColor: primary + "08" }}>
+                        <p className="slide-metric" style={{ fontSize: "30px", color: primary }}>{typeof s.value === "number" ? s.value.toLocaleString("pt-BR") : s.value}</p>
+                        <p className="uppercase tracking-[0.25em] mt-2" style={{ fontSize: "11px", color: colors.textLight }}>{s.label}</p>
                       </div>
                     ))}
                   </div>
                 )}
                 {c.regional_numbers && (
-                  <div className="flex flex-wrap gap-4 mt-4">
+                  <div className="flex flex-wrap gap-5 mt-5">
                     {c.regional_numbers.split("|").map((item: string, i: number) => (
-                      <div key={i} className="px-5 py-3" style={{ backgroundColor: accent + "12" }}>
-                        <p className="font-bold text-[15px]" style={{ color: primary }}>{item.trim()}</p>
+                      <div key={i} className="px-6 py-4" style={{ backgroundColor: accent + "12" }}>
+                        <p className="font-bold" style={{ fontSize: "18px", color: primary }}>{item.trim()}</p>
                       </div>
                     ))}
                   </div>
@@ -336,65 +328,56 @@ export function LayoutImpactoComercial({ section, branding }: Props) {
     );
   }
 
+  /* ═══════ PRICING SCENARIOS ═══════ */
+  if (section.section_key === "pricing_scenarios") {
+    return (
+      <div className="w-full h-full bg-white p-14" style={{ fontFamily: FONT }}>
+        <SlideLabel color={accent} bold>Precificação</SlideLabel>
+        <h2 className="slide-title uppercase mt-3" style={{ fontSize: theme.heading.titleSize, color: primary }}>{section.title}</h2>
+        {c.owner_expected_price && (
+          <p className="mt-3 mb-8" style={{ fontSize: "17px", color: colors.textLight }}>
+            Valor pretendido: <span className="font-bold" style={{ color: accent }}>R$ {Number(c.owner_expected_price).toLocaleString("pt-BR")}</span>
+          </p>
+        )}
+        <div className="w-14 h-1 mb-8" style={{ backgroundColor: accent }} />
+        <SlideScenarios scenarios={c.scenarios || []} colors={colors} metricSize="46px" />
+      </div>
+    );
+  }
+
   /* ═══════ GENERIC ═══════ */
   return (
-    <div className="min-h-[500px] bg-white p-10" style={{ fontFamily: FONT }}>
-      <SectionLabel>{section.section_key.replace(/_/g, " ")}</SectionLabel>
-      <h2 className="slide-title text-[28px] uppercase mt-2 mb-4" style={{ color: primary }}>{section.title}</h2>
-      <div className="w-10 h-1 mb-6" style={{ backgroundColor: accent }} />
+    <div className="w-full h-full bg-white p-14" style={{ fontFamily: FONT }}>
+      <SlideLabel color={accent} bold>{section.section_key.replace(/_/g, " ")}</SlideLabel>
+      <h2 className="slide-title uppercase mt-3 mb-5" style={{ fontSize: theme.heading.titleSize, color: primary, textTransform }}>{section.title}</h2>
+      <div className="w-14 h-1 mb-8" style={{ backgroundColor: accent }} />
 
-      {c.text && <p className="slide-body whitespace-pre-wrap max-w-xl" style={{ color: "#6B7280" }}>{c.text}</p>}
-      {c.image_url && <img src={c.image_url} alt="" className="max-h-64 object-cover w-full rounded-lg mt-4" />}
-      {c.branch_photo_url && <img src={c.branch_photo_url} alt="" className="max-h-64 object-cover w-full rounded-lg mt-4" />}
+      <div className="space-y-6">
+        {c.text && <p className="slide-body whitespace-pre-wrap max-w-[700px]" style={{ fontSize: "17px", color: textMuted }}>{c.text}</p>}
+        {c.image_url && <img src={c.image_url} alt="" className="max-h-[380px] object-cover w-full rounded-lg" />}
+        {c.branch_photo_url && <img src={c.branch_photo_url} alt="" className="max-h-[380px] object-cover w-full rounded-lg" />}
 
-      {c.actions && (
-        <div className="grid grid-cols-2 gap-x-8 gap-y-5">
-          {c.actions.map((a: any, i: number) => (
-            <div key={i} className="py-3 border-b border-gray-100">
-              <div className="flex items-baseline gap-3">
-                <span className="slide-metric text-[20px]" style={{ color: accent }}>{String(i + 1).padStart(2, "0")}</span>
-                <h4 className="font-bold text-[14px] uppercase tracking-wider" style={{ color: primary }}>{a.title}</h4>
+        {c.actions && (
+          <div className="grid grid-cols-2 gap-x-10 gap-y-6">
+            {c.actions.map((a: any, i: number) => (
+              <div key={i} className="py-4 border-b border-gray-100">
+                <div className="flex items-baseline gap-4">
+                  <span className="slide-metric" style={{ fontSize: "24px", color: accent }}>{String(i + 1).padStart(2, "0")}</span>
+                  <h4 className="font-bold uppercase tracking-wider" style={{ fontSize: "17px", color: primary }}>{a.title}</h4>
+                </div>
+                {a.description && <p className="mt-2 ml-12 leading-relaxed" style={{ fontSize: "15px", color: colors.textLight }}>{a.description}</p>}
               </div>
-              {a.description && <p className="text-[12px] mt-1 ml-10 leading-relaxed" style={{ color: "#9CA3AF" }}>{a.description}</p>}
-            </div>
-          ))}
-        </div>
-      )}
+            ))}
+          </div>
+        )}
 
-      {c.items && (
-        <div className="space-y-4">
-          {c.items.map((item: any, i: number) => (
-            <div key={i} className="flex items-start gap-4 py-3 border-b border-gray-100 last:border-0">
-              <span className="slide-metric text-[20px] shrink-0" style={{ color: accent }}>{String(i + 1).padStart(2, "0")}</span>
-              <div>
-                <h4 className="font-bold text-[14px]" style={{ color: primary }}>{item.title || item.author_name}</h4>
-                <p className="text-[12px] mt-1 leading-relaxed" style={{ color: "#9CA3AF" }}>{item.description || item.content}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+        {c.items && <SlideItemList items={c.items} colors={colors} />}
+        {c.scenarios && <SlideScenarios scenarios={c.scenarios} colors={colors} metricSize="42px" />}
 
-      {c.scenarios && (
-        <div className="flex mt-4">
-          {c.scenarios.map((s: any, i: number) => {
-            const colors = [accent, primary, "#16a34a"];
-            return (
-              <div key={i} className="flex-1 text-center py-8 relative">
-                {i > 0 && <div className="absolute left-0 top-4 bottom-4 w-px" style={{ backgroundColor: accent + "22" }} />}
-                <p className="slide-label mb-3" style={{ color: "#9CA3AF" }}>{s.label}</p>
-                <p className="slide-metric text-[36px]" style={{ color: colors[i] }}>
-                  {s.value ? `R$ ${Number(s.value).toLocaleString("pt-BR")}` : "—"}
-                </p>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {!c.text && !c.actions && !c.items && !c.scenarios && (
-        <p className="text-[14px] italic" style={{ color: "#D1D5DB" }}>Conteúdo não preenchido</p>
-      )}
+        {!c.text && !c.actions && !c.items && !c.scenarios && (
+          <p className="italic" style={{ fontSize: "17px", color: "#D1D5DB" }}>Conteúdo não preenchido</p>
+        )}
+      </div>
     </div>
   );
 }
