@@ -305,39 +305,45 @@ export function LayoutExecutivo({ section, branding }: Props) {
             </div>
             <div className="w-10 h-[2px]" style={{ backgroundColor: accent }} />
 
-            <div className={c.image_url || (section.section_key === "about_national" && stats?.presence_states?.length) ? "grid grid-cols-2 gap-8 items-start" : ""}>
-              <div className="space-y-4">
-                {c.text && <p className="slide-body whitespace-pre-wrap max-w-xl" style={{ color: "#6B7280" }}>{c.text}</p>}
-                {stats?.presence_text && <p className="text-[13px] font-bold tracking-wider uppercase mt-2" style={{ color: accent }}>{stats.presence_text}</p>}
-                {statItems.length > 0 && (
-                  <div className="flex flex-wrap gap-4 mt-4">
-                    {statItems.map((s, i) => (
-                      <div key={i} className="px-5 py-3 rounded-lg text-center" style={{ backgroundColor: primary + "08" }}>
-                        <p className="slide-metric text-[24px]" style={{ color: primary }}>{typeof s.value === "number" ? s.value.toLocaleString("pt-BR") : s.value}</p>
-                        <p className="text-[10px] uppercase tracking-wider mt-1" style={{ color: "#9CA3AF" }}>{s.label}</p>
+            {(() => {
+              const displayImage = c.branch_photo_url || c.image_url;
+              const hasVisual = displayImage || (section.section_key === "about_national" && stats?.presence_states?.length);
+              return (
+                <div className={hasVisual ? "grid grid-cols-2 gap-8 items-start" : ""}>
+                  <div className="space-y-4">
+                    {c.text && <p className="slide-body whitespace-pre-wrap max-w-xl" style={{ color: "#6B7280" }}>{c.text}</p>}
+                    {stats?.presence_text && <p className="text-[13px] font-bold tracking-wider uppercase mt-2" style={{ color: accent }}>{stats.presence_text}</p>}
+                    {statItems.length > 0 && (
+                      <div className="flex flex-wrap gap-4 mt-4">
+                        {statItems.map((s, i) => (
+                          <div key={i} className="px-5 py-3 rounded-lg text-center" style={{ backgroundColor: primary + "08" }}>
+                            <p className="slide-metric text-[24px]" style={{ color: primary }}>{typeof s.value === "number" ? s.value.toLocaleString("pt-BR") : s.value}</p>
+                            <p className="text-[10px] uppercase tracking-wider mt-1" style={{ color: "#9CA3AF" }}>{s.label}</p>
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
-                )}
-                {c.regional_numbers && (
-                  <div className="flex flex-wrap gap-4 mt-4">
-                    {c.regional_numbers.split("|").map((item: string, i: number) => (
-                      <div key={i} className="px-5 py-3 rounded" style={{ backgroundColor: primary + "08" }}>
-                        <p className="font-bold text-[15px]" style={{ color: primary }}>{item.trim()}</p>
+                    )}
+                    {c.regional_numbers && (
+                      <div className="flex flex-wrap gap-4 mt-4">
+                        {c.regional_numbers.split("|").map((item: string, i: number) => (
+                          <div key={i} className="px-5 py-3 rounded" style={{ backgroundColor: primary + "08" }}>
+                            <p className="font-bold text-[15px]" style={{ color: primary }}>{item.trim()}</p>
+                          </div>
+                        ))}
                       </div>
-                    ))}
+                    )}
                   </div>
-                )}
-              </div>
-              <div>
-                {section.section_key === "about_national" && stats?.presence_states?.length > 0 && (
-                  <BrazilPresenceMap states={stats.presence_states} primaryColor={primary} accentColor={accent} />
-                )}
-                {c.image_url && <img src={c.image_url} alt="" className="max-h-56 object-cover w-full rounded-lg" />}
-              </div>
-            </div>
-
-            {c.branch_photo_url && <img src={c.branch_photo_url} alt="" className="max-h-64 object-cover w-full rounded-lg mt-4" />}
+                  {hasVisual && (
+                    <div>
+                      {section.section_key === "about_national" && stats?.presence_states?.length > 0 && (
+                        <BrazilPresenceMap states={stats.presence_states} primaryColor={primary} accentColor={accent} />
+                      )}
+                      {displayImage && <img src={displayImage} alt="" className="max-h-56 object-cover w-full rounded-lg" />}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
           </div>
         </div>
       </div>
