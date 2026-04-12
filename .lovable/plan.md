@@ -1,25 +1,51 @@
 
 
-# Busca automática de endereço pelo CEP
+# Aumentar tipografia dos slides e alinhar com referencia visual RE/MAX
 
-## O que será feito
-Ao digitar o CEP no formulário de imóvel (Step 1 do wizard), o sistema buscará automaticamente o endereço, bairro e cidade usando a API pública **ViaCEP** (`viacep.com.br/ws/{cep}/json/`). Os campos serão preenchidos automaticamente, mas editáveis.
+## Problema
+As fontes dos slides ficaram muito pequenas apos a refatoracao. O ScaledSlide renderiza a 1920x1080 e escala para o container, mas os tamanhos de fonte nos temas estao pequenos demais (title: 28px, label: 10px, metric: 30px). As imagens de referencia mostram tipografia muito mais bold e grande -- titulos em 60-80px, metricas em 80-120px, labels em 16-20px.
 
-## Mudanças
+## O que sera feito
 
-### `src/components/wizard/StepPropertyData.tsx`
-1. Adicionar função `fetchCep` que chama `https://viacep.com.br/ws/{cep}/json/` quando o CEP tiver 8 dígitos
-2. Aplicar máscara de CEP (00000-000) no input
-3. Auto-preencher `address` (logradouro), `neighborhood` (bairro) e `city` (localidade) com os dados retornados
-4. Mostrar indicador de loading enquanto busca
-5. Mostrar feedback se CEP não encontrado
+### 1. Aumentar font sizes nos 3 temas
+Ajustar os tokens de tipografia para proporcoes adequadas a 1920x1080:
 
-## Detalhes técnicos
-- API ViaCEP é gratuita, pública, sem autenticação
-- Disparo automático ao completar 8 dígitos (sem botão extra)
-- Campos preenchidos continuam editáveis pelo usuário
-- Sem dependências adicionais
+| Token | Atual | Novo |
+|-------|-------|------|
+| `cover.titleSize` | 48px | 72px |
+| `heading.titleSize` | 28px | 48px |
+| `metric.size` | 30px | 64px |
+| `metric.labelSize` | 10px | 16px |
+| `divider.width` | 40px | 60px |
+
+Arquivos: `theme-executivo.ts`, `theme-premium.ts`, `theme-impacto.ts`
+
+### 2. Aumentar CSS base classes
+No `index.css`, aumentar `.slide-label` de 10px para 16px, e ajustar `.slide-body` para proporcoes maiores.
+
+### 3. Aumentar inline font sizes nos layouts
+Nos 3 arquivos de layout, aumentar todos os `fontSize` inline:
+- Broker intro: nome 42px -> 56px, bio 18px -> 24px, CRECI 14px -> 18px
+- Property summary: titulo 36px -> 48px, highlights 17px -> 22px
+- Closing: titulo 42px -> 56px, nome 28px -> 40px, contatos 17px -> 22px
+- Generic sections: body text 15-17px -> 20-24px, card titles 18px -> 24px
+- Stat bar numbers: 28px -> 48px
+- Labels/badges: 12px -> 16px
+
+Arquivos: `LayoutExecutivo.tsx`, `LayoutPremium.tsx`, `LayoutImpactoComercial.tsx`
+
+### 4. Aumentar padding e espacamentos
+Ajustar `p-14` e `gap` values para proporcoes corretas a 1920x1080 (p-16 a p-20, gaps maiores).
+
+## Arquivos modificados
+- `src/components/layouts/themes/theme-executivo.ts`
+- `src/components/layouts/themes/theme-premium.ts`
+- `src/components/layouts/themes/theme-impacto.ts`
+- `src/components/layouts/LayoutExecutivo.tsx`
+- `src/components/layouts/LayoutPremium.tsx`
+- `src/components/layouts/LayoutImpactoComercial.tsx`
+- `src/index.css`
 
 ## Risco
-Nenhum. Apenas adiciona funcionalidade ao formulário existente.
+Nenhum. Apenas ajuste de tamanhos visuais, sem mudanca de logica.
 
