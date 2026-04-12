@@ -1,74 +1,60 @@
 
 
-# Unificar Estudo de Mercado com Apresentação + Remover Simulados
+# Completar o Fluxo do Estudo de Mercado na Apresentação
 
 ## Problema
 
-Atualmente existem dois fluxos separados:
-- **Wizard de Apresentação** (`/presentations/new`) — tem step "Mercado" que chama Manus, mas salva em tabelas diferentes (`market_analysis_jobs`, `market_comparables`, `market_reports`)
-- **Estudo de Mercado standalone** (`/market-studies/new`) — fluxo separado com suas próprias tabelas (`market_studies`, `market_study_comparables`, `market_study_results`)
+O `handleGenerate` em `AgentNewPresentation.tsx` cria o estudo de mercado com comparáveis, ajustes e resultado, mas falta:
 
-O usuário quer um fluxo unificado: o estudo de mercado deve ser parte do fluxo da apresentação, sem simulados, e o módulo standalone deve ser removido.
+1. **Chamada ao `generate-market-summary`** — a edge function que gera resumo executivo, justificativa e insights por IA nunca é invocada. O campo `executive_summary` fica com texto genérico e `justification` + `market_insights` ficam vazios.
+2. **Estudo só é criado com comparáveis** — se nenhum portal for selecionado ou o scraping falhar, nenhum `market_study` é criado. Deveria ao menos criar o estudo com status "draft" ou "sem dados".
 
 ## Solução
 
-### 1. Remover fallback de dados simulados
+### 1. Chamar `generate-market-summary` após salvar o resultado
 
-**Arquivos:** `AgentNewPresentation.tsx`, `NewMarketStudy.tsx`
+**Arquivo:** `src/pages/agent/AgentNewPresentation.tsx`
 
-- Remover import e uso de `generateSimulatedComparables`
-- Se Manus e Firecrawl falharem, mostrar erro ao usuário em vez de usar dados falsos
-- O fluxo continua criando a apresentação, mas sem dados de mercado (seções ficam vazias)
+Após o `supabase.from("market_study_results").insert(...)` (linha ~351), adicionar:
 
-### 2. Integrar estudo de mercado no wizard da apresentação
+```typescript
+// Gerar resumo por IA
+try {
+  const { data: aiSummary } = await supabase.functions.invoke("generate-market-summary", {
+    body: {
+      subject: subjectForScoring,
+      comparables: studyComparables,
+      result: { ...result, avg_price_per_sqm: Math.round(avgPriceSqm) },
+    },
+  });
 
-**Arquivo:** `AgentNewPresentation.tsx`
+  if (aiSummary?.executive_summary) {
+    await supabase.from("market_study_results")
+      .update({
+        executive_summary: aiSummary.executive_summary,
+        justification: aiSummary.justification,
+        market_insights: aiSummary.market_insights,
+      })
+      .eq("market_study_id", study.id);
+  }
+} catch (aiErr) {
+  console.warn("AI summary generation failed (non-fatal):", aiErr);
+}
+```
 
-No `handleGenerate`, após chamar Manus/Firecrawl com sucesso:
-- Criar automaticamente um registro em `market_studies` vinculado à apresentação
-- Salvar o imóvel em `market_study_subject_properties` (mapeando de `PropertyData`)
-- Salvar os comparáveis em `market_study_comparables`
-- Rodar `scoredComparables` + `calculateAllAdjustments` + `calculateMarketResult` para gerar os resultados completos
-- Salvar em `market_study_results` com resumo executivo
-- Chamar `generate-market-summary` para gerar insights por IA
-- Vincular o `market_study_id` à apresentação (via campo ou metadata)
+### 2. Criar estudo mesmo sem comparáveis
 
-Isso garante que cada apresentação com dados de mercado também gera um estudo completo acessível em `/market-studies/:id`.
+Mover a criação do `market_study` para fora do bloco `if (generatedComparables.length > 0)`, logo após o scraping. Se não houver comparáveis, o estudo fica com status `"completed"` mas sem dados — o `MarketStudyResult` já lida com listas vazias.
 
-### 3. Remover o fluxo standalone de criação de estudo
+### 3. Passar `owner_expected_price` no subject para o AI
 
-**Rotas removidas:**
-- `/market-studies/new` — remover rota e lazy import
-- `/market-studies` (listagem) — manter, mas remover botão "Novo Estudo"
-
-**Sidebar:** Manter link "Estudos de Mercado" que lista os estudos gerados automaticamente pelas apresentações.
-
-**Arquivos a remover/simplificar:**
-- `src/pages/agent/NewMarketStudy.tsx` — deletar (fluxo standalone)
-- `src/components/market-study/SubjectPropertyForm.tsx` — manter (usado no resultado)
-- `src/components/market-study/SearchConfigForm.tsx` — manter (filtros reutilizáveis no wizard)
-
-### 4. Atualizar listagem de estudos
-
-**Arquivo:** `MarketStudies.tsx`
-
-- Remover botão "Novo Estudo de Mercado"
-- Adicionar informação de qual apresentação gerou cada estudo
-- Estudos são criados automaticamente pelo wizard
-
-### 5. Manter MarketStudyResult como está
-
-A tela de resultado (`/market-studies/:id`) continua funcionando normalmente com todos os gráficos, insights, exportação PDF e botão "Criar Apresentação" (para gerar apresentações adicionais a partir do mesmo estudo).
+O `subjectForScoring` atual não inclui `owner_expected_price`, que é essencial para o prompt do `generate-market-summary`. Adicionar esse campo.
 
 ## Arquivos
 
-| Arquivo | Acao |
+| Arquivo | Ação |
 |---------|------|
-| `src/pages/agent/AgentNewPresentation.tsx` | Modificar — remover simulados, criar estudo de mercado junto com apresentacao |
-| `src/pages/agent/NewMarketStudy.tsx` | Deletar |
-| `src/pages/agent/MarketStudies.tsx` | Modificar — remover botao "Novo Estudo" |
-| `src/App.tsx` | Modificar — remover rota `/market-studies/new` e lazy import |
-| `src/components/AppSidebar.tsx` | Sem alteracao — link "Estudos de Mercado" aponta para listagem |
+| `src/pages/agent/AgentNewPresentation.tsx` | Modificar — adicionar chamada `generate-market-summary`, mover criação do estudo para fora do if de comparáveis, incluir `owner_expected_price` no subject |
 
-Nenhuma migracao de banco necessaria.
+Nenhuma migração necessária.
 
