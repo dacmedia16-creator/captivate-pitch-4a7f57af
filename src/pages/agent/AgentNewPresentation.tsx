@@ -157,25 +157,34 @@ export default function AgentNewPresentation() {
             };
 
             let scrapedComparables: any[] = [];
+            let researchMetadata: any = null;
 
             try {
-              console.log("Trying Manus AI for market analysis...");
-              const { data: manusResult, error: manusError } = await supabase.functions.invoke("analyze-market-manus", {
+              console.log("Trying analyze-market-deep (3-phase methodology)...");
+              const { data: deepResult, error: deepError } = await supabase.functions.invoke("analyze-market-deep", {
                 body: analyzeBody,
               });
 
-              if (!manusError && manusResult?.success && manusResult?.comparables?.length) {
-                console.log(`Manus returned ${manusResult.comparables.length} comparables`);
-                scrapedComparables = manusResult.comparables;
+              if (!deepError && deepResult?.success && deepResult?.comparables?.length) {
+                console.log(`Deep analysis returned ${deepResult.comparables.length} comparables`);
+                scrapedComparables = deepResult.comparables;
+                researchMetadata = deepResult.research_metadata || null;
+                
+                const meta = deepResult.research_metadata;
+                if (meta) {
+                  toast.success(
+                    `${meta.total_listings_found} anúncios encontrados, ${meta.listings_opened} validados, ${deepResult.comparables.length} selecionados`
+                  );
+                }
               } else {
-                console.warn("Manus failed, trying Firecrawl...", manusError || manusResult?.message);
+                console.warn("Deep analysis failed, trying Firecrawl fallback...", deepError || deepResult?.message);
 
                 const { data: analyzeResult, error: analyzeError } = await supabase.functions.invoke("analyze-market", {
                   body: analyzeBody,
                 });
 
                 if (!analyzeError && analyzeResult?.success && analyzeResult?.comparables?.length) {
-                  console.log(`Firecrawl returned ${analyzeResult.comparables.length} comparables`);
+                  console.log(`Firecrawl fallback returned ${analyzeResult.comparables.length} comparables`);
                   scrapedComparables = analyzeResult.comparables;
                 } else {
                   console.warn("Firecrawl also failed. No market data available.", analyzeError || analyzeResult?.message);
