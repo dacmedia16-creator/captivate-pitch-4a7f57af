@@ -1,5 +1,6 @@
 import { SectionData } from "./SectionRenderer";
 import { MarketPriceBarChart, MarketStats } from "@/components/charts/MarketCharts";
+import { Key, BarChart3, ClipboardCheck, FileText, CheckCircle } from "lucide-react";
 
 interface Props {
   section: SectionData;
