@@ -41,6 +41,7 @@ import PresentationMode from "@/pages/agent/PresentationMode";
 import SharedPresentation from "@/pages/shared/SharedPresentation";
 
 import NotFound from "@/pages/NotFound";
+import { VersionUpdateBanner } from "@/components/VersionUpdateBanner";
 
 const queryClient = new QueryClient();
 
@@ -52,6 +53,7 @@ const App = () => (
       <BrowserRouter>
         <AuthProvider>
           <RoleProvider>
+            <VersionUpdateBanner />
             <Routes>
               {/* Public routes */}
               <Route path="/" element={<Navigate to="/dashboard" replace />} />
