@@ -152,35 +152,37 @@
   }
 
   .slide-label {
-    font-family: 'Inter', sans-serif;
+    font-family: 'Gotham', 'Montserrat', sans-serif;
     font-size: 10px;
     font-weight: 600;
-    letter-spacing: 0.25em;
+    letter-spacing: 0.20em;
     text-transform: uppercase;
   }
 
   .slide-metric {
-    font-family: 'Playfair Display', serif;
+    font-family: 'Gotham', 'Montserrat', sans-serif;
     font-weight: 700;
+    letter-spacing: -0.02em;
     line-height: 1;
   }
 
   .slide-title {
-    font-family: 'Playfair Display', serif;
-    font-weight: 700;
-    letter-spacing: -0.02em;
-    line-height: 1.1;
+    font-family: 'Gotham', 'Montserrat', sans-serif;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    line-height: 1.05;
   }
 
   .slide-body {
-    font-family: 'Inter', sans-serif;
-    font-weight: 300;
+    font-family: 'Gotham', 'Montserrat', sans-serif;
+    font-weight: 400;
     line-height: 1.7;
   }
 
   .editorial-divider {
-    height: 1px;
-    opacity: 0.12;
+    height: 2px;
+    background-color: #DC1431;
+    opacity: 1;
   }
 }
 
