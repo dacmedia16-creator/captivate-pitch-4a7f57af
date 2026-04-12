@@ -1,6 +1,7 @@
 import { SectionData } from "./SectionRenderer";
 import { MarketPriceBarChart, MarketStats } from "@/components/charts/MarketCharts";
-import { Key, BarChart3, ClipboardCheck, FileText, CheckCircle } from "lucide-react";
+import { BrazilPresenceMap } from "@/components/charts/BrazilPresenceMap";
+import { Key, BarChart3, ClipboardCheck, FileText, CheckCircle, Globe, Building2, Users } from "lucide-react";
 
 interface Props {
   section: SectionData;
@@ -283,6 +284,66 @@ export function LayoutExecutivo({ section, branding }: Props) {
     );
   }
 
+  /* ═══════ ABOUT GLOBAL / NATIONAL / REGIONAL ═══════ */
+  if (section.section_key === "about_global" || section.section_key === "about_national" || section.section_key === "about_regional") {
+    const stats = c.stats;
+    const statItems = stats ? [
+      { label: stats.rank ? "Ranking" : null, value: stats.rank },
+      { label: "Agências", value: stats.agencies },
+      { label: "Corretores", value: stats.brokers },
+      { label: "Franquias", value: stats.franchises },
+    ].filter(s => s.label && s.value) : [];
+
+    return (
+      <div className="min-h-[500px] bg-white p-10" style={{ fontFamily: FONT }}>
+        <div className="flex gap-6">
+          <RedBar h={40} />
+          <div className="flex-1 space-y-6">
+            <div>
+              <SectionLabel>{section.section_key.replace(/_/g, " ")}</SectionLabel>
+              <h2 className="slide-title text-[28px] mt-2" style={{ color: primary }}>{section.title}</h2>
+            </div>
+            <div className="w-10 h-[2px]" style={{ backgroundColor: accent }} />
+
+            <div className={c.image_url || (section.section_key === "about_national" && stats?.presence_states?.length) ? "grid grid-cols-2 gap-8 items-start" : ""}>
+              <div className="space-y-4">
+                {c.text && <p className="slide-body whitespace-pre-wrap max-w-xl" style={{ color: "#6B7280" }}>{c.text}</p>}
+                {stats?.presence_text && <p className="text-[13px] font-bold tracking-wider uppercase mt-2" style={{ color: accent }}>{stats.presence_text}</p>}
+                {statItems.length > 0 && (
+                  <div className="flex flex-wrap gap-4 mt-4">
+                    {statItems.map((s, i) => (
+                      <div key={i} className="px-5 py-3 rounded-lg text-center" style={{ backgroundColor: primary + "08" }}>
+                        <p className="slide-metric text-[24px]" style={{ color: primary }}>{typeof s.value === "number" ? s.value.toLocaleString("pt-BR") : s.value}</p>
+                        <p className="text-[10px] uppercase tracking-wider mt-1" style={{ color: "#9CA3AF" }}>{s.label}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {c.regional_numbers && (
+                  <div className="flex flex-wrap gap-4 mt-4">
+                    {c.regional_numbers.split("|").map((item: string, i: number) => (
+                      <div key={i} className="px-5 py-3 rounded" style={{ backgroundColor: primary + "08" }}>
+                        <p className="font-bold text-[15px]" style={{ color: primary }}>{item.trim()}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div>
+                {section.section_key === "about_national" && stats?.presence_states?.length > 0 && (
+                  <BrazilPresenceMap states={stats.presence_states} primaryColor={primary} accentColor={accent} />
+                )}
+                {c.image_url && <img src={c.image_url} alt="" className="max-h-56 object-cover w-full rounded-lg" />}
+              </div>
+            </div>
+
+            {c.branch_photo_url && <img src={c.branch_photo_url} alt="" className="max-h-64 object-cover w-full rounded-lg mt-4" />}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   /* ═══════ GENERIC ═══════ */
   return (
     <div className="min-h-[500px] bg-white p-10" style={{ fontFamily: FONT }}>
@@ -298,16 +359,6 @@ export function LayoutExecutivo({ section, branding }: Props) {
           {c.text && <p className="slide-body whitespace-pre-wrap max-w-xl" style={{ color: "#6B7280" }}>{c.text}</p>}
           {c.image_url && <img src={c.image_url} alt="" className="max-h-64 object-cover w-full rounded-lg mt-4" />}
           {c.branch_photo_url && <img src={c.branch_photo_url} alt="" className="max-h-64 object-cover w-full rounded-lg mt-4" />}
-
-          {c.regional_numbers && (
-            <div className="flex flex-wrap gap-6 mt-5">
-              {c.regional_numbers.split("|").map((item: string, i: number) => (
-                <div key={i} className="px-5 py-3 rounded" style={{ backgroundColor: primary + "08" }}>
-                  <p className="font-bold text-[15px]" style={{ color: primary }}>{item.trim()}</p>
-                </div>
-              ))}
-            </div>
-          )}
 
           {c.actions && (
             <div className="grid grid-cols-2 gap-x-8 gap-y-6">
@@ -345,7 +396,7 @@ export function LayoutExecutivo({ section, branding }: Props) {
                   <div key={i} className="flex-1 text-center py-6 relative">
                     {i > 0 && <div className="absolute left-0 top-4 bottom-4 w-px" style={{ backgroundColor: accent + "22" }} />}
                     <p className="slide-label mb-2" style={{ color: "#9CA3AF" }}>{s.label}</p>
-                    <p className="slide-metric text-[28px]" style={{ color: colors[i] }}>
+                    <p className="slide-metric text-[36px]" style={{ color: colors[i] }}>
                       {s.value ? `R$ ${Number(s.value).toLocaleString("pt-BR")}` : "—"}
                     </p>
                   </div>
@@ -355,7 +406,7 @@ export function LayoutExecutivo({ section, branding }: Props) {
           )}
 
           {!c.text && !c.actions && !c.items && !c.scenarios && (
-            <p className="italic text-[14px]" style={{ color: "#D1D5DB" }}>{c.message || "Conteúdo pendente"}</p>
+            <p className="text-[14px] italic" style={{ color: "#D1D5DB" }}>Conteúdo não preenchido</p>
           )}
         </div>
       </div>

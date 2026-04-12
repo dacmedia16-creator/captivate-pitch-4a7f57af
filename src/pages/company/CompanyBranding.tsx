@@ -36,6 +36,7 @@ export default function CompanyBranding() {
     about_global: "", about_national: "", about_regional: "", regional_numbers: "",
     about_global_image_url: "" as string | null, about_national_image_url: "" as string | null, about_regional_image_url: "" as string | null,
     objectives: null as any, value_propositions: null as any, global_stats: null as any,
+    about_global_stats: null as any, about_national_stats: null as any, about_regional_stats: null as any,
   });
 
   useEffect(() => {
@@ -57,6 +58,9 @@ export default function CompanyBranding() {
         objectives: a.objectives || null,
         value_propositions: a.value_propositions || null,
         global_stats: a.global_stats || null,
+        about_global_stats: a.about_global_stats || null,
+        about_national_stats: a.about_national_stats || null,
+        about_regional_stats: a.about_regional_stats || null,
       });
     }
   }, [agency]);
@@ -171,6 +175,16 @@ export default function CompanyBranding() {
             <CardContent className="space-y-4">
               <Textarea value={agencyForm.about_global} onChange={(e) => set("about_global", e.target.value)} rows={8} placeholder="Conteúdo institucional global..." />
               <div className="space-y-2"><Label>Imagem do slide</Label><ImageUploader value={agencyForm.about_global_image_url} onChange={(v) => set("about_global_image_url", v)} folder="agency" /></div>
+              <div className="border-t pt-4 space-y-4">
+                <p className="text-sm font-semibold">Estatísticas Mundiais</p>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1"><Label>Ranking (ex: Nº1)</Label><Input value={agencyForm.about_global_stats?.rank || ""} onChange={(e) => set("about_global_stats", { ...(agencyForm.about_global_stats || {}), rank: e.target.value })} /></div>
+                  <div className="space-y-1"><Label>Agências</Label><Input type="number" value={agencyForm.about_global_stats?.agencies || ""} onChange={(e) => set("about_global_stats", { ...(agencyForm.about_global_stats || {}), agencies: Number(e.target.value) || 0 })} /></div>
+                  <div className="space-y-1"><Label>Corretores</Label><Input type="number" value={agencyForm.about_global_stats?.brokers || ""} onChange={(e) => set("about_global_stats", { ...(agencyForm.about_global_stats || {}), brokers: Number(e.target.value) || 0 })} /></div>
+                  <div className="space-y-1"><Label>Franquias</Label><Input type="number" value={agencyForm.about_global_stats?.franchises || ""} onChange={(e) => set("about_global_stats", { ...(agencyForm.about_global_stats || {}), franchises: Number(e.target.value) || 0 })} /></div>
+                </div>
+                <div className="space-y-1"><Label>Texto de presença (ex: PRESENTE EM 100+ PAÍSES)</Label><Input value={agencyForm.about_global_stats?.presence_text || ""} onChange={(e) => set("about_global_stats", { ...(agencyForm.about_global_stats || {}), presence_text: e.target.value })} /></div>
+              </div>
               <Button onClick={() => saveAgency.mutate()} disabled={saveAgency.isPending}><Save className="h-4 w-4 mr-1" />Salvar</Button>
             </CardContent>
           </Card>
@@ -182,6 +196,35 @@ export default function CompanyBranding() {
             <CardContent className="space-y-4">
               <Textarea value={agencyForm.about_national} onChange={(e) => set("about_national", e.target.value)} rows={8} placeholder="Conteúdo institucional nacional..." />
               <div className="space-y-2"><Label>Imagem do slide</Label><ImageUploader value={agencyForm.about_national_image_url} onChange={(v) => set("about_national_image_url", v)} folder="agency" /></div>
+              <div className="border-t pt-4 space-y-4">
+                <p className="text-sm font-semibold">Estatísticas Nacionais</p>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1"><Label>Ranking (ex: Nº1)</Label><Input value={agencyForm.about_national_stats?.rank || ""} onChange={(e) => set("about_national_stats", { ...(agencyForm.about_national_stats || {}), rank: e.target.value })} /></div>
+                  <div className="space-y-1"><Label>Agências</Label><Input type="number" value={agencyForm.about_national_stats?.agencies || ""} onChange={(e) => set("about_national_stats", { ...(agencyForm.about_national_stats || {}), agencies: Number(e.target.value) || 0 })} /></div>
+                  <div className="space-y-1"><Label>Corretores</Label><Input type="number" value={agencyForm.about_national_stats?.brokers || ""} onChange={(e) => set("about_national_stats", { ...(agencyForm.about_national_stats || {}), brokers: Number(e.target.value) || 0 })} /></div>
+                  <div className="space-y-1"><Label>Franquias</Label><Input type="number" value={agencyForm.about_national_stats?.franchises || ""} onChange={(e) => set("about_national_stats", { ...(agencyForm.about_national_stats || {}), franchises: Number(e.target.value) || 0 })} /></div>
+                </div>
+                <div className="space-y-1"><Label>Texto de presença</Label><Input value={agencyForm.about_national_stats?.presence_text || ""} onChange={(e) => set("about_national_stats", { ...(agencyForm.about_national_stats || {}), presence_text: e.target.value })} /></div>
+                <div className="space-y-2">
+                  <Label>Estados com presença (selecione)</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {["AC","AL","AM","AP","BA","CE","DF","ES","GO","MA","MG","MS","MT","PA","PB","PE","PI","PR","RJ","RN","RO","RR","RS","SC","SE","SP","TO"].map(uf => {
+                      const current = agencyForm.about_national_stats?.presence_states || [];
+                      const active = current.includes(uf);
+                      return (
+                        <button key={uf} type="button" className={`px-2 py-1 text-xs font-bold rounded border ${active ? "text-white" : "text-muted-foreground"}`}
+                          style={{ backgroundColor: active ? agencyForm.secondary_color || "#DC1431" : "transparent", borderColor: active ? "transparent" : "#E5E7EB" }}
+                          onClick={() => {
+                            const newStates = active ? current.filter((s: string) => s !== uf) : [...current, uf];
+                            set("about_national_stats", { ...(agencyForm.about_national_stats || {}), presence_states: newStates });
+                          }}>
+                          {uf}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
               <Button onClick={() => saveAgency.mutate()} disabled={saveAgency.isPending}><Save className="h-4 w-4 mr-1" />Salvar</Button>
             </CardContent>
           </Card>
@@ -194,6 +237,16 @@ export default function CompanyBranding() {
               <Textarea value={agencyForm.about_regional} onChange={(e) => set("about_regional", e.target.value)} rows={6} placeholder="Conteúdo regional..." />
               <div className="space-y-2"><Label>Números regionais</Label><Textarea value={agencyForm.regional_numbers} onChange={(e) => set("regional_numbers", e.target.value)} rows={4} placeholder="Dados e métricas regionais..." /></div>
               <div className="space-y-2"><Label>Imagem do slide</Label><ImageUploader value={agencyForm.about_regional_image_url} onChange={(v) => set("about_regional_image_url", v)} folder="agency" /></div>
+              <div className="border-t pt-4 space-y-4">
+                <p className="text-sm font-semibold">Estatísticas Regionais</p>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1"><Label>Ranking</Label><Input value={agencyForm.about_regional_stats?.rank || ""} onChange={(e) => set("about_regional_stats", { ...(agencyForm.about_regional_stats || {}), rank: e.target.value })} /></div>
+                  <div className="space-y-1"><Label>Agências</Label><Input type="number" value={agencyForm.about_regional_stats?.agencies || ""} onChange={(e) => set("about_regional_stats", { ...(agencyForm.about_regional_stats || {}), agencies: Number(e.target.value) || 0 })} /></div>
+                  <div className="space-y-1"><Label>Corretores</Label><Input type="number" value={agencyForm.about_regional_stats?.brokers || ""} onChange={(e) => set("about_regional_stats", { ...(agencyForm.about_regional_stats || {}), brokers: Number(e.target.value) || 0 })} /></div>
+                  <div className="space-y-1"><Label>Franquias</Label><Input type="number" value={agencyForm.about_regional_stats?.franchises || ""} onChange={(e) => set("about_regional_stats", { ...(agencyForm.about_regional_stats || {}), franchises: Number(e.target.value) || 0 })} /></div>
+                </div>
+                <div className="space-y-1"><Label>Texto de presença</Label><Input value={agencyForm.about_regional_stats?.presence_text || ""} onChange={(e) => set("about_regional_stats", { ...(agencyForm.about_regional_stats || {}), presence_text: e.target.value })} /></div>
+              </div>
               <Button onClick={() => saveAgency.mutate()} disabled={saveAgency.isPending}><Save className="h-4 w-4 mr-1" />Salvar</Button>
             </CardContent>
           </Card>

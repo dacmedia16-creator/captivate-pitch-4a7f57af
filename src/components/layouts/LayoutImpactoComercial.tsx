@@ -1,5 +1,6 @@
 import { SectionData } from "./SectionRenderer";
 import { MarketPriceBarChart, MarketStats } from "@/components/charts/MarketCharts";
+import { BrazilPresenceMap } from "@/components/charts/BrazilPresenceMap";
 import { Key, BarChart3, ClipboardCheck, FileText, CheckCircle } from "lucide-react";
 
 interface Props {
@@ -276,6 +277,59 @@ export function LayoutImpactoComercial({ section, branding }: Props) {
     );
   }
 
+  /* ═══════ ABOUT GLOBAL / NATIONAL / REGIONAL ═══════ */
+  if (section.section_key === "about_global" || section.section_key === "about_national" || section.section_key === "about_regional") {
+    const stats = c.stats;
+    const statItems = stats ? [
+      { label: stats.rank ? "RANKING" : null, value: stats.rank },
+      { label: "AGÊNCIAS", value: stats.agencies },
+      { label: "CORRETORES", value: stats.brokers },
+      { label: "FRANQUIAS", value: stats.franchises },
+    ].filter(s => s.label && s.value) : [];
+
+    return (
+      <div className="min-h-[500px] bg-white p-10" style={{ fontFamily: FONT }}>
+        <SectionLabel>{section.section_key.replace(/_/g, " ")}</SectionLabel>
+        <h2 className="slide-title text-[28px] uppercase mt-2 mb-4" style={{ color: primary }}>{section.title}</h2>
+        <div className="w-10 h-1 mb-6" style={{ backgroundColor: accent }} />
+
+        <div className={c.image_url || (section.section_key === "about_national" && stats?.presence_states?.length) ? "grid grid-cols-2 gap-8 items-start" : ""}>
+          <div className="space-y-4">
+            {c.text && <p className="slide-body whitespace-pre-wrap max-w-xl" style={{ color: "#6B7280" }}>{c.text}</p>}
+            {stats?.presence_text && <p className="text-[13px] font-bold tracking-[0.25em] uppercase mt-2" style={{ color: accent }}>{stats.presence_text}</p>}
+            {statItems.length > 0 && (
+              <div className="flex flex-wrap gap-3 mt-4">
+                {statItems.map((s, i) => (
+                  <div key={i} className="px-5 py-4 text-center" style={{ backgroundColor: primary + "08" }}>
+                    <p className="slide-metric text-[26px]" style={{ color: primary }}>{typeof s.value === "number" ? s.value.toLocaleString("pt-BR") : s.value}</p>
+                    <p className="text-[9px] uppercase tracking-[0.25em] mt-1" style={{ color: "#9CA3AF" }}>{s.label}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+            {c.regional_numbers && (
+              <div className="flex flex-wrap gap-4 mt-4">
+                {c.regional_numbers.split("|").map((item: string, i: number) => (
+                  <div key={i} className="px-5 py-3" style={{ backgroundColor: accent + "12" }}>
+                    <p className="font-bold text-[15px]" style={{ color: primary }}>{item.trim()}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          <div>
+            {section.section_key === "about_national" && stats?.presence_states?.length > 0 && (
+              <BrazilPresenceMap states={stats.presence_states} primaryColor={primary} accentColor={accent} />
+            )}
+            {c.image_url && <img src={c.image_url} alt="" className="max-h-56 object-cover w-full rounded-lg" />}
+          </div>
+        </div>
+
+        {c.branch_photo_url && <img src={c.branch_photo_url} alt="" className="max-h-64 object-cover w-full rounded-lg mt-6" />}
+      </div>
+    );
+  }
+
   /* ═══════ GENERIC ═══════ */
   return (
     <div className="min-h-[500px] bg-white p-10" style={{ fontFamily: FONT }}>
@@ -286,16 +340,6 @@ export function LayoutImpactoComercial({ section, branding }: Props) {
       {c.text && <p className="slide-body whitespace-pre-wrap max-w-xl" style={{ color: "#6B7280" }}>{c.text}</p>}
       {c.image_url && <img src={c.image_url} alt="" className="max-h-64 object-cover w-full rounded-lg mt-4" />}
       {c.branch_photo_url && <img src={c.branch_photo_url} alt="" className="max-h-64 object-cover w-full rounded-lg mt-4" />}
-
-      {c.regional_numbers && (
-        <div className="flex flex-wrap gap-6 mt-5">
-          {c.regional_numbers.split("|").map((item: string, i: number) => (
-            <div key={i} className="px-5 py-3" style={{ backgroundColor: accent + "12" }}>
-              <p className="font-bold text-[15px]" style={{ color: primary }}>{item.trim()}</p>
-            </div>
-          ))}
-        </div>
-      )}
 
       {c.actions && (
         <div className="grid grid-cols-2 gap-x-8 gap-y-5">
@@ -343,7 +387,7 @@ export function LayoutImpactoComercial({ section, branding }: Props) {
       )}
 
       {!c.text && !c.actions && !c.items && !c.scenarios && (
-        <p className="italic text-[14px]" style={{ color: "#D1D5DB" }}>{c.message || "Conteúdo pendente"}</p>
+        <p className="text-[14px] italic" style={{ color: "#D1D5DB" }}>Conteúdo não preenchido</p>
       )}
     </div>
   );
