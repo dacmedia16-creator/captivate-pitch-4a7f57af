@@ -1,64 +1,36 @@
 
 
-# Corrigir integração Manus AI — API v2 correta + prompt detalhado por portal
+# Sincronizar animação de geração com o processo real
 
-## Problema atual
-A edge function `analyze-market-manus` tem vários erros em relação à API real do Manus:
-- URL errada (`/v1/tasks` em vez de `/v2/task.create`)
-- Autenticação errada (`Authorization: Bearer` em vez de `x-manus-api-key`)
-- Formato de request errado (campo `prompt` em vez de `message.content`)
-- Polling errado (endpoint e status codes incorretos)
-- O prompt não instrui o Manus a **navegar cada portal individualmente** e coletar os links reais
+## Problema
+A tela de geração (`StepGeneration`) usa timers fixos (total ~6.2s) para animar os 4 estágios e depois chama `onAnimationDone()`, que marca como completo e redireciona. Mas o processo real (Manus pode levar até 5 min) continua rodando em background. A animação termina antes da apresentação estar pronta.
 
 ## Solução
+Usar duas flags independentes: "animação terminou" e "geração real terminou". Só marcar como completo e redirecionar quando **ambas** forem true.
 
-### Reescrever `supabase/functions/analyze-market-manus/index.ts`
+### Mudanças
 
-**1. Endpoints corretos da API v2:**
-- `POST https://api.manus.ai/v2/task.create` com header `x-manus-api-key`
-- Body: `{ message: { content: [{ type: "text", text: "..." }] } }`
-- Resposta: `{ ok: true, task_id: "..." }`
+**1. `AgentNewPresentation.tsx`**
+- Adicionar estado `generationDone` (boolean, false)
+- Ao final de `handleGenerate()` (após todas as operações de DB), setar `generationDone = true`
+- Renomear `handleAnimationDone` → lógica que verifica se `generationDone` também é true
+- Passar `generationDone` como prop para `StepGeneration`
 
-**2. Polling correto:**
-- `GET https://api.manus.ai/v2/task.listMessages?task_id=X&order=desc&limit=50`
-- Procurar eventos `status_update` com `agent_status`:
-  - `running` → continuar polling
-  - `stopped` → ler `assistant_message` events para resultados
-  - `error` → falhou
+**2. `StepGeneration.tsx`**
+- Receber nova prop `generationDone: boolean`
+- Quando os timers terminam mas `generationDone` é false: manter o último estágio com spinner (não chamar `onAnimationDone`)
+- Adicionar um estágio extra "Finalizando..." que fica ativo enquanto espera
+- Usar `useEffect` que monitora `generationDone`: quando vira true E animação já passou, chamar `onAnimationDone()`
+- Se `generationDone` virar true antes dos timers acabarem, acelerar a animação restante
 
-**3. Prompt melhorado — instrui o Manus a navegar cada portal:**
-O prompt será reescrito para instruir o Manus a:
-- Abrir cada portal (ZAP, Viva Real, OLX, etc.) no navegador
-- Aplicar os filtros do usuário (tipo, bairro, área, preço, quartos)
-- Coletar cada anúncio individual com **o link direto do anúncio**
-- Retornar JSON estruturado com `source_url` sendo a URL real do anúncio no portal
-
-**4. Timeout aumentado para 5 minutos** (Manus navega portais reais, leva tempo)
-
-### Arquivos modificados
-1. `supabase/functions/analyze-market-manus/index.ts` — reescrita completa com API v2
-
-### Sem mudanças no frontend
-O `AgentNewPresentation.tsx` já chama `analyze-market-manus` e espera `{ success, comparables }` — o contrato se mantém.
-
-## Exemplo do novo prompt enviado ao Manus
-
+### Fluxo corrigido
 ```text
-Você é um pesquisador imobiliário. Sua tarefa é navegar nos portais 
-imobiliários listados abaixo e encontrar imóveis comparáveis ao imóvel 
-de referência.
-
-INSTRUÇÕES IMPORTANTES:
-1. Acesse CADA portal listado abaixo usando o navegador
-2. Em cada portal, busque imóveis com características similares
-3. Para CADA imóvel encontrado, copie o link direto do anúncio
-4. Colete: título, preço, área, quartos, suítes, vagas, endereço, 
-   bairro, e o LINK DO ANÚNCIO
-
-Imóvel de referência: Apartamento, 3 quartos, 120m², Bairro X, Cidade Y
-Portais: ZAP Imóveis (zapimoveis.com.br), Viva Real (vivareal.com.br)
-Filtros: área 100-140m², preço R$700k-R$1M
-
-Retorne JSON com source_url sendo a URL real do anúncio no portal.
+Timer animação:  ████████████████░░░░░░░░░░░  (6s)
+Geração real:    ████████████████████████████████ (30-120s)
+                                              ↑ onAnimationDone só aqui
 ```
+
+### Arquivos
+1. `src/components/wizard/StepGeneration.tsx` — adicionar prop `generationDone`, lógica de espera
+2. `src/pages/agent/AgentNewPresentation.tsx` — adicionar estado `generationDone`, passar como prop
 
