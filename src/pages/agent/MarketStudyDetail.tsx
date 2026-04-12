@@ -140,6 +140,9 @@ export default function MarketStudyDetail() {
         </CardContent>
       </Card>
 
+      {/* Filters and portals */}
+      <FiltersAndPortalsCard job={job} />
+
       {/* Pricing scenarios */}
       {report && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -254,6 +257,63 @@ export default function MarketStudyDetail() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+function FiltersAndPortalsCard({ job }: { job: any }) {
+  const filters = (job?.filters as Record<string, any>) || {};
+  const selectedPortals = (job?.selected_portals as string[]) || [];
+
+  const { data: portalSources } = useQuery({
+    queryKey: ["portal-sources"],
+    queryFn: async () => {
+      const { data } = await supabase.from("portal_sources").select("id, name, code");
+      return data || [];
+    },
+    enabled: selectedPortals.length > 0,
+  });
+
+  const portalNames = selectedPortals.map((pId: string) => {
+    const found = portalSources?.find((p: any) => p.id === pId);
+    return found?.name || pId;
+  });
+
+  const hasFilters = Object.keys(filters).length > 0;
+  const hasPortals = selectedPortals.length > 0;
+
+  if (!hasFilters && !hasPortals) return null;
+
+  return (
+    <Card className="glass-card">
+      <CardHeader><CardTitle className="text-lg">Parâmetros da Pesquisa</CardTitle></CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {hasFilters && (
+            <div>
+              <p className="text-sm font-medium mb-2 text-muted-foreground">Filtros Aplicados</p>
+              <div className="flex flex-wrap gap-2">
+                {filters.radius && <Badge variant="outline">Raio: {filters.radius} km</Badge>}
+                {filters.priceMin && <Badge variant="outline">Preço mín: {formatBRL(filters.priceMin)}</Badge>}
+                {filters.priceMax && <Badge variant="outline">Preço máx: {formatBRL(filters.priceMax)}</Badge>}
+                {filters.areaMin && <Badge variant="outline">Área mín: {filters.areaMin} m²</Badge>}
+                {filters.areaMax && <Badge variant="outline">Área máx: {filters.areaMax} m²</Badge>}
+                {filters.maxComparables && <Badge variant="outline">Máx comparáveis: {filters.maxComparables}</Badge>}
+              </div>
+            </div>
+          )}
+          {hasPortals && (
+            <div>
+              <p className="text-sm font-medium mb-2 text-muted-foreground">Portais Selecionados</p>
+              <div className="flex flex-wrap gap-2">
+                {portalNames.map((name: string, i: number) => (
+                  <Badge key={i} variant="secondary">{name}</Badge>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
