@@ -1,42 +1,58 @@
 
 
-# Auth, Roles, Tabelas e Seed Demo — Ajuste Final
+# Nucleo do Produto — Status
 
-## Status Atual
+## Tudo ja esta implementado
 
-Tudo ja esta implementado:
+Apos revisao completa do codigo, **todos os itens solicitados ja existem e estao funcionais**:
 
-- **Auth**: Supabase Auth com email/senha, `handle_new_user` trigger criando profiles
-- **Roles**: Tabela `user_roles` com enum `app_role` (super_admin, agency_admin, broker), funcao `has_role()` SECURITY DEFINER
-- **22 tabelas**: Todas criadas com RLS ativo e policies por perfil
-- **Portal sources**: 8 portais ja populados
-- **Super admin**: dacmedia16@gmail.com com role super_admin
-- **Multi-tenant**: `get_user_tenant_id()` SECURITY DEFINER, policies segregando por tenant
+### Dashboard do Corretor (`AgentDashboard.tsx`)
+- 5 metric cards: total, mes, PDFs, estudos, modelos
+- Botao "Nova Apresentacao"
+- Lista de apresentacoes recentes com status
+- Lista de rascunhos
 
-## Unica Pendencia: Seed Demo
+### Wizard Nova Apresentacao (`AgentNewPresentation.tsx`)
+- **Etapa 1** — Dados do imovel (`StepPropertyData.tsx`): todos os campos solicitados (titulo, proprietario, tipo, finalidade, endereco, cidade, bairro, condominio, CEP, areas, dormitorios, suites, banheiros, vagas, padrao, idade, diferenciais, valor pretendido, observacoes, upload de fotos)
+- **Etapa 2** — Layout e estilo (`StepLayoutStyle.tsx`): 3 layouts (executivo, premium, impacto), 4 tons, 3 modos
+- **Etapa 3** — Estudo de mercado (`StepMarketStudy.tsx`): portais, raio, faixas, comparaveis
+- **Etapa 4** — Geracao (`StepGeneration.tsx`): loading premium com 4 estagios animados
 
-Falta criar dados demo com 1 imobiliaria, 1 admin e 2 corretores. Isso requer:
+### Geracao Automatica (`useGeneratePresentation.ts`)
+- Busca perfil do corretor, imobiliaria, branding, marketing, diferenciais, resultados, depoimentos
+- Gera 12 sections: capa, corretor, global, nacional, regional, resumo imovel, marketing, diferenciais, resultados, estudo mercado, cenarios preco, fechamento
 
-### Migracao SQL (seed)
+### 3 Layouts Premium
+- **Executivo** (`LayoutExecutivo.tsx`): clean, corporativo, com icones e grids estruturados
+- **Premium** (`LayoutPremium.tsx`): gradientes, tipografia serif, gold accents, visual forte
+- **Impacto Comercial** (`LayoutImpactoComercial.tsx`): uppercase, badges, apelo comercial forte
+- Todos usam branding da imobiliaria (cores, logo)
 
-1. Criar 3 usuarios via `supabase.auth.admin.createUser` (nao e possivel via SQL puro) — alternativa: criar via edge function ou inserir direto nas tabelas `profiles` e `user_roles` sem vincular a auth.users (dados fictícios para visualizacao)
+### Editor (`PresentationEditor.tsx`)
+- Sidebar de slides com toggle visibilidade
+- Preview central com SectionRenderer
+- Painel lateral de edicao por tipo de secao
+- Editar textos, ocultar secao, duplicar, salvar como modelo
+- Gerar textos com IA (edge function `generate-presentation-text`)
+- Exportar PDF (edge function `export-pdf`)
+- Link compartilhavel com share_token
+- Modo apresentacao
 
-**Abordagem pratica**: Criar uma edge function `seed-demo` que:
-- Cria 1 tenant "Imobiliaria Premium Demo"
-- Cria 3 usuarios de teste via admin API (admin@demo.com, corretor1@demo.com, corretor2@demo.com, senha: 12345678)
-- Atribui roles (agency_admin + 2 brokers)
-- Cria agency_profile com branding demo
-- Cria 2 broker_profiles com dados ficticios
+### Modo Apresentacao (`PresentationMode.tsx`)
+- Fullscreen com Fullscreen API
+- Navegacao anterior/proximo + teclado (setas, Space, Escape)
+- Barra de progresso
+- Top bar auto-hide
 
-### Arquivos
+### Compartilhamento (`SharedPresentation.tsx`)
+- Rota publica `/share/:token`
+- Renderiza todas as sections visiveis com branding
 
-| Arquivo | Acao |
-|---------|------|
-| `supabase/functions/seed-demo/index.ts` | Criar — edge function one-shot para popular dados demo |
+### Edge Functions
+- `generate-presentation-text`: IA via Lovable AI Gateway (Gemini) com tool calling
+- `export-pdf`: Gera HTML estilizado e salva no storage
 
-### Alternativa mais simples
+## Nenhuma alteracao necessaria
 
-Inserir diretamente via SQL migration apenas o tenant + agency_profile, e pedir ao usuario que crie as contas manualmente via signup. Isso evita complexidade de criar usuarios via admin API.
-
-**Recomendacao**: Usar a edge function para seed completo, ja que o usuario quer tudo funcional automaticamente.
+Todos os modulos, layouts, wizard, editor, modo apresentacao e funcoes estao implementados conforme solicitado.
 
