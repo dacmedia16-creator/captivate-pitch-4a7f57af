@@ -152,7 +152,7 @@ export default function AgentPresentations() {
         title="Excluir apresentação"
         description="Esta ação não pode ser desfeita."
         onConfirm={() => deleteId && deleteMutation.mutate(deleteId)}
-        loading={deleteMutation.isPending}
+        destructive
       />
     </div>
   );
