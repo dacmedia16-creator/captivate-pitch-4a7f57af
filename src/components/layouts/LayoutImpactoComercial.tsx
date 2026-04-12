@@ -193,6 +193,9 @@ export function LayoutImpactoComercial({ section, branding }: Props) {
       <div className="w-10 h-1 mb-6" style={{ backgroundColor: accent }} />
 
       {c.text && <p className="slide-body whitespace-pre-wrap max-w-xl" style={{ color: "#6B7280" }}>{c.text}</p>}
+      {c.branch_photo_url && (
+        <img src={c.branch_photo_url} alt="" className="max-h-64 object-cover w-full rounded-lg mt-4" />
+      )}
 
       {c.actions && (
         <div className="grid grid-cols-2 gap-x-8 gap-y-5">
