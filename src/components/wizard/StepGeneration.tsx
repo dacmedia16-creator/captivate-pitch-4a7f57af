@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Check, Loader2, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -7,18 +7,22 @@ const stages = [
   { label: "Organizando branding da imobiliária", duration: 1200 },
   { label: "Gerando narrativa da apresentação", duration: 2000 },
   { label: "Montando apresentação final", duration: 1500 },
+  { label: "Finalizando...", duration: 0 }, // waiting stage
 ];
 
 interface StepGenerationProps {
   isGenerating: boolean;
   isComplete: boolean;
+  generationDone: boolean;
   onAnimationDone: () => void;
 }
 
-export function StepGeneration({ isGenerating, isComplete, onAnimationDone }: StepGenerationProps) {
+export function StepGeneration({ isGenerating, isComplete, generationDone, onAnimationDone }: StepGenerationProps) {
   const [currentStage, setCurrentStage] = useState(-1);
   const [progress, setProgress] = useState(0);
+  const animationDone = useRef(false);
 
+  // Animate through first 4 stages on fixed timers
   useEffect(() => {
     if (!isGenerating) return;
     let stageIndex = 0;
@@ -26,18 +30,36 @@ export function StepGeneration({ isGenerating, isComplete, onAnimationDone }: St
 
     const advance = () => {
       stageIndex++;
-      if (stageIndex < stages.length) {
+      if (stageIndex < 4) {
         setCurrentStage(stageIndex);
-        setProgress(Math.round((stageIndex / stages.length) * 100));
+        setProgress(Math.round((stageIndex / 4) * 90));
         setTimeout(advance, stages[stageIndex].duration);
       } else {
-        setProgress(100);
-        onAnimationDone();
+        // Animation done, show waiting stage if generation not done
+        setProgress(90);
+        animationDone.current = true;
+        if (generationDone) {
+          setProgress(100);
+          onAnimationDone();
+        } else {
+          setCurrentStage(4); // "Finalizando..."
+        }
       }
     };
 
     setTimeout(advance, stages[0].duration);
   }, [isGenerating]);
+
+  // Watch generationDone — complete when both animation and generation are done
+  useEffect(() => {
+    if (generationDone && animationDone.current && !isComplete) {
+      setCurrentStage(4);
+      setProgress(100);
+      onAnimationDone();
+    }
+  }, [generationDone, isComplete, onAnimationDone]);
+
+  const visibleStages = currentStage < 4 && !generationDone ? stages.slice(0, 4) : stages;
 
   return (
     <div className="max-w-lg mx-auto py-12 space-y-8">
@@ -58,7 +80,6 @@ export function StepGeneration({ isGenerating, isComplete, onAnimationDone }: St
         </p>
       </div>
 
-      {/* Progress bar with gradient */}
       <div className="h-2 bg-muted rounded-full overflow-hidden">
         <div
           className="h-full rounded-full transition-all duration-500 ease-out animate-shimmer-gold"
@@ -67,7 +88,7 @@ export function StepGeneration({ isGenerating, isComplete, onAnimationDone }: St
       </div>
 
       <div className="space-y-3">
-        {stages.map((stage, i) => (
+        {visibleStages.map((stage, i) => (
           <div
             key={i}
             className={cn(
