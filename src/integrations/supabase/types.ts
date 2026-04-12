@@ -980,6 +980,48 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_presentation_by_share_token: {
+        Args: { _token: string }
+        Returns: {
+          address: string | null
+          area_built: number | null
+          area_land: number | null
+          area_total: number | null
+          bathrooms: number | null
+          bedrooms: number | null
+          broker_id: string
+          cep: string | null
+          city: string | null
+          condominium: string | null
+          created_at: string
+          creation_mode: string | null
+          highlights: string | null
+          id: string
+          neighborhood: string | null
+          notes: string | null
+          owner_expected_price: number | null
+          owner_name: string | null
+          parking_spots: number | null
+          property_age: string | null
+          property_purpose: string | null
+          property_standard: string | null
+          property_type: string | null
+          selected_layout: string | null
+          selected_tone: string | null
+          share_token: string | null
+          status: string
+          suites: number | null
+          tenant_id: string
+          title: string | null
+          updated_at: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "presentations"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       get_user_tenant_id: { Args: { _user_id: string }; Returns: string }
       has_role: {
         Args: {
