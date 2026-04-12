@@ -1,21 +1,32 @@
 
 
-# Adicionar Botão Permanente "Atualizar Sistema" na TopBar
+# Exibir Todos os Dados do Perfil no Slide do Corretor
 
-## O que muda
+## Problema
 
-Adicionar um botão visível na barra superior (TopBar) que recarrega a página para buscar a versão mais recente. Sempre visível, sem depender de detecção automática.
+O corretor cadastra **educação** e **regiões de atuação** no perfil, e esses dados já são salvos no `content` da seção `broker_intro` pelo `useGeneratePresentation.ts`. Porém os 3 layouts ignoram esses campos — só mostram nome, CRECI, bio, anos, especialidades e VGV.
 
-## Arquivo a editar
+## O que será adicionado nos slides
 
-### `src/components/TopBar.tsx`
+Campos que faltam nos layouts:
+- **`education`** (Formação) — ex: "MBA em Gestão Imobiliária - FGV"
+- **`service_regions`** (Regiões de atuação) — ex: "Jardins, Itaim Bibi, Vila Nova Conceição"
 
-- Adicionar um ícone `RefreshCw` ao lado dos outros botões (busca, notificações)
-- Ao clicar: `sessionStorage.setItem("app_version_reloaded", "1")` + `window.location.reload()`
-- Tooltip: "Atualizar sistema"
-- Estilo consistente com os outros botões ghost da TopBar
+## Arquivos a editar
 
-## O banner automático
+### 1. `src/components/layouts/LayoutExecutivo.tsx` (broker_intro, linhas 47-80)
+- Adicionar `education` abaixo da bio (texto discreto)
+- Adicionar `service_regions` ao bloco de métricas junto com anos e especialidades
 
-O `VersionUpdateBanner` continua funcionando normalmente como complemento — ele avisa quando há versão nova. O botão é para o usuário forçar a atualização quando quiser.
+### 2. `src/components/layouts/LayoutPremium.tsx` (broker_intro, linhas 54-73)
+- Adicionar `education` e `service_regions` abaixo da bio
+- Adicionar bloco de métricas (anos + especialidades) que está ausente neste layout
+
+### 3. `src/components/layouts/LayoutImpactoComercial.tsx` (broker_intro, linhas 41-71)
+- Adicionar `education` abaixo da bio
+- Adicionar `service_regions` como badge/bloco adicional
+
+## Sem alterações em
+- `useGeneratePresentation.ts` — já passa `education` e `service_regions` no content
+- Banco de dados, rotas, perfil do corretor
 
