@@ -150,6 +150,38 @@
     box-shadow: 0 2px 20px -4px hsl(215 30% 12% / 0.15),
                 0 0 0 1px hsl(215 20% 90% / 0.5);
   }
+
+  .slide-label {
+    font-family: 'Inter', sans-serif;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+  }
+
+  .slide-metric {
+    font-family: 'Playfair Display', serif;
+    font-weight: 700;
+    line-height: 1;
+  }
+
+  .slide-title {
+    font-family: 'Playfair Display', serif;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+  }
+
+  .slide-body {
+    font-family: 'Inter', sans-serif;
+    font-weight: 300;
+    line-height: 1.7;
+  }
+
+  .editorial-divider {
+    height: 1px;
+    opacity: 0.12;
+  }
 }
 
 @keyframes shimmer-gold {

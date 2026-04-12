@@ -11,97 +11,161 @@ export function LayoutPremium({ section, branding }: Props) {
   const primary = branding?.primary_color || "#1e3a5f";
   const gold = branding?.secondary_color || "#c9a84c";
 
-  const GoldDivider = () => (
-    <div className="flex items-center gap-3 my-4">
-      <div className="h-px flex-1" style={{ backgroundColor: gold + "33" }} />
-      <div className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: gold }} />
-      <div className="h-px flex-1" style={{ backgroundColor: gold + "33" }} />
-    </div>
+  const SectionLabel = ({ children, light }: { children: React.ReactNode; light?: boolean }) => (
+    <p className="slide-label" style={{ color: light ? `${gold}99` : gold }}>{children}</p>
   );
 
+  const GoldBar = () => (
+    <div className="w-[3px] h-20 rounded-full" style={{ background: `linear-gradient(to bottom, ${gold}, ${gold}33)` }} />
+  );
+
+  /* ═══════ COVER ═══════ */
   if (section.section_key === "cover") {
     return (
-      <div className="relative min-h-[500px] rounded-xl overflow-hidden flex flex-col items-center justify-center text-center text-white" style={{ background: `linear-gradient(135deg, ${primary} 0%, ${primary}dd 60%, ${gold}22 100%)` }}>
-        {c.cover_image && <img src={c.cover_image} alt="Imóvel" className="absolute inset-0 w-full h-full object-cover opacity-20" />}
-        <div className="absolute inset-0" style={{ background: `radial-gradient(ellipse at 30% 50%, ${gold}15 0%, transparent 70%)` }} />
-        <div className="relative z-10 space-y-6 p-8">
-          {c.logo_url && <img src={c.logo_url} alt="Logo" className="h-16 mx-auto object-contain drop-shadow-lg" />}
-          <div className="flex items-center justify-center gap-4">
-            <div className="h-px w-16" style={{ backgroundColor: gold }} />
-            <div className="h-2 w-2 rounded-full" style={{ backgroundColor: gold }} />
-            <div className="h-px w-16" style={{ backgroundColor: gold }} />
+      <div className="relative min-h-[500px] overflow-hidden text-white" style={{ fontFamily: "'Inter', sans-serif" }}>
+        {c.cover_image && <img src={c.cover_image} alt="" className="absolute inset-0 w-full h-full object-cover" />}
+        <div className="absolute inset-0" style={{ background: `linear-gradient(135deg, ${primary}ee 0%, ${primary}bb 50%, ${primary}88 100%)` }} />
+        <div className="absolute inset-0" style={{ background: `radial-gradient(ellipse at 20% 80%, ${gold}15 0%, transparent 60%)` }} />
+
+        {c.logo_url && <img src={c.logo_url} alt="" className="absolute top-8 left-10 h-12 object-contain drop-shadow-lg" />}
+
+        <div className="relative z-10 min-h-[500px] flex flex-col justify-end p-10 pb-14">
+          <div className="flex items-end gap-6">
+            <GoldBar />
+            <div className="space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="h-px w-10" style={{ backgroundColor: gold }} />
+                <div className="h-1 w-1 rounded-full" style={{ backgroundColor: gold }} />
+              </div>
+              <h1 className="slide-title text-[48px] text-white max-w-lg">{c.title}</h1>
+              <p className="slide-label text-white/50">{[c.neighborhood, c.city].filter(Boolean).join(" — ")}</p>
+              {c.broker_name && <p className="text-[12px] text-white/30 font-light mt-2">{c.broker_name} · {c.agency_name}</p>}
+            </div>
           </div>
-          <h1 className="text-4xl md:text-5xl font-bold font-serif tracking-tight">{c.title}</h1>
-          <p className="text-lg opacity-80 tracking-widest uppercase text-sm">{[c.neighborhood, c.city].filter(Boolean).join(" — ")}</p>
-          {c.broker_name && <p className="text-sm opacity-50 mt-4">{c.broker_name} • {c.agency_name}</p>}
         </div>
       </div>
     );
   }
 
+  /* ═══════ BROKER INTRO ═══════ */
   if (section.section_key === "broker_intro") {
     return (
-      <div className="min-h-[500px] rounded-xl p-8 md:p-12 text-white flex items-center" style={{ background: `linear-gradient(160deg, ${primary}ee 0%, ${primary} 100%)` }}>
-        <div className="flex items-start gap-8 w-full">
-          {c.avatar_url && <img src={c.avatar_url} alt={c.name} className="h-32 w-32 rounded-full object-cover border-4 shadow-xl" style={{ borderColor: gold }} />}
-          <div className="space-y-3 flex-1">
-            <h2 className="text-3xl font-bold font-serif tracking-tight">{c.name}</h2>
-            {c.creci && <p className="text-sm opacity-60 tracking-wider">CRECI: {c.creci}</p>}
-            <div className="w-12 h-0.5 rounded-full" style={{ backgroundColor: gold }} />
-            {c.short_bio && <p className="text-white/80 leading-relaxed">{c.short_bio}</p>}
-            {c.vgv_summary && <p className="text-sm opacity-50 italic">{c.vgv_summary}</p>}
-          </div>
+      <div className="min-h-[500px] flex" style={{ fontFamily: "'Inter', sans-serif" }}>
+        <div className="flex-1 p-10 flex flex-col justify-center" style={{ background: `linear-gradient(160deg, ${primary} 0%, ${primary}ee 100%)` }}>
+          <SectionLabel light>Seu consultor</SectionLabel>
+          <h2 className="slide-title text-[40px] text-white mt-3 mb-2">{c.name}</h2>
+          {c.creci && <p className="text-[11px] text-white/30 tracking-wider mb-6">CRECI {c.creci}</p>}
+          <div className="w-12 h-px rounded-full mb-6" style={{ backgroundColor: gold }} />
+          {c.short_bio && <p className="slide-body text-white/60 max-w-sm">{c.short_bio}</p>}
+          {c.vgv_summary && <p className="text-[12px] text-white/30 italic mt-4">{c.vgv_summary}</p>}
         </div>
+        {c.avatar_url && (
+          <div className="w-[40%] relative">
+            <img src={c.avatar_url} alt={c.name} className="absolute inset-0 w-full h-full object-cover" />
+            <div className="absolute inset-y-0 left-0 w-24" style={{ background: `linear-gradient(to right, ${primary}, transparent)` }} />
+          </div>
+        )}
       </div>
     );
   }
 
+  /* ═══════ PROPERTY SUMMARY ═══════ */
   if (section.section_key === "property_summary") {
     return (
-      <div className="min-h-[500px] rounded-xl overflow-hidden" style={{ background: `linear-gradient(180deg, ${primary}06, white)` }}>
+      <div className="min-h-[500px] bg-white" style={{ fontFamily: "'Inter', sans-serif" }}>
         {c.images?.length > 0 && (
-          <div className="grid grid-cols-2 gap-0.5">
-            <img src={c.images[0]} alt="Principal" className="col-span-2 h-48 w-full object-cover" />
-            {c.images.slice(1, 3).map((img: string, i: number) => (
-              <img key={i} src={img} alt={`Foto ${i+2}`} className="h-32 w-full object-cover" />
-            ))}
+          <div className="flex gap-[1px]">
+            <img src={c.images[0]} alt="" className="flex-[2] h-52 object-cover" />
+            {c.images.length > 1 && (
+              <div className="flex-1 flex flex-col gap-[1px]">
+                {c.images.slice(1, 3).map((img: string, i: number) => (
+                  <img key={i} src={img} alt="" className="flex-1 w-full object-cover" />
+                ))}
+              </div>
+            )}
           </div>
         )}
-        <div className="p-8 space-y-3">
-          <h2 className="text-2xl font-bold font-serif tracking-tight" style={{ color: primary }}>{section.title}</h2>
-          <GoldDivider />
-          <div className="grid grid-cols-4 gap-3">
+        <div className="p-10 space-y-5">
+          <SectionLabel>O imóvel</SectionLabel>
+          <h2 className="slide-title text-[30px]" style={{ color: primary }}>{section.title}</h2>
+          <div className="h-px w-full" style={{ backgroundColor: gold + "22" }} />
+          <div className="flex gap-10 py-2">
             {[
               { label: "Área", value: c.area_total ? `${c.area_total}m²` : null },
               { label: "Quartos", value: c.bedrooms },
               { label: "Suítes", value: c.suites },
               { label: "Vagas", value: c.parking_spots },
             ].filter(i => i.value).map((item, i) => (
-              <div key={i} className="text-center py-3 px-2 rounded-xl border" style={{ borderColor: gold + "22", backgroundColor: primary + "06" }}>
-                <p className="text-2xl font-bold font-serif" style={{ color: primary }}>{item.value}</p>
-                <p className="text-[10px] text-gray-400 uppercase tracking-widest mt-1">{item.label}</p>
+              <div key={i}>
+                <p className="slide-metric text-[28px]" style={{ color: primary }}>{item.value}</p>
+                <p className="slide-label text-gray-400 mt-1">{item.label}</p>
               </div>
             ))}
           </div>
-          {c.highlights && <p className="text-gray-600 leading-relaxed mt-2">{c.highlights}</p>}
+          {c.highlights && <p className="slide-body text-gray-500 max-w-lg">{c.highlights}</p>}
         </div>
       </div>
     );
   }
 
+  /* ═══════ MARKET STUDY ═══════ */
+  if (section.section_key === "market_study_placeholder" && c.comparables?.length > 0) {
+    return (
+      <div className="min-h-[500px] bg-white p-10" style={{ fontFamily: "'Inter', sans-serif" }}>
+        <SectionLabel>Análise de mercado</SectionLabel>
+        <h2 className="slide-title text-[28px] mt-2 mb-6" style={{ color: primary }}>{section.title}</h2>
+        <div className="h-px w-full mb-6" style={{ backgroundColor: gold + "22" }} />
+        <MarketStats avgPrice={c.avg_price} medianPrice={c.median_price} avgPricePerSqm={c.avg_price_per_sqm} totalComparables={c.comparables.length} compact primaryColor={primary} accentColor={gold} />
+        <div className="mt-6">
+          <MarketPriceBarChart comparables={c.comparables} ownerExpectedPrice={c.owner_expected_price} compact primaryColor={primary} accentColor={gold} />
+        </div>
+      </div>
+    );
+  }
+
+  /* ═══════ PRICING SCENARIOS ═══════ */
+  if (section.section_key === "pricing_scenarios") {
+    return (
+      <div className="min-h-[500px] bg-white p-10" style={{ fontFamily: "'Inter', sans-serif" }}>
+        <SectionLabel>Precificação sugerida</SectionLabel>
+        <h2 className="slide-title text-[28px] mt-2" style={{ color: primary }}>{section.title}</h2>
+        {c.owner_expected_price && (
+          <p className="text-[13px] text-gray-400 mt-2 mb-6">Valor pretendido: <span className="font-semibold" style={{ color: gold }}>R$ {Number(c.owner_expected_price).toLocaleString("pt-BR")}</span></p>
+        )}
+        <div className="h-px w-full mb-6" style={{ backgroundColor: gold + "22" }} />
+        <div className="flex">
+          {(c.scenarios || []).map((s: any, i: number) => {
+            const colors = ["#dc2626", primary, "#16a34a"];
+            return (
+              <div key={i} className="flex-1 py-10 text-center relative">
+                {i > 0 && <div className="absolute left-0 top-6 bottom-6 w-px" style={{ backgroundColor: gold + "22" }} />}
+                <p className="slide-label text-gray-400 mb-4">{s.label}</p>
+                <p className="slide-metric text-[40px]" style={{ color: colors[i] }}>
+                  {s.value ? `R$ ${Number(s.value).toLocaleString("pt-BR")}` : "—"}
+                </p>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
+  /* ═══════ CLOSING ═══════ */
   if (section.section_key === "closing") {
     return (
-      <div className="min-h-[500px] rounded-xl flex flex-col items-center justify-center text-center text-white p-8" style={{ background: `linear-gradient(135deg, ${primary}, ${primary}dd)` }}>
-        {c.logo_url && <img src={c.logo_url} alt="Logo" className="h-14 object-contain mb-6 drop-shadow-lg" />}
-        <div className="flex items-center gap-3 mb-6">
-          <div className="h-px w-12" style={{ backgroundColor: gold }} />
+      <div className="min-h-[500px] flex flex-col items-center justify-center text-center text-white p-12" style={{ background: `linear-gradient(135deg, ${primary}, ${primary}dd)`, fontFamily: "'Inter', sans-serif" }}>
+        <div className="absolute inset-0" style={{ background: `radial-gradient(ellipse at 50% 0%, ${gold}08 0%, transparent 60%)` }} />
+        {c.logo_url && <img src={c.logo_url} alt="" className="h-12 object-contain mb-10 opacity-70 relative z-10" />}
+        <div className="flex items-center gap-4 mb-8 relative z-10">
+          <div className="h-px w-20" style={{ backgroundColor: gold + "55" }} />
           <div className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: gold }} />
-          <div className="h-px w-12" style={{ backgroundColor: gold }} />
+          <div className="h-px w-20" style={{ backgroundColor: gold + "55" }} />
         </div>
-        <h2 className="text-3xl font-bold font-serif mb-4 tracking-tight">Obrigado pela confiança</h2>
-        <p className="opacity-70 mb-6 max-w-md">Estou à disposição para transformar este imóvel em um excelente negócio.</p>
-        <div className="space-y-1 text-sm opacity-70">
-          <p className="font-semibold text-lg" style={{ color: gold }}>{c.broker_name}</p>
+        <h2 className="slide-title text-[36px] text-white mb-4 relative z-10">Obrigado pela confiança</h2>
+        <p className="text-white/40 text-[14px] font-light max-w-sm mb-10 leading-relaxed relative z-10">Estou à disposição para transformar este imóvel em um excelente negócio.</p>
+        <p className="text-[22px] font-semibold relative z-10" style={{ color: gold }}>{c.broker_name}</p>
+        <div className="space-y-1 text-[13px] text-white/40 mt-3 relative z-10">
           {c.broker_phone && <p>{c.broker_phone}</p>}
           {c.broker_email && <p>{c.broker_email}</p>}
         </div>
@@ -109,63 +173,62 @@ export function LayoutPremium({ section, branding }: Props) {
     );
   }
 
-  if (section.section_key === "market_study_placeholder" && c.comparables?.length > 0) {
-    return (
-      <div className="min-h-[500px] rounded-xl p-8 md:p-12 bg-white">
-        <h2 className="text-2xl font-bold font-serif mb-1 tracking-tight" style={{ color: primary }}>{section.title}</h2>
-        <GoldDivider />
-        <MarketStats avgPrice={c.avg_price} medianPrice={c.median_price} avgPricePerSqm={c.avg_price_per_sqm} totalComparables={c.comparables.length} compact />
-        <div className="mt-4">
-          <MarketPriceBarChart comparables={c.comparables} ownerExpectedPrice={c.owner_expected_price} compact primaryColor={primary} accentColor={gold} />
-        </div>
-      </div>
-    );
-  }
-
-  // Generic
+  /* ═══════ GENERIC ═══════ */
   return (
-    <div className="min-h-[500px] rounded-xl p-8 md:p-12 bg-white">
-      <h2 className="text-2xl font-bold font-serif mb-1 tracking-tight" style={{ color: primary }}>{section.title}</h2>
-      <GoldDivider />
-      {c.text ? <p className="text-gray-600 whitespace-pre-wrap leading-relaxed">{c.text}</p> : null}
-      {c.actions ? (
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-4">
+    <div className="min-h-[500px] bg-white p-10" style={{ fontFamily: "'Inter', sans-serif" }}>
+      <SectionLabel>{section.section_key.replace(/_/g, " ")}</SectionLabel>
+      <h2 className="slide-title text-[28px] mt-2 mb-4" style={{ color: primary }}>{section.title}</h2>
+      <div className="h-px w-full mb-6" style={{ backgroundColor: gold + "22" }} />
+
+      {c.text && <p className="slide-body text-gray-500 whitespace-pre-wrap max-w-xl">{c.text}</p>}
+
+      {c.actions && (
+        <div className="grid grid-cols-2 gap-x-8 gap-y-5">
           {c.actions.map((a: any, i: number) => (
-            <div key={i} className="p-4 rounded-xl border text-center" style={{ borderColor: gold + "33" }}>
-              <h4 className="font-medium text-sm">{a.title}</h4>
-              {a.description && <p className="text-xs text-gray-500 mt-1 leading-relaxed">{a.description}</p>}
-            </div>
-          ))}
-        </div>
-      ) : null}
-      {c.items ? (
-        <div className="space-y-3 mt-4">
-          {c.items.map((item: any, i: number) => (
-            <div key={i} className="flex items-start gap-3">
-              <div className="h-6 w-6 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0" style={{ backgroundColor: gold }}>{i + 1}</div>
+            <div key={i} className="flex items-baseline gap-3">
+              <span className="slide-metric text-[18px]" style={{ color: gold }}>{String(i + 1).padStart(2, "0")}</span>
               <div>
-                <h4 className="font-medium text-sm">{item.title || item.author_name}</h4>
-                <p className="text-xs text-gray-500 leading-relaxed">{item.description || item.content}</p>
+                <h4 className="font-medium text-[14px]" style={{ color: primary }}>{a.title}</h4>
+                {a.description && <p className="text-[12px] text-gray-400 mt-1 leading-relaxed">{a.description}</p>}
               </div>
             </div>
           ))}
         </div>
-      ) : null}
-      {c.scenarios ? (
-        <div className="grid grid-cols-3 gap-4 mt-4">
+      )}
+
+      {c.items && (
+        <div className="space-y-4">
+          {c.items.map((item: any, i: number) => (
+            <div key={i} className="flex items-start gap-4 py-3 border-b border-gray-50 last:border-0">
+              <span className="slide-metric text-[18px] shrink-0" style={{ color: gold }}>{String(i + 1).padStart(2, "0")}</span>
+              <div>
+                <h4 className="font-medium text-[14px]" style={{ color: primary }}>{item.title || item.author_name}</h4>
+                <p className="text-[12px] text-gray-400 mt-1 leading-relaxed">{item.description || item.content}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {c.scenarios && (
+        <div className="flex mt-4">
           {c.scenarios.map((s: any, i: number) => {
-            const colors = ["#ef4444", primary, "#22c55e"];
+            const colors = ["#dc2626", primary, "#16a34a"];
             return (
-              <div key={i} className="p-5 rounded-xl text-center border" style={{ borderColor: colors[i] + "22", backgroundColor: colors[i] + "06" }}>
-                <p className="text-xs text-gray-400 uppercase tracking-wider">{s.label}</p>
-                <p className="text-xl font-bold font-serif mt-1" style={{ color: colors[i] }}>{s.value ? `R$ ${Number(s.value).toLocaleString("pt-BR")}` : "—"}</p>
+              <div key={i} className="flex-1 text-center py-8 relative">
+                {i > 0 && <div className="absolute left-0 top-4 bottom-4 w-px" style={{ backgroundColor: gold + "22" }} />}
+                <p className="slide-label text-gray-400 mb-3">{s.label}</p>
+                <p className="slide-metric text-[36px]" style={{ color: colors[i] }}>
+                  {s.value ? `R$ ${Number(s.value).toLocaleString("pt-BR")}` : "—"}
+                </p>
               </div>
             );
           })}
         </div>
-      ) : null}
+      )}
+
       {!c.text && !c.actions && !c.items && !c.scenarios && (
-        <p className="text-gray-400 italic">{c.message || "Conteúdo pendente"}</p>
+        <p className="text-gray-300 italic text-[14px]">{c.message || "Conteúdo pendente"}</p>
       )}
     </div>
   );
