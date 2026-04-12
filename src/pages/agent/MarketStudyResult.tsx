@@ -340,6 +340,14 @@ export default function MarketStudyResult() {
             <Sparkles className={`h-4 w-4 mr-2 ${generatingAI ? "animate-pulse" : ""}`} />
             {generatingAI ? "Gerando..." : "Resumo IA"}
           </Button>
+          <Button variant="outline" size="sm" onClick={handleExportPDF} disabled={exportingPDF || !result}>
+            {exportingPDF ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileDown className="h-4 w-4 mr-2" />}
+            PDF
+          </Button>
+          <Button variant="outline" size="sm" onClick={handleCreatePresentation} disabled={creatingPresentation}>
+            {creatingPresentation ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Presentation className="h-4 w-4 mr-2" />}
+            Apresentação
+          </Button>
           <Badge variant={study.status === "completed" ? "default" : "secondary"}>
             {study.status === "completed" ? "Concluído" : study.status === "draft" ? "Rascunho" : study.status}
           </Badge>
