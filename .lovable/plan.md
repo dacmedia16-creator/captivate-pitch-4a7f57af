@@ -1,50 +1,137 @@
 
 
-# Corrigir integração Manus — polling quebrado + timeout mata o fluxo
+# Módulo Estudo de Mercado — Plano de Implementação
 
-## Diagnóstico
+Este é um módulo grande. Vou dividir em **4 fases** para entregar valor incremental sem quebrar o que já existe.
 
-A apresentação "Cannes 5" ficou em rascunho porque:
+---
 
-1. **Manus task é criada com sucesso** (`task_id: YuYu3VKUnmvSqJ6nJCHCdJ`)
-2. **Polling retorna 404 "Task not found"** — o endpoint `task.listMessages` não encontra a task
-3. **Após o 404, o polling continua por 3+ minutos** com `agent_status: undefined` até o edge function ser encerrado pelo runtime
-4. **Edge function morre sem retornar resposta** → o cliente recebe erro de rede
-5. **O `catch` no cliente mostra toast de erro e faz `return`** — nunca chega em `generatePresentationSections` → apresentação fica em "draft"
+## Fase 1 — Banco de Dados + Formulário Completo do Imóvel
 
-## Solução — 3 correções
+### Migração SQL
+Criar as novas tabelas (todas com RLS multi-tenant):
 
-### 1. Corrigir o polling da API Manus
-O endpoint de polling pode estar errado. A API v2 do Manus provavelmente usa `/task.get` ou outro endpoint para verificar status, não `task.listMessages`. Vamos:
-- Adicionar fallback: tentar primeiro `GET /task.get?task_id=X`, e se falhar tentar `GET /task.listMessages?task_id=X`
-- Se receber 404 no polling, **não continuar em loop** — lançar erro imediatamente após 3 tentativas com 404
+- **`market_studies`** — tabela principal do estudo (tenant_id, broker_id, status, title, purpose, created_at, updated_at). Independente de `presentations`.
+- **`market_study_subject_properties`** — dados completos do imóvel avaliado (todos os campos do formulário: finalidade, tipo, categoria, endereço, CEP, áreas, quartos, suítes, banheiros, vagas, salas, lavabos, idade, padrão construtivo, estado de conservação, diferenciais como JSONB, valor condomínio, IPTU, objetivo da precificação, observações).
+- **`market_study_comparables`** — comparáveis do estudo (dados do imóvel + similarity_score 0-100, status ativo/vendido/desatualizado, ajustes aplicados como JSONB, source_url, source_name, is_approved).
+- **`market_study_adjustments`** — ajustes individuais por comparável (comparable_id, adjustment_type, label, percentage, value, direction: positive/negative/neutral).
+- **`market_study_results`** — resultado final (avg_price, median_price, avg_price_per_sqm, suggested_ad_price, suggested_market_price, suggested_fast_sale_price, price_range_min, price_range_max, executive_summary, justification, market_insights JSONB, confidence_level).
+- **`market_study_settings`** — configurações de pesos e regras por tenant (tenant_id, adjustment_weights JSONB, similarity_weights JSONB, default_filters JSONB).
 
-### 2. Reduzir timeout do Manus para 60s no edge function
-O edge function tem um timeout do runtime (~60-120s). Com `MAX_POLL_TIME = 300_000` (5 min), o runtime mata a function antes do timeout interno. Reduzir para 55s para garantir que a function retorne uma resposta (com erro) antes de ser encerrada, permitindo o fallback para Firecrawl funcionar.
+RLS: broker vê os próprios, agency_admin vê do tenant, super_admin vê tudo.
 
-### 3. Proteger o fluxo do cliente contra falha total
-No `AgentNewPresentation.tsx`, se o Manus E Firecrawl falharem com exceção (não só retorno de erro, mas timeout/network error), o código já faz `useSimulated = true` no `catch`. Mas o `catch` externo (linha 272) faz `return` e nunca gera as sections. Mover o `generatePresentationSections` para fora do try/catch de market analysis, ou garantir que o catch não aborte o fluxo todo.
+### Novas Páginas e Rotas
+- `/market-studies` — lista de estudos (substituir `/market-study`)
+- `/market-studies/new` — wizard de criação (multi-step)
+- `/market-studies/:id` — resultado completo
+- `/market-studies/:id/comparables` — tela de comparáveis com edição
+- `/market-studies/:id/edit` — editar estudo
 
-## Arquivos a modificar
+### Formulário Multi-Step (Wizard)
+4 steps:
+1. **Dados do Imóvel** — formulário completo com todos os campos solicitados (finalidade, tipo, categoria, endereço, áreas, quartos, suítes, banheiros, vagas, salas, lavabos, idade, padrão, estado de conservação, diferenciais como checkboxes, condomínio/IPTU, objetivo da precificação, observações)
+2. **Configuração de Pesquisa** — portais, raio, filtros de área/preço, nº de comparáveis
+3. **Geração** — tela de progresso com polling do status
+4. **Resultado** — redirect para a tela de resultado
 
-1. **`supabase/functions/analyze-market-manus/index.ts`**
-   - Corrigir `pollManusTask`: abortar após 3 erros 404 consecutivos em vez de continuar polling
-   - Reduzir `MAX_POLL_TIME` para 55000 (55s)
-   - Tentar endpoint alternativo `task.get` antes de `task.listMessages`
+### Sidebar
+Atualizar o menu do agente: trocar "Estudo de Mercado" para apontar para `/market-studies`.
 
-2. **`src/pages/agent/AgentNewPresentation.tsx`**
-   - Reestruturar o try/catch para que falha no market analysis NÃO impeça `generatePresentationSections` de rodar
-   - O market analysis inteiro (Manus/Firecrawl/simulado) deve ficar num try/catch próprio que sempre resolve (com simulado no pior caso)
-   - `generatePresentationSections` e as atualizações de seções devem rodar **fora** desse try/catch
+---
 
-## Fluxo corrigido
+## Fase 2 — Motor de Similaridade + Ajustes Automáticos
 
-```text
-1. Criar apresentação e job ✓
-2. Tentar Manus (timeout 55s) → falha? Firecrawl → falha? Simulado
-   ↑ NUNCA lança exceção para fora — sempre retorna dados (mesmo simulados)
-3. generatePresentationSections() — SEMPRE executa
-4. Atualizar seções com dados de mercado
-5. setGenerationDone(true)
-```
+### Hook `useMarketSimilarity`
+Calcular similarity score (0-100) com pesos configuráveis:
+- Mesmo condomínio: +25 pontos
+- Mesmo bairro: +20 pontos
+- Mesmo tipo: +15 pontos
+- Faixa de metragem (±20%): +15 pontos
+- Quartos/suítes/vagas próximos: +10 pontos
+- Mesmo padrão: +10 pontos
+- Descartar se score < 30
+
+### Hook `useMarketAdjustments`
+Ajustes automáticos baseados em diferenças:
+- Piscina: +3-5%
+- Área gourmet: +2-3%
+- Suíte master: +2%
+- Mais vagas: +1-2% por vaga
+- Terreno maior: proporcional
+- Estado de conservação: ±3-8%
+- Idade: ±2-5%
+- Vista privilegiada: +3-5%
+
+Cada ajuste gera um registro em `market_study_adjustments` com direção (positivo/negativo/neutro).
+
+### Recálculo Automático
+Quando o usuário alterar filtros ou aprovar/rejeitar comparáveis, recalcular scores e preços em tempo real.
+
+---
+
+## Fase 3 — Tela de Resultado Premium
+
+### Componentes Visuais
+- **ExecutiveSummary** — card com resumo textual gerado por IA (Gemini)
+- **PriceRangeChart** — gráfico de faixa de preço (min/mercado/aspiracional) com gauge visual
+- **PricePerSqmChart** — gráfico de barras R$/m² dos comparáveis vs imóvel
+- **ComparativeTable** — tabela expandida com ajustes por coluna, badges de score, status (ativo/vendido)
+- **AdjustmentBadges** — badges visuais verde (positivo), vermelho (negativo), cinza (neutro)
+- **MarketInsights** — cards com insights (acima do mercado, competitivo, boa liquidez, risco de superavaliação)
+- **RecommendationBlock** — bloco final com recomendação de preço e justificativa
+
+### Geração de Resumo por IA
+Edge function que usa Gemini para gerar:
+- Resumo executivo em linguagem profissional
+- Justificativa de preço
+- Insights de mercado
+Usando os dados dos comparáveis e ajustes como input.
+
+---
+
+## Fase 4 — Exportação PDF + Integração com Apresentação
+
+### Exportar PDF
+Edge function `export-market-study-pdf` que gera PDF profissional com:
+- Capa com dados do imóvel e logo da imobiliária
+- Resumo executivo
+- Tabela comparativa
+- Gráficos (renderizados como imagens)
+- Recomendação final
+
+### Transformar em Apresentação
+Botão que cria uma apresentação a partir do estudo, preenchendo as sections de pricing/market com os dados do estudo.
+
+### Duplicar Estudo
+Copiar estudo existente com novos IDs para reutilização.
+
+---
+
+## Arquivos Principais
+
+| Arquivo | Ação |
+|---------|------|
+| Migração SQL (6 tabelas + RLS) | Criar |
+| `src/pages/agent/MarketStudies.tsx` | Criar — lista |
+| `src/pages/agent/NewMarketStudy.tsx` | Criar — wizard |
+| `src/pages/agent/MarketStudyResult.tsx` | Criar — resultado |
+| `src/pages/agent/MarketStudyComparables.tsx` | Criar — comparáveis |
+| `src/components/market-study/StudyWizard.tsx` | Criar — wizard steps |
+| `src/components/market-study/SubjectPropertyForm.tsx` | Criar — formulário completo |
+| `src/components/market-study/ComparableCard.tsx` | Criar |
+| `src/components/market-study/AdjustmentBadge.tsx` | Criar |
+| `src/components/market-study/PriceRangeGauge.tsx` | Criar |
+| `src/components/market-study/ExecutiveSummary.tsx` | Criar |
+| `src/components/market-study/MarketInsights.tsx` | Criar |
+| `src/hooks/useMarketSimilarity.ts` | Criar |
+| `src/hooks/useMarketAdjustments.ts` | Criar |
+| `supabase/functions/generate-market-summary/index.ts` | Criar — resumo IA |
+| `src/App.tsx` | Modificar — novas rotas |
+| `src/components/AppSidebar.tsx` | Modificar — nav atualizada |
+
+---
+
+## Abordagem
+
+Devido ao tamanho, vou implementar **Fase 1 primeiro** (DB + wizard + formulário + lista). Depois de testar, seguimos com as fases seguintes. Cada fase é funcional de forma independente.
 
