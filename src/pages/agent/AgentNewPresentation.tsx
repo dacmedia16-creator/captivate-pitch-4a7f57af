@@ -3,8 +3,9 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { generatePresentationSections } from "@/hooks/useGeneratePresentation";
-import { generateSimulatedComparables } from "@/hooks/useSimulateComparables";
 import { calculateMarketPrices } from "@/hooks/useMarketCalculations";
+import { scoredComparables } from "@/hooks/useMarketSimilarity";
+import { calculateAllAdjustments, calculateMarketResult } from "@/hooks/useMarketAdjustments";
 import { WizardStepper } from "@/components/wizard/WizardStepper";
 import { StepPropertyData, PropertyData } from "@/components/wizard/StepPropertyData";
 import { StepLayoutStyle, LayoutStyleData } from "@/components/wizard/StepLayoutStyle";
@@ -132,7 +133,6 @@ export default function AgentNewPresentation() {
           if (job && !jobError) {
             const portals = (portalSourcesRes?.data || []).map((p: any) => ({ id: p.id, name: p.name, code: p.code }));
 
-            let useSimulated = false;
             const analyzeBody = {
               property: propertyData,
               portals,
@@ -146,6 +146,8 @@ export default function AgentNewPresentation() {
               },
             };
 
+            let scrapedComparables: any[] = [];
+
             try {
               console.log("Trying Manus AI for market analysis...");
               const { data: manusResult, error: manusError } = await supabase.functions.invoke("analyze-market-manus", {
@@ -154,12 +156,9 @@ export default function AgentNewPresentation() {
 
               if (!manusError && manusResult?.success && manusResult?.comparables?.length) {
                 console.log(`Manus returned ${manusResult.comparables.length} comparables`);
-                generatedComparables = manusResult.comparables.map((c: any) => ({
-                  market_analysis_job_id: job.id,
-                  ...c,
-                }));
+                scrapedComparables = manusResult.comparables;
               } else {
-                console.warn("Manus failed or returned no results, trying Firecrawl...", manusError || manusResult?.message);
+                console.warn("Manus failed, trying Firecrawl...", manusError || manusResult?.message);
 
                 const { data: analyzeResult, error: analyzeError } = await supabase.functions.invoke("analyze-market", {
                   body: analyzeBody,
@@ -167,55 +166,201 @@ export default function AgentNewPresentation() {
 
                 if (!analyzeError && analyzeResult?.success && analyzeResult?.comparables?.length) {
                   console.log(`Firecrawl returned ${analyzeResult.comparables.length} comparables`);
-                  generatedComparables = analyzeResult.comparables.map((c: any) => ({
-                    market_analysis_job_id: job.id,
-                    ...c,
-                  }));
+                  scrapedComparables = analyzeResult.comparables;
                 } else {
-                  console.warn("Firecrawl also failed, using simulated:", analyzeError || analyzeResult?.message);
-                  useSimulated = true;
+                  console.warn("Firecrawl also failed. No market data available.", analyzeError || analyzeResult?.message);
+                  toast.warning("Não foi possível buscar comparáveis nos portais. O estudo de mercado ficará sem dados.");
                 }
               }
             } catch (err) {
-              console.error("Market analysis error, falling back to simulated:", err);
-              useSimulated = true;
+              console.error("Market analysis error:", err);
+              toast.warning("Erro ao buscar comparáveis nos portais.");
             }
 
-            if (useSimulated) {
-              generatedComparables = generateSimulatedComparables(job.id, propertyData, portals);
-            }
+            // Save comparables to market_comparables for the job
+            generatedComparables = scrapedComparables.map((c: any) => ({
+              market_analysis_job_id: job.id,
+              ...c,
+            }));
 
-            marketCalc = calculateMarketPrices(generatedComparables.map(c => ({
-              price: c.price,
-              price_per_sqm: c.price_per_sqm,
-              is_approved: c.is_approved,
-            })));
+            if (generatedComparables.length > 0) {
+              marketCalc = calculateMarketPrices(generatedComparables.map(c => ({
+                price: c.price,
+                price_per_sqm: c.price_per_sqm,
+                is_approved: c.is_approved ?? true,
+              })));
 
-            const confidenceLevel = useSimulated ? "low" : "medium";
-            const summaryText = useSimulated
-              ? `Análise baseada em ${generatedComparables.length} comparáveis simulados.`
-              : `Análise baseada em ${generatedComparables.length} comparáveis reais extraídos de portais.`;
+              const summaryText = `Análise baseada em ${generatedComparables.length} comparáveis reais extraídos de portais.`;
 
-            const [, reportRes] = await Promise.all([
-              supabase.from("market_comparables").insert(generatedComparables),
-              supabase.from("market_reports").insert({
-                market_analysis_job_id: job.id,
-                avg_price: marketCalc.avg_price,
-                median_price: marketCalc.median_price,
-                avg_price_per_sqm: marketCalc.avg_price_per_sqm,
-                suggested_market_price: marketCalc.suggested_market_price,
-                suggested_aspirational_price: marketCalc.suggested_aspirational_price,
-                suggested_fast_sale_price: marketCalc.suggested_fast_sale_price,
-                confidence_level: confidenceLevel,
-                summary: summaryText,
-              }).select().single(),
-              supabase.from("market_analysis_jobs").update({
-                status: "completed",
+              const [, reportRes] = await Promise.all([
+                supabase.from("market_comparables").insert(generatedComparables),
+                supabase.from("market_reports").insert({
+                  market_analysis_job_id: job.id,
+                  avg_price: marketCalc.avg_price,
+                  median_price: marketCalc.median_price,
+                  avg_price_per_sqm: marketCalc.avg_price_per_sqm,
+                  suggested_market_price: marketCalc.suggested_market_price,
+                  suggested_aspirational_price: marketCalc.suggested_aspirational_price,
+                  suggested_fast_sale_price: marketCalc.suggested_fast_sale_price,
+                  confidence_level: "medium",
+                  summary: summaryText,
+                }).select().single(),
+                supabase.from("market_analysis_jobs").update({
+                  status: "completed",
+                  finished_at: new Date().toISOString(),
+                }).eq("id", job.id),
+              ]);
+
+              marketReport = reportRes?.data;
+
+              // === Create Market Study (unified) ===
+              try {
+                const { data: study } = await supabase.from("market_studies").insert({
+                  broker_id: user.id,
+                  tenant_id: profile.tenant_id,
+                  title: propertyData.title || "Estudo de Mercado",
+                  purpose: propertyData.property_purpose || "venda",
+                  status: "completed",
+                }).select().single();
+
+                if (study) {
+                  // Save subject property
+                  await supabase.from("market_study_subject_properties").insert({
+                    market_study_id: study.id,
+                    property_type: propertyData.property_type || null,
+                    property_category: propertyData.property_type || null,
+                    address: propertyData.address || null,
+                    neighborhood: propertyData.neighborhood || null,
+                    city: propertyData.city || null,
+                    condominium: propertyData.condominium || null,
+                    cep: propertyData.cep || null,
+                    area_useful: propertyData.area_total ? Number(propertyData.area_total) : null,
+                    area_built: propertyData.area_built ? Number(propertyData.area_built) : null,
+                    area_land: propertyData.area_land ? Number(propertyData.area_land) : null,
+                    bedrooms: propertyData.bedrooms ? Number(propertyData.bedrooms) : null,
+                    suites: propertyData.suites ? Number(propertyData.suites) : null,
+                    bathrooms: propertyData.bathrooms ? Number(propertyData.bathrooms) : null,
+                    parking_spots: propertyData.parking_spots ? Number(propertyData.parking_spots) : null,
+                    construction_standard: propertyData.property_standard || null,
+                    property_age: propertyData.property_age || null,
+                    owner_expected_price: propertyData.owner_expected_price ? Number(propertyData.owner_expected_price) : null,
+                    purpose: propertyData.property_purpose || "venda",
+                  });
+
+                  // Build subject for similarity scoring
+                  const subjectForScoring = {
+                    condominium: propertyData.condominium || null,
+                    neighborhood: propertyData.neighborhood || null,
+                    city: propertyData.city || null,
+                    property_type: propertyData.property_type || null,
+                    area_useful: propertyData.area_total ? Number(propertyData.area_total) : null,
+                    area_built: propertyData.area_built ? Number(propertyData.area_built) : null,
+                    area_land: propertyData.area_land ? Number(propertyData.area_land) : null,
+                    bedrooms: propertyData.bedrooms ? Number(propertyData.bedrooms) : null,
+                    suites: propertyData.suites ? Number(propertyData.suites) : null,
+                    parking_spots: propertyData.parking_spots ? Number(propertyData.parking_spots) : null,
+                    construction_standard: propertyData.property_standard || null,
+                  };
+
+                  // Score comparables
+                  const scored = scoredComparables(subjectForScoring, scrapedComparables.map((c: any, i: number) => ({
+                    id: `temp-${i}`,
+                    ...c,
+                  })), undefined, 0);
+
+                  // Save study comparables
+                  const studyComparables = scored.map((c: any) => ({
+                    market_study_id: study.id,
+                    title: c.title || null,
+                    address: c.address || null,
+                    neighborhood: c.neighborhood || null,
+                    city: c.city || null,
+                    condominium: c.condominium || null,
+                    property_type: c.property_type || null,
+                    price: c.price || null,
+                    area: c.area || null,
+                    price_per_sqm: c.price_per_sqm || null,
+                    bedrooms: c.bedrooms || null,
+                    suites: c.suites || null,
+                    parking_spots: c.parking_spots || null,
+                    similarity_score: c.similarity_score || 0,
+                    source_name: c.source_name || null,
+                    source_url: c.source_url || null,
+                    is_approved: true,
+                  }));
+
+                  const { data: insertedComps } = await supabase
+                    .from("market_study_comparables")
+                    .insert(studyComparables)
+                    .select();
+
+                  // Calculate adjustments and results
+                  if (insertedComps && insertedComps.length > 0) {
+                    const adjustedComps = calculateAllAdjustments(subjectForScoring, insertedComps.map((c: any) => ({
+                      id: c.id,
+                      price: c.price,
+                      suites: c.suites,
+                      parking_spots: c.parking_spots,
+                      conservation_state: c.conservation_state,
+                      construction_standard: c.construction_standard,
+                      area: c.area,
+                      differentials: c.differentials,
+                    })));
+
+                    // Save adjustments
+                    const allAdjustments = adjustedComps.flatMap(ac =>
+                      ac.adjustments.map(a => ({
+                        comparable_id: ac.comparable_id,
+                        adjustment_type: a.adjustment_type,
+                        label: a.label,
+                        percentage: a.percentage,
+                        value: a.value,
+                        direction: a.direction,
+                      }))
+                    );
+
+                    if (allAdjustments.length > 0) {
+                      await supabase.from("market_study_adjustments").insert(allAdjustments);
+                    }
+
+                    // Update adjusted prices
+                    await Promise.all(adjustedComps.map(ac =>
+                      supabase.from("market_study_comparables")
+                        .update({ adjusted_price: ac.adjusted_price })
+                        .eq("id", ac.comparable_id)
+                    ));
+
+                    // Calculate market result
+                    const result = calculateMarketResult(adjustedComps);
+                    const avgPriceSqm = insertedComps
+                      .filter((c: any) => c.price_per_sqm && c.price_per_sqm > 0)
+                      .reduce((sum: number, c: any, _: number, arr: any[]) => sum + (c.price_per_sqm / arr.length), 0);
+
+                    await supabase.from("market_study_results").insert({
+                      market_study_id: study.id,
+                      avg_price: result.avg_price,
+                      median_price: result.median_price,
+                      avg_price_per_sqm: Math.round(avgPriceSqm),
+                      suggested_ad_price: result.suggested_ad_price,
+                      suggested_market_price: result.suggested_market_price,
+                      suggested_fast_sale_price: result.suggested_fast_sale_price,
+                      price_range_min: result.price_range_min,
+                      price_range_max: result.price_range_max,
+                      confidence_level: "medium",
+                      executive_summary: summaryText,
+                    });
+                  }
+                }
+              } catch (studyErr) {
+                console.error("Market study creation failed (non-fatal):", studyErr);
+              }
+            } else {
+              // No comparables — mark job as failed
+              await supabase.from("market_analysis_jobs").update({
+                status: "failed",
                 finished_at: new Date().toISOString(),
-              }).eq("id", job.id),
-            ]);
-
-            marketReport = reportRes?.data;
+              }).eq("id", job.id);
+            }
           }
         }
       } catch (marketErr: any) {
@@ -232,7 +377,7 @@ export default function AgentNewPresentation() {
         brokerId: user.id,
       });
 
-      if (marketReport) {
+      if (marketReport && marketCalc) {
         const chartComparables = generatedComparables.map((c: any) => ({
           title: c.title, price: c.price, area: c.area, price_per_sqm: c.price_per_sqm,
         }));
