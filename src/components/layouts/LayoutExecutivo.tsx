@@ -28,8 +28,8 @@ export function LayoutExecutivo({ section, branding, theme, colors }: Props) {
       <div className="relative w-full h-full overflow-hidden flex flex-col justify-end" style={{ fontFamily: FONT }}>
         {c.cover_image && <img src={c.cover_image} alt="" className="absolute inset-0 w-full h-full object-cover" />}
         <div className="absolute inset-0" style={{ background: theme.cover.overlay(primary, colors.deep) }} />
-        {c.logo_url && (
-          <img src={c.logo_url} alt="" className={`absolute top-14 ${theme.cover.logoPosition === "top-right" ? "right-16" : "left-16"} h-16 object-contain drop-shadow-lg`} />
+{c.logo_url && (
+          <img src={c.logo_url} alt="" className={`absolute top-14 ${theme.cover.logoPosition === "top-right" ? "right-16" : "left-16"} h-16 max-w-[200px] object-contain drop-shadow-lg`} />
         )}
         <div className="relative z-10 p-16 pb-24 flex items-end gap-8">
           <RedBar h={160} />

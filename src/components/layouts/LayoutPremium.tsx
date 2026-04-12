@@ -25,7 +25,7 @@ export function LayoutPremium({ section, branding, theme, colors }: Props) {
         {c.cover_image && <img src={c.cover_image} alt="" className="absolute inset-0 w-full h-full object-cover" />}
         <div className="absolute inset-0" style={{ background: theme.cover.overlay(primary, deep) }} />
         <div className="absolute inset-0" style={{ background: `radial-gradient(ellipse at 20% 80%, ${accent}12 0%, transparent 50%)` }} />
-        {c.logo_url && <img src={c.logo_url} alt="" className="absolute top-14 left-16 h-18 object-contain drop-shadow-lg" />}
+        {c.logo_url && <img src={c.logo_url} alt="" className="absolute top-14 left-16 h-18 max-w-[200px] object-contain drop-shadow-lg" />}
         <div className="relative z-10 w-full h-full flex flex-col justify-end p-16 pb-24">
           <div className="flex items-end gap-10">
             <div className="w-[4px] h-36 rounded-full" style={{ background: `linear-gradient(to bottom, ${accent}, ${accent}33)` }} />
