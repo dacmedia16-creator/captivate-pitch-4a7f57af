@@ -54,6 +54,23 @@ const STREET_PREFIXES = [
   "Rua", "Rua", "Rua", "Av.", "Travessa", "Alameda",
 ];
 
+const PORTAL_DOMAINS: Record<string, string> = {
+  zapimoveis: "https://www.zapimoveis.com.br/imovel",
+  vivareal: "https://www.vivareal.com.br/imovel",
+  olx: "https://www.olx.com.br/imoveis",
+  imovelweb: "https://www.imovelweb.com.br/propriedades",
+  quintoandar: "https://www.quintoandar.com.br/imovel",
+  chaves: "https://www.chavesnamao.com.br/imovel",
+};
+
+function generateSourceUrl(portalName: string): string {
+  const key = portalName.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, "");
+  const domain = Object.entries(PORTAL_DOMAINS).find(([k]) => key.includes(k))?.[1]
+    || `https://www.${key}.com.br/imovel`;
+  const id = Math.random().toString(36).substring(2, 10) + rand(10000, 99999);
+  return `${domain}/${id}`;
+}
+
 // Common Brazilian street name patterns (will be combined with neighborhood context)
 const STREET_SUFFIXES_GENERIC = [
   "das Acácias", "dos Ipês", "das Palmeiras", "dos Jatobás", "das Orquídeas",
