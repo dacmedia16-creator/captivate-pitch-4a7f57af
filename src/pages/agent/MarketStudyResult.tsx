@@ -455,17 +455,37 @@ export default function MarketStudyResult() {
 
           {/* Charts */}
           {approvedComparables.length > 0 && (
-            <Card className="glass-card">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <BarChart3 className="h-5 w-5" />
-                  R$/m² por Comparável
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <PricePerSqmChart comparables={approvedComparables} avgPricePerSqm={result.avg_price_per_sqm ? Number(result.avg_price_per_sqm) : undefined} />
-              </CardContent>
-            </Card>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <Card className="glass-card">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <BarChart3 className="h-5 w-5" />
+                    R$/m² por Comparável
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <PricePerSqmChart comparables={approvedComparables} avgPricePerSqm={result.avg_price_per_sqm ? Number(result.avg_price_per_sqm) : undefined} />
+                </CardContent>
+              </Card>
+              <Card className="glass-card">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <ScatterChart className="h-5 w-5" />
+                    Área vs Preço
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <MarketScatterChart
+                    comparables={approvedComparables.map((c: any): ComparableChartData => ({
+                      title: c.title || c.address || "Comp.",
+                      price: Number(c.price) || 0,
+                      area: Number(c.area) || 0,
+                      price_per_sqm: Number(c.price_per_sqm) || 0,
+                    }))}
+                  />
+                </CardContent>
+              </Card>
+            </div>
           )}
         </>
       ) : (
