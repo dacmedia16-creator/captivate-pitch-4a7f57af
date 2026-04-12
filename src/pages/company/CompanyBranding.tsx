@@ -117,6 +117,8 @@ export default function CompanyBranding() {
           <TabsTrigger value="global">Mundial</TabsTrigger>
           <TabsTrigger value="nacional">Nacional</TabsTrigger>
           <TabsTrigger value="regional">Regional</TabsTrigger>
+          <TabsTrigger value="objetivos">Objetivos</TabsTrigger>
+          <TabsTrigger value="proposta">Proposta de Valor</TabsTrigger>
           <TabsTrigger value="diferenciais">Diferenciais</TabsTrigger>
           <TabsTrigger value="resultados">Resultados</TabsTrigger>
           <TabsTrigger value="depoimentos">Depoimentos</TabsTrigger>
