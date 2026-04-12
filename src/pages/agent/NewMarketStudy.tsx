@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft, ArrowRight, Check, Loader2 } from "lucide-react";
 import { SubjectPropertyForm, type SubjectPropertyData } from "@/components/market-study/SubjectPropertyForm";
 import { SearchConfigForm, type SearchConfigData } from "@/components/market-study/SearchConfigForm";
+import { scoredComparables } from "@/hooks/useMarketSimilarity";
+import { calculateAllAdjustments, calculateMarketResult } from "@/hooks/useMarketAdjustments";
 
 const steps = ["Dados do Imóvel", "Configuração de Pesquisa", "Gerando..."];
 
@@ -92,6 +94,90 @@ export default function NewMarketStudy() {
 
       if (propError) throw propError;
 
+      // 3. Fetch existing comparables (if any were added externally / by Manus)
+      const { data: rawComparables } = await supabase
+        .from("market_study_comparables")
+        .select("*")
+        .eq("market_study_id", study.id);
+
+      const comparables = rawComparables ?? [];
+
+      if (comparables.length > 0) {
+        // 4. Calculate similarity scores
+        const scored = scoredComparables(propertyData, comparables, undefined, searchConfig.min_similarity);
+
+        // Update scores in DB
+        for (const comp of scored) {
+          await supabase
+            .from("market_study_comparables")
+            .update({ similarity_score: comp.similarity_score })
+            .eq("id", comp.id);
+        }
+
+        // 5. Calculate adjustments
+        const adjusted = calculateAllAdjustments(propertyData, scored.map(c => ({
+          id: c.id,
+          price: Number(c.price),
+          suites: c.suites,
+          parking_spots: c.parking_spots,
+          conservation_state: c.conservation_state,
+          construction_standard: c.construction_standard,
+          area: Number(c.area),
+          differentials: c.differentials,
+        })));
+
+        // Save adjustments
+        for (const comp of adjusted) {
+          // Update adjusted price on comparable
+          await supabase
+            .from("market_study_comparables")
+            .update({ adjusted_price: comp.adjusted_price })
+            .eq("id", comp.comparable_id);
+
+          // Insert adjustment records
+          if (comp.adjustments.length > 0) {
+            await supabase
+              .from("market_study_adjustments")
+              .insert(
+                comp.adjustments.map((a) => ({
+                  comparable_id: comp.comparable_id,
+                  adjustment_type: a.adjustment_type,
+                  label: a.label,
+                  percentage: a.percentage,
+                  value: a.value,
+                  direction: a.direction,
+                }))
+              );
+          }
+        }
+
+        // 6. Calculate and save results
+        const result = calculateMarketResult(adjusted);
+        const subjectArea = propertyData.area_useful || propertyData.area_built || propertyData.area_land;
+        const avgPricePerSqm = subjectArea && subjectArea > 0
+          ? Math.round(result.avg_price / subjectArea)
+          : 0;
+
+        await supabase.from("market_study_results").insert({
+          market_study_id: study.id,
+          avg_price: result.avg_price,
+          median_price: result.median_price,
+          avg_price_per_sqm: avgPricePerSqm,
+          suggested_ad_price: result.suggested_ad_price,
+          suggested_market_price: result.suggested_market_price,
+          suggested_fast_sale_price: result.suggested_fast_sale_price,
+          price_range_min: result.price_range_min,
+          price_range_max: result.price_range_max,
+          confidence_level: adjusted.length >= 5 ? "high" : adjusted.length >= 3 ? "medium" : "low",
+        });
+
+        // Update study status
+        await supabase
+          .from("market_studies")
+          .update({ status: "completed" })
+          .eq("id", study.id);
+      }
+
       toast.success("Estudo criado com sucesso!");
       navigate(`/market-studies/${study.id}`);
     } catch (err: any) {
@@ -155,7 +241,7 @@ export default function NewMarketStudy() {
           <Loader2 className="h-12 w-12 animate-spin text-primary" />
           <p className="text-lg font-medium">Criando estudo de mercado...</p>
           <p className="text-sm text-muted-foreground">
-            Salvando dados do imóvel e configurações
+            Salvando dados e calculando similaridade e ajustes
           </p>
         </div>
       )}
