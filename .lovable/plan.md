@@ -1,65 +1,172 @@
 
 
-# Estudo de Mercado, IA, PDF e Link Compartilhavel — Plano
+# Visual & UX Premium Refinement — Listing Studio AI
 
-## Status Atual
+## Scope
 
-A maioria dos itens ja esta implementada:
+Three interconnected improvements: (1) Premium visual polish across all UI, (2) UX refinements for speed and clarity, (3) PDF export upgrade.
 
-- **MarketStudyDetail.tsx**: tabela de comparaveis com score, preco, area, quartos, vagas, imagem, fonte, aprovar/remover, adicionar manualmente, calculos automaticos, 3 cards de cenario
-- **generate-presentation-text**: edge function com Lovable AI Gateway (Gemini), tool calling para gerar resumo do imovel, perfil comprador, analise mercado, justificativa preco, cenarios, fechamento
-- **export-pdf**: edge function que gera HTML estilizado e salva no storage
-- **SharedPresentation.tsx**: rota publica `/share/:token` com branding
-- **PresentationEditor.tsx**: botoes de exportar PDF, compartilhar, gerar IA, duplicar, salvar modelo
-- **useAuditLog.ts**: funcao `logAudit` usada em criacao, edicao, geracao IA, exportacao PDF
+## 1. Global Visual Upgrade
 
-## Pendencias Identificadas
+### CSS & Theme (`src/index.css`)
+- Add subtle animated gradient for gold elements
+- Add new utilities: `text-gradient-gold`, `card-hover-lift`, `section-divider`
+- Refine glass-card with stronger backdrop-blur and refined border opacity
+- Add smooth page transitions via `animate-fade-in` and `animate-slide-up`
 
-### 1. MarketStudyDetail — mostrar filtros e portais (pequeno)
-A pagina nao mostra os filtros usados nem os portais selecionados do job. Adicionar card com essas informacoes.
+### MetricCard (`src/components/shared/MetricCard.tsx`)
+- Add subtle hover lift animation
+- Refine icon container with softer gradient and shadow
+- Add trend indicator support (optional up/down arrow)
+- Better spacing between label and value
 
-### 2. Export PDF — melhorar qualidade (medio)
-O edge function atual gera HTML simples. Precisa melhorar para ter aparencia premium com branding, paginacao, e visual profissional. Nao e possivel usar headless browser no edge function, mas podemos melhorar significativamente o HTML/CSS gerado.
+### TopBar (`src/components/TopBar.tsx`)
+- Make thinner (h-12), more discrete
+- Add subtle bottom shadow instead of hard border
+- Refine avatar with gold ring accent
+- Add breadcrumb-style current page indicator
 
-### 3. Seed Demo — dados de apresentacao e estudo (medio)
-Falta criar dados demo:
-- 1 apresentacao demo vinculada ao corretor1
-- 12 sections geradas
-- 1 market_analysis_job
-- 5-8 comparaveis ficticios
-- 1 market_report com cenarios calculados
+### AppSidebar (`src/components/AppSidebar.tsx`)
+- Add subtle gradient to sidebar background
+- Improve active state with left gold accent bar
+- Better spacing between items
+- Add hover micro-animation
+- Refine footer branding
 
-### 4. Filtros no MarketStudyDetail (pequeno)
-Adicionar card mostrando filtros (raio, faixa de preco, faixa de area) e portais selecionados a partir do campo `filters` e `selected_portals` do job.
+### DataTable (`src/components/shared/DataTable.tsx`)
+- Refined header with lighter weight
+- Subtle row hover with left accent
+- Better cell padding
+- Softer border lines
 
-## Arquivos a Modificar/Criar
+### Login (`src/pages/auth/Login.tsx`)
+- Add background gradient/pattern
+- Bigger logo area with brand name in premium typography
+- Softer card with more padding
+- Add "Listing Studio" watermark/decoration
 
-| Arquivo | Acao |
-|---------|------|
-| `src/pages/agent/MarketStudyDetail.tsx` | Adicionar cards de filtros usados e portais selecionados |
-| `supabase/functions/export-pdf/index.ts` | Melhorar HTML com branding premium, paginacao, cores, logo |
-| `supabase/functions/seed-demo/index.ts` | Adicionar seed de 1 apresentacao + sections + estudo + comparaveis + report |
+## 2. Dashboard Refinements
 
-## Detalhes Tecnicos
+### AgentDashboard (`src/pages/agent/AgentDashboard.tsx`)
+- Add welcome greeting with time-of-day
+- Better card grid with subtle stagger animation
+- Presentation list items with thumbnail preview dots
+- Quick action buttons row below metrics
 
-### MarketStudyDetail — filtros e portais
-- Ler `job.filters` (jsonb) e `job.selected_portals` (jsonb) 
-- Renderizar em card apos resumo do imovel
-- Buscar nomes dos portais de `portal_sources`
+### AdminDashboard (`src/pages/admin/AdminDashboard.tsx`)
+- Refine metric grid spacing
+- Better section headers with gold accent line
+- Table polish via shared DataTable improvements
 
-### Export PDF — upgrade visual
-- Adicionar logo da imobiliaria no header
-- Usar cores do branding (primary_color, secondary_color)
-- Melhorar tipografia com fontes web-safe (Georgia para headings)
-- Adicionar page breaks entre secoes
-- Footer com branding em cada pagina
-- Manter como HTML (PDF real requer headless browser nao disponivel)
+## 3. Wizard UX Improvements
 
-### Seed Demo
-- Criar apresentacao para corretor1@demo.com no tenant demo
-- Gerar as 12 sections com conteudo ficticio realista
-- Criar market_analysis_job com status "completed"
-- Inserir 6 comparaveis ficticios com precos e scores
-- Criar market_report com cenarios calculados
-- Executar via chamada ao edge function seed-demo atualizado
+### WizardStepper (`src/components/wizard/WizardStepper.tsx`)
+- Larger step circles with smoother transitions
+- Add step description text below labels
+- Animated progress line between steps
+- Better active state with pulse animation
+
+### StepPropertyData (`src/components/wizard/StepPropertyData.tsx`)
+- Group cards with section icons in headers
+- Collapsible optional sections (CEP, condominium, notes)
+- Better grid layout for characteristics (3 cols on desktop)
+- Currency input formatting for price field
+- Photo upload area with drag-drop visual cue
+
+### StepLayoutStyle (`src/components/wizard/StepLayoutStyle.tsx`)
+- Add mini preview thumbnail for each layout
+- Larger selection cards with better selected state (gold border glow)
+- Tone selector with colored accent per tone
+
+### StepGeneration (`src/components/wizard/StepGeneration.tsx`)
+- Add subtle particle/sparkle animation during generation
+- Larger progress bar with gradient fill
+- Success state with confetti-style celebration
+- Better stage cards with animated check transition
+
+## 4. Editor & Presentation Polish
+
+### EditorToolbar (`src/components/editor/EditorToolbar.tsx`)
+- Group actions into logical clusters with subtle dividers
+- Add keyboard shortcut hints on hover
+- Gold accent for primary actions (Save, AI)
+
+### SlidesSidebar (`src/components/editor/SlidesSidebar.tsx`)
+- Add mini slide preview (colored strip or icon per section type)
+- Better selected state with left gold bar
+- Drag handle with subtle grip pattern
+- Slide counter badge
+
+### EditPanel (`src/components/editor/EditPanel.tsx`)
+- Section header with icon and type label
+- Better field grouping with dividers
+- Subtle animations on section switch
+
+### PresentationEditor (`src/pages/agent/PresentationEditor.tsx`)
+- Better preview area background (subtle grid pattern)
+- Shadow and frame around preview slide for "printed" feel
+- Smooth transition between slides
+
+### PresentationMode (`src/pages/agent/PresentationMode.tsx`)
+- Smoother slide transitions (fade/slide animation)
+- Better progress bar with slide dots
+- Refined control overlay with glassmorphism
+
+## 5. Layout Refinements (Slide Rendering)
+
+### LayoutExecutivo (`src/components/layouts/LayoutExecutivo.tsx`)
+- Add subtle top accent line per section
+- Better property grid with refined borders
+- Softer backgrounds, refined spacing
+- Cover with geometric accent elements
+
+### LayoutPremium (`src/components/layouts/LayoutPremium.tsx`)
+- Richer gradients with overlay patterns
+- Gold dividers between content blocks
+- Better typography hierarchy (larger headings, more letter-spacing)
+- Property stats in elegant pill style
+
+### LayoutImpactoComercial (`src/components/layouts/LayoutImpactoComercial.tsx`)
+- Bolder accent badges
+- Better card glass effects on dark sections
+- Stronger visual hierarchy for results/numbers
+- CTA-style closing with button-like element
+
+## 6. PDF Export Upgrade
+
+### `supabase/functions/export-pdf/index.ts`
+- Refined cover page with gradient header and logo
+- Better section page breaks with branded header/footer per page
+- Pricing scenarios in visually distinct cards with colors
+- Property summary with structured grid
+- Better text/image balance with proper spacing
+- Professional typography (larger headings, comfortable line height)
+- Footer with page numbers and branding
+
+## Files to Modify
+
+| File | Changes |
+|------|---------|
+| `src/index.css` | New utilities, animations, refined tokens |
+| `src/components/shared/MetricCard.tsx` | Hover lift, refined icon, spacing |
+| `src/components/shared/DataTable.tsx` | Refined header, hover, padding |
+| `src/components/TopBar.tsx` | Thinner, shadow, breadcrumb |
+| `src/components/AppSidebar.tsx` | Gold active bar, spacing, gradient |
+| `src/components/AppLayout.tsx` | Background pattern on main area |
+| `src/pages/auth/Login.tsx` | Background, bigger brand, polish |
+| `src/pages/agent/AgentDashboard.tsx` | Greeting, animations, quick actions |
+| `src/pages/admin/AdminDashboard.tsx` | Section headers, spacing |
+| `src/components/wizard/WizardStepper.tsx` | Larger steps, animation, descriptions |
+| `src/components/wizard/StepPropertyData.tsx` | Section icons, collapsible, currency |
+| `src/components/wizard/StepLayoutStyle.tsx` | Glow selection, larger cards |
+| `src/components/wizard/StepGeneration.tsx` | Sparkle animation, gradient progress |
+| `src/components/editor/EditorToolbar.tsx` | Action groups, shortcuts, gold accents |
+| `src/components/editor/SlidesSidebar.tsx` | Mini previews, gold active bar |
+| `src/components/editor/EditPanel.tsx` | Section icon, field grouping |
+| `src/pages/agent/PresentationEditor.tsx` | Preview frame, transitions |
+| `src/pages/agent/PresentationMode.tsx` | Slide transitions, glass controls |
+| `src/components/layouts/LayoutExecutivo.tsx` | Accent lines, refined grids |
+| `src/components/layouts/LayoutPremium.tsx` | Richer gradients, gold dividers |
+| `src/components/layouts/LayoutImpactoComercial.tsx` | Bolder accents, glass cards |
+| `supabase/functions/export-pdf/index.ts` | Premium cover, headers, scenarios cards |
 
