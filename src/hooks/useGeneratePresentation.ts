@@ -76,13 +76,13 @@ export async function generatePresentationSections({ presentationId, tenantId, b
         };
         break;
       case "about_global":
-        content = { text: agency?.about_global, logo_url: agency?.logo_url };
+        content = { text: agency?.about_global, logo_url: agency?.logo_url, image_url: (agency as any)?.about_global_image_url };
         break;
       case "about_national":
-        content = { text: agency?.about_national, logo_url: agency?.logo_url };
+        content = { text: agency?.about_national, logo_url: agency?.logo_url, image_url: (agency as any)?.about_national_image_url };
         break;
       case "about_regional":
-        content = { text: agency?.about_regional, regional_numbers: agency?.regional_numbers, branch_photo_url: agency?.branch_photo_url };
+        content = { text: agency?.about_regional, regional_numbers: agency?.regional_numbers, branch_photo_url: agency?.branch_photo_url, image_url: (agency as any)?.about_regional_image_url };
         break;
       case "property_summary":
         content = {

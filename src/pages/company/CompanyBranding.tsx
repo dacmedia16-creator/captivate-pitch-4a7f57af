@@ -34,6 +34,7 @@ export default function CompanyBranding() {
     company_name: "", logo_url: "" as string | null, branch_photo_url: "" as string | null,
     primary_color: "#1e3a5f", secondary_color: "#c9a84c",
     about_global: "", about_national: "", about_regional: "", regional_numbers: "",
+    about_global_image_url: "" as string | null, about_national_image_url: "" as string | null, about_regional_image_url: "" as string | null,
   });
 
   useEffect(() => {
@@ -48,6 +49,9 @@ export default function CompanyBranding() {
         about_national: agency.about_national || "",
         about_regional: agency.about_regional || "",
         regional_numbers: agency.regional_numbers || "",
+        about_global_image_url: (agency as any).about_global_image_url || null,
+        about_national_image_url: (agency as any).about_national_image_url || null,
+        about_regional_image_url: (agency as any).about_regional_image_url || null,
       });
     }
   }, [agency]);
@@ -159,6 +163,7 @@ export default function CompanyBranding() {
             <CardHeader><CardTitle className="font-sans text-lg">Apresentação Mundial</CardTitle></CardHeader>
             <CardContent className="space-y-4">
               <Textarea value={agencyForm.about_global} onChange={(e) => set("about_global", e.target.value)} rows={8} placeholder="Conteúdo institucional global..." />
+              <div className="space-y-2"><Label>Imagem do slide</Label><ImageUploader value={agencyForm.about_global_image_url} onChange={(v) => set("about_global_image_url", v)} folder="agency" /></div>
               <Button onClick={() => saveAgency.mutate()} disabled={saveAgency.isPending}><Save className="h-4 w-4 mr-1" />Salvar</Button>
             </CardContent>
           </Card>
@@ -169,6 +174,7 @@ export default function CompanyBranding() {
             <CardHeader><CardTitle className="font-sans text-lg">Apresentação Nacional</CardTitle></CardHeader>
             <CardContent className="space-y-4">
               <Textarea value={agencyForm.about_national} onChange={(e) => set("about_national", e.target.value)} rows={8} placeholder="Conteúdo institucional nacional..." />
+              <div className="space-y-2"><Label>Imagem do slide</Label><ImageUploader value={agencyForm.about_national_image_url} onChange={(v) => set("about_national_image_url", v)} folder="agency" /></div>
               <Button onClick={() => saveAgency.mutate()} disabled={saveAgency.isPending}><Save className="h-4 w-4 mr-1" />Salvar</Button>
             </CardContent>
           </Card>
@@ -180,6 +186,7 @@ export default function CompanyBranding() {
             <CardContent className="space-y-4">
               <Textarea value={agencyForm.about_regional} onChange={(e) => set("about_regional", e.target.value)} rows={6} placeholder="Conteúdo regional..." />
               <div className="space-y-2"><Label>Números regionais</Label><Textarea value={agencyForm.regional_numbers} onChange={(e) => set("regional_numbers", e.target.value)} rows={4} placeholder="Dados e métricas regionais..." /></div>
+              <div className="space-y-2"><Label>Imagem do slide</Label><ImageUploader value={agencyForm.about_regional_image_url} onChange={(v) => set("about_regional_image_url", v)} folder="agency" /></div>
               <Button onClick={() => saveAgency.mutate()} disabled={saveAgency.isPending}><Save className="h-4 w-4 mr-1" />Salvar</Button>
             </CardContent>
           </Card>

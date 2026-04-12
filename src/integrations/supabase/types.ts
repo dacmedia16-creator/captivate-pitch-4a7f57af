@@ -17,8 +17,11 @@ export type Database = {
       agency_profiles: {
         Row: {
           about_global: string | null
+          about_global_image_url: string | null
           about_national: string | null
+          about_national_image_url: string | null
           about_regional: string | null
+          about_regional_image_url: string | null
           branch_photo_url: string | null
           company_name: string | null
           created_at: string
@@ -32,8 +35,11 @@ export type Database = {
         }
         Insert: {
           about_global?: string | null
+          about_global_image_url?: string | null
           about_national?: string | null
+          about_national_image_url?: string | null
           about_regional?: string | null
+          about_regional_image_url?: string | null
           branch_photo_url?: string | null
           company_name?: string | null
           created_at?: string
@@ -47,8 +53,11 @@ export type Database = {
         }
         Update: {
           about_global?: string | null
+          about_global_image_url?: string | null
           about_national?: string | null
+          about_national_image_url?: string | null
           about_regional?: string | null
+          about_regional_image_url?: string | null
           branch_photo_url?: string | null
           company_name?: string | null
           created_at?: string
