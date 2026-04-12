@@ -47,17 +47,11 @@ export default function MarketStudies() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold font-display">Estudos de Mercado</h1>
-          <p className="text-muted-foreground">
-            Análises comparativas para embasar suas captações
-          </p>
-        </div>
-        <Button onClick={() => navigate("/market-studies/new")} className="gap-2">
-          <Plus className="h-4 w-4" />
-          Novo Estudo
-        </Button>
+      <div>
+        <h1 className="text-3xl font-bold font-display">Estudos de Mercado</h1>
+        <p className="text-muted-foreground">
+          Estudos gerados automaticamente ao criar apresentações
+        </p>
       </div>
 
       {!studies || studies.length === 0 ? (
@@ -66,14 +60,14 @@ export default function MarketStudies() {
             <BarChart3 className="h-12 w-12 text-muted-foreground mb-4" />
             <p className="text-lg font-medium">Nenhum estudo de mercado ainda</p>
             <p className="text-sm text-muted-foreground mt-1">
-              Crie um novo estudo para gerar uma análise comparativa
+              Crie uma apresentação para gerar um estudo de mercado automaticamente
             </p>
             <Button
-              onClick={() => navigate("/market-studies/new")}
+              onClick={() => navigate("/presentations/new")}
               className="mt-4 gap-2"
             >
               <Plus className="h-4 w-4" />
-              Criar Estudo
+              Nova Apresentação
             </Button>
           </CardContent>
         </Card>

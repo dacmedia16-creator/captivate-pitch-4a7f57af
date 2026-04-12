@@ -37,7 +37,6 @@ const AgentNewPresentation = lazy(() => import("@/pages/agent/AgentNewPresentati
 const AgentProfile = lazy(() => import("@/pages/agent/AgentProfile"));
 const AgentMarketStudy = lazy(() => import("@/pages/agent/AgentMarketStudy"));
 const MarketStudies = lazy(() => import("@/pages/agent/MarketStudies"));
-const NewMarketStudy = lazy(() => import("@/pages/agent/NewMarketStudy"));
 const MarketStudyResult = lazy(() => import("@/pages/agent/MarketStudyResult"));
 const MarketStudyDetail = lazy(() => import("@/pages/agent/MarketStudyDetail"));
 const PresentationEditor = lazy(() => import("@/pages/agent/PresentationEditor"));
@@ -82,7 +81,6 @@ const App = () => (
                 <Route path="/market-study" element={<AppLayout><RoleGuard allowedRoles={["agent"]}><AgentMarketStudy /></RoleGuard></AppLayout>} />
                 <Route path="/market-study/:id" element={<AppLayout><RoleGuard allowedRoles={["agent"]}><MarketStudyDetail /></RoleGuard></AppLayout>} />
                 <Route path="/market-studies" element={<AppLayout><RoleGuard allowedRoles={["agent"]}><MarketStudies /></RoleGuard></AppLayout>} />
-                <Route path="/market-studies/new" element={<AppLayout><RoleGuard allowedRoles={["agent"]}><NewMarketStudy /></RoleGuard></AppLayout>} />
                 <Route path="/market-studies/:id" element={<AppLayout><RoleGuard allowedRoles={["agent"]}><MarketStudyResult /></RoleGuard></AppLayout>} />
 
                 {/* Public shared route */}
