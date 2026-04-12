@@ -92,7 +92,7 @@ export default function MarketStudyResult() {
     onError: () => toast.error("Erro ao excluir comparável"),
   });
 
-
+  const handleRecalculate = async () => {
     if (!study) return;
     setRecalculating(true);
     try {
