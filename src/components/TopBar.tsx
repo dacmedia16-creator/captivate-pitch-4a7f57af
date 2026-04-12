@@ -21,6 +21,25 @@ export function TopBar() {
 
       <div className="flex-1" />
 
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-muted-foreground hover:text-foreground"
+              onClick={() => {
+                sessionStorage.setItem("app_version_reloaded", "1");
+                window.location.reload();
+              }}
+            >
+              <RefreshCw className="h-3.5 w-3.5" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Atualizar sistema</TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+
       <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground">
         <Search className="h-3.5 w-3.5" />
       </Button>
