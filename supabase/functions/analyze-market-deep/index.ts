@@ -47,6 +47,7 @@ interface Filters {
   maxComparables?: string;
   minComparables?: string;
   preferSameCondominium?: boolean;
+  maxListingAgeMonths?: string;
 }
 
 interface DiscardReason {
@@ -408,6 +409,8 @@ IMÓVEL DE REFERÊNCIA:
 - Padrão: ${property.property_standard || "Não informado"}
 - Preço esperado: ${property.owner_expected_price ? `R$ ${Number(property.owner_expected_price).toLocaleString("pt-BR")}` : "Não informado"}
 
+IMPORTANTE: Extraia também a data do anúncio (listing_date) quando disponível. Procure por textos como "Anúncio criado em", "Publicado em", "Atualizado em", "Atualizado há X dias/meses", datas no formato DD/MM/YYYY ou similar. Se encontrar "Atualizado há 3 meses", calcule a data aproximada. Retorne no formato YYYY-MM-DD.
+
 Extraia todos os imóveis relevantes. Descarte apenas se claramente incompatível (tipo diferente, cidade diferente).`;
 
     const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -453,6 +456,7 @@ Extraia todos os imóveis relevantes. Descarte apenas se claramente incompatíve
                         advertiser: { type: "string", description: "Imobiliária ou anunciante" },
                         differentials: { type: "array", items: { type: "string" }, description: "Diferenciais do imóvel" },
                         description_summary: { type: "string", description: "Resumo curto da descrição" },
+                        listing_date: { type: "string", description: "Data do anúncio no formato YYYY-MM-DD, se disponível" },
                       },
                       required: ["title", "price", "area", "source_url", "source_name"],
                       additionalProperties: false,
@@ -532,6 +536,11 @@ Extraia todos os imóveis relevantes. Descarte apenas se claramente incompatíve
 
     const validComparables: any[] = [];
 
+    const maxAgeMonths = Number(filters.maxListingAgeMonths) || 0;
+    const cutoffDate = maxAgeMonths > 0
+      ? new Date(Date.now() - maxAgeMonths * 30 * 24 * 60 * 60 * 1000)
+      : null;
+
     for (const c of (extracted.comparables || [])) {
       if (!c.price || c.price <= 0 || !c.area || c.area <= 0) {
         discardReasons.push({
@@ -540,6 +549,20 @@ Extraia todos os imóveis relevantes. Descarte apenas se claramente incompatíve
           reason: "Preço ou área não disponível",
         });
         continue;
+      }
+
+      // Filter by listing age
+      if (cutoffDate && c.listing_date) {
+        const listingDate = new Date(c.listing_date);
+        if (!isNaN(listingDate.getTime()) && listingDate < cutoffDate) {
+          const ageMonths = Math.round((Date.now() - listingDate.getTime()) / (30 * 24 * 60 * 60 * 1000));
+          discardReasons.push({
+            url: c.source_url || "unknown",
+            portal: c.source_name || "unknown",
+            reason: `Anúncio muito antigo (criado há ${ageMonths} meses)`,
+          });
+          continue;
+        }
       }
 
       if (isDuplicate(c, validComparables)) {

@@ -18,6 +18,7 @@ export interface MarketStudyData {
   minComparables: string;
   maxComparables: string;
   preferSameCondominium: boolean;
+  maxListingAgeMonths: string;
 }
 
 interface StepMarketStudyProps {
@@ -95,6 +96,24 @@ export function StepMarketStudy({ data, onChange }: StepMarketStudyProps) {
               <SelectContent>
                 {["500m", "1km", "2km", "5km", "10km"].map(r => (
                   <SelectItem key={r} value={r}>{r}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label>Idade máxima do anúncio</Label>
+            <Select value={data.maxListingAgeMonths} onValueChange={v => onChange({ ...data, maxListingAgeMonths: v })}>
+              <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+              <SelectContent>
+                {[
+                  { value: "1", label: "1 mês" },
+                  { value: "3", label: "3 meses" },
+                  { value: "6", label: "6 meses" },
+                  { value: "12", label: "12 meses" },
+                  { value: "24", label: "24 meses" },
+                  { value: "0", label: "Sem limite" },
+                ].map(opt => (
+                  <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
