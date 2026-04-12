@@ -51,13 +51,14 @@ function buildSearchQuery(property: PropertyData, portal: PortalInfo): string {
   if (property.city) parts.push(property.city);
 
   const purpose = property.property_purpose?.toLowerCase();
-  if (purpose === "venda" || purpose === "sale") {
-    parts.push("venda");
-  } else if (purpose === "aluguel" || purpose === "rent") {
+  if (purpose === "aluguel" || purpose === "rent") {
     parts.push("aluguel");
   } else {
     parts.push("venda");
   }
+
+  // Add "preço R$" to encourage results with price info
+  parts.push("preço R$");
 
   const siteFilter = PORTAL_SITE_MAP[portal.code];
   if (siteFilter) parts.push(siteFilter);
