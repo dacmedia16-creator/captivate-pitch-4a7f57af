@@ -104,7 +104,7 @@ export default function MarketStudyResult() {
       }
       const scored = scoredComparables(subject, comparables, undefined, 0);
       for (const comp of scored) {
-        await supabase.from("market_study_comparables").update({ similarity_score: comp.similarity_score }).eq("id", comp.id);
+        await supabase.from("market_study_comparables").update({ similarity_score: comp.similarity_score } as any).eq("id", comp.id);
       }
       const adjusted = calculateAllAdjustments(subject, scored.map(c => ({
         id: c.id, price: Number(c.price), suites: c.suites, parking_spots: c.parking_spots,
