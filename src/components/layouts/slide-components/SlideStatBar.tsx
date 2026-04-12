@@ -42,20 +42,20 @@ export function SlideStatBar({
 
   return (
     <div
-      className="flex gap-8 p-6"
+      className="flex gap-8 p-8"
       style={{ backgroundColor: bg, borderRadius }}
     >
       {filtered.map((s, i) => (
         <div key={i} className="text-center flex-1">
-          <p className="slide-metric" style={{ fontSize: "32px", color: metricColor }}>
+          <p className="slide-metric" style={{ fontSize: "48px", color: metricColor }}>
             {typeof s.value === "number"
               ? s.value.toLocaleString("pt-BR")
               : s.value}
           </p>
           <p
-            className="mt-1"
+            className="mt-2"
             style={{
-              fontSize: "10px",
+              fontSize: "14px",
               fontWeight: 600,
               letterSpacing: "0.20em",
               textTransform: "uppercase",

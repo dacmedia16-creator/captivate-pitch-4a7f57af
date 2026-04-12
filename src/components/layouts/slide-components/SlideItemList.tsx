@@ -23,11 +23,11 @@ export function SlideItemList({
   if (!items?.length) return null;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       {items.map((item, i) => (
         <div
           key={i}
-          className="flex items-start gap-4 py-3"
+          className="flex items-start gap-5 py-4"
           style={{
             borderBottom:
               borderStyle === "bottom" && i < items.length - 1
@@ -38,7 +38,7 @@ export function SlideItemList({
           {numbered && (
             <span
               className="slide-metric shrink-0"
-              style={{ fontSize: "20px", color: colors.accent }}
+              style={{ fontSize: "28px", color: colors.accent }}
             >
               {String(i + 1).padStart(2, "0")}
             </span>
@@ -46,14 +46,14 @@ export function SlideItemList({
           <div>
             <h4
               className="font-semibold"
-              style={{ fontSize: "14px", color: colors.primary }}
+              style={{ fontSize: "20px", color: colors.primary }}
             >
               {item.title || item.author_name}
             </h4>
             {(item.description || item.content) && (
               <p
-                className="mt-1 leading-relaxed"
-                style={{ fontSize: "12px", color: colors.textLight }}
+                className="mt-2 leading-relaxed"
+                style={{ fontSize: "17px", color: colors.textLight }}
               >
                 {item.description || item.content}
               </p>

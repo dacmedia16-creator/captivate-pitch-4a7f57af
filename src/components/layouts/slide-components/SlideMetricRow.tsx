@@ -16,8 +16,8 @@ interface SlideMetricRowProps {
 export function SlideMetricRow({
   items,
   colors,
-  metricSize = "30px",
-  labelSize = "10px",
+  metricSize = "64px",
+  labelSize = "16px",
   labelTracking = "0.20em",
 }: SlideMetricRowProps) {
   const filtered = items.filter((i) => i.value != null && i.value !== "");
@@ -25,7 +25,7 @@ export function SlideMetricRow({
   if (filtered.length === 0) return null;
 
   return (
-    <div className="flex gap-10 py-2">
+    <div className="flex gap-12 py-3">
       {filtered.map((item, i) => (
         <div key={i}>
           <p
@@ -35,7 +35,7 @@ export function SlideMetricRow({
             {item.value}
           </p>
           <p
-            className="mt-1"
+            className="mt-2"
             style={{
               fontSize: labelSize,
               letterSpacing: labelTracking,

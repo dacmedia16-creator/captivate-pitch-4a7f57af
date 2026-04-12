@@ -11,7 +11,7 @@ interface SlideScenariosProps {
   metricSize?: string;
 }
 
-export function SlideScenarios({ scenarios, colors, metricSize = "42px" }: SlideScenariosProps) {
+export function SlideScenarios({ scenarios, colors, metricSize = "64px" }: SlideScenariosProps) {
   if (!scenarios?.length) return null;
 
   const palette = [colors.accent, colors.primary, "#16a34a"];
@@ -19,15 +19,15 @@ export function SlideScenarios({ scenarios, colors, metricSize = "42px" }: Slide
   return (
     <div className="flex">
       {scenarios.map((s, i) => (
-        <div key={i} className="flex-1 py-10 text-center relative">
+        <div key={i} className="flex-1 py-12 text-center relative">
           {i > 0 && (
             <div
-              className="absolute left-0 top-6 bottom-6 w-px"
+              className="absolute left-0 top-8 bottom-8 w-px"
               style={{ backgroundColor: colors.accent + "22" }}
             />
           )}
           <p
-            className="slide-label mb-4"
+            className="slide-label mb-5"
             style={{ color: colors.textLight }}
           >
             {s.label}
