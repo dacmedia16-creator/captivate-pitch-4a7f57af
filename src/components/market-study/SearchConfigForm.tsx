@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export interface SearchConfigData {
   same_condominium: boolean;
@@ -16,6 +17,7 @@ export interface SearchConfigData {
   max_comparables: number;
   min_similarity: number;
   selectedPortals: string[];
+  max_listing_age_months: number;
 }
 
 interface Props {
@@ -151,6 +153,31 @@ export function SearchConfigForm({ data, onChange }: Props) {
               max={60}
               step={5}
             />
+          </div>
+
+          <div className="space-y-3">
+            <div className="flex justify-between">
+              <Label>Idade máxima do anúncio</Label>
+              <span className="text-sm text-muted-foreground font-medium">
+                {data.max_listing_age_months === 0 ? "Sem limite" : `${data.max_listing_age_months} meses`}
+              </span>
+            </div>
+            <Select
+              value={String(data.max_listing_age_months)}
+              onValueChange={(v) => set("max_listing_age_months", Number(v))}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="1">1 mês</SelectItem>
+                <SelectItem value="3">3 meses</SelectItem>
+                <SelectItem value="6">6 meses</SelectItem>
+                <SelectItem value="12">12 meses</SelectItem>
+                <SelectItem value="24">24 meses</SelectItem>
+                <SelectItem value="0">Sem limite</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
