@@ -7,7 +7,7 @@ import { SlidesSidebar } from "@/components/editor/SlidesSidebar";
 import { EditPanel } from "@/components/editor/EditPanel";
 import { EditorToolbar } from "@/components/editor/EditorToolbar";
 import { SectionRenderer, SectionData } from "@/components/layouts/SectionRenderer";
-import { Loader2 } from "lucide-react";
+import { PresentationEditorSkeleton } from "@/components/skeletons/PresentationEditorSkeleton";
 import { toast } from "sonner";
 import { logAudit } from "@/hooks/useAuditLog";
 
@@ -135,7 +135,7 @@ export default function PresentationEditor() {
   };
 
   if (loadingPres || loadingSections) {
-    return <div className="flex items-center justify-center min-h-[60vh]"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
+    return <PresentationEditorSkeleton />;
   }
 
   const selected = localSections.find(s => s.id === selectedId) || null;

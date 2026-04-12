@@ -6,7 +6,8 @@ import { MetricCard } from "@/components/shared/MetricCard";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatusBadge } from "@/components/shared/StatusBadge";
-import { PlusCircle, Presentation, FileDown, BarChart3, BookTemplate, Loader2, ArrowRight } from "lucide-react";
+import { PlusCircle, Presentation, FileDown, BarChart3, BookTemplate, ArrowRight } from "lucide-react";
+import { AgentDashboardSkeleton } from "@/components/skeletons/AgentDashboardSkeleton";
 
 function getGreeting() {
   const h = new Date().getHours();
@@ -58,7 +59,7 @@ export default function AgentDashboard() {
   });
 
   if (isLoading) {
-    return <div className="flex items-center justify-center min-h-[60vh]"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
+    return <AgentDashboardSkeleton />;
   }
 
   const firstName = profile?.full_name?.split(" ")[0] || "Corretor";

@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
-import { PlusCircle, Pencil, Trash2, Copy, Loader2, Presentation as PresentationIcon, BookTemplate } from "lucide-react";
+import { PlusCircle, Pencil, Trash2, Copy, Presentation as PresentationIcon, BookTemplate } from "lucide-react";
+import { AgentPresentationsSkeleton } from "@/components/skeletons/AgentPresentationsSkeleton";
 import { toast } from "sonner";
 
 export default function AgentPresentations() {
@@ -76,7 +77,7 @@ export default function AgentPresentations() {
   };
 
   if (isLoading) {
-    return <div className="flex items-center justify-center min-h-[60vh]"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
+    return <AgentPresentationsSkeleton />;
   }
 
   return (
