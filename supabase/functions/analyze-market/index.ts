@@ -40,10 +40,16 @@ interface Filters {
   minPrice?: string;
   maxPrice?: string;
   maxComparables?: string;
+  preferSameCondominium?: boolean;
 }
 
-function buildSearchQuery(property: PropertyData, portal: PortalInfo): string {
+function buildSearchQuery(property: PropertyData, portal: PortalInfo, filters?: Filters): string {
   const parts: string[] = [];
+
+  // When preferSameCondominium is on, prioritize condominium name in query
+  if (filters?.preferSameCondominium && property.condominium) {
+    parts.push(property.condominium);
+  }
 
   if (property.property_type) parts.push(property.property_type);
   if (property.bedrooms) parts.push(`${property.bedrooms} quartos`);
@@ -73,13 +79,15 @@ function computeSimilarity(
   compPriceSqm: number,
   basePriceSqm: number,
   compBedrooms: number,
-  baseBedrooms: number
+  baseBedrooms: number,
+  sameCondominium?: boolean
 ): number {
   if (!baseArea || !basePriceSqm) return 75;
   const areaDiff = Math.abs(compArea - baseArea) / baseArea;
   const priceDiff = Math.abs(compPriceSqm - basePriceSqm) / basePriceSqm;
   const bedroomDiff = Math.abs(compBedrooms - baseBedrooms);
-  const score = 100 - (areaDiff * 40 + priceDiff * 40 + bedroomDiff * 5);
+  let score = 100 - (areaDiff * 40 + priceDiff * 40 + bedroomDiff * 5);
+  if (sameCondominium) score += 10;
   return Math.max(50, Math.min(98, Math.round(score)));
 }
 
@@ -131,7 +139,7 @@ serve(async (req) => {
     const allSearchResults: Array<{ portal: PortalInfo; markdown: string; url: string; title: string }> = [];
 
     for (const portal of limitedPortals) {
-      const query = buildSearchQuery(property, portal);
+      const query = buildSearchQuery(property, portal, filters);
       console.log(`Firecrawl search: "${query}"`);
 
       try {
@@ -218,6 +226,8 @@ Dados do imóvel de referência para comparação:
 - Quartos: ${property.bedrooms || "Não informado"}
 - Padrão: ${property.property_standard || "Não informado"}
 - Preço esperado: ${property.owner_expected_price ? `R$ ${Number(property.owner_expected_price).toLocaleString("pt-BR")}` : "Não informado"}
+- Condomínio: ${property.condominium || "Não informado"}
+${filters.preferSameCondominium && property.condominium ? `\nPRIORIDADE: Dê preferência a imóveis do condomínio "${property.condominium}". Extraia o nome do condomínio de cada imóvel quando disponível.` : ""}
 
 Extraia imóveis que sejam comparáveis relevantes (mesmo tipo, região similar). Ignore anúncios duplicados.`;
 
@@ -260,6 +270,7 @@ Extraia imóveis que sejam comparáveis relevantes (mesmo tipo, região similar)
                         source_url: { type: "string", description: "URL original do anúncio" },
                         source_name: { type: "string", description: "Nome do portal de origem" },
                         result_index: { type: "number", description: "Índice do resultado (1-based)" },
+                        condominium: { type: "string", description: "Nome do condomínio/edifício, se disponível" },
                       },
                       required: ["title", "price", "area", "bedrooms", "source_url", "source_name"],
                       additionalProperties: false,
@@ -337,8 +348,10 @@ Extraia imóveis que sejam comparáveis relevantes (mesmo tipo, região similar)
       })
       .map((c: any) => {
         const priceSqm = Math.round(c.price / c.area);
+        const isSameCondo = filters.preferSameCondominium && property.condominium && c.condominium
+          && c.condominium.toLowerCase().includes(property.condominium.toLowerCase());
         const similarity = computeSimilarity(
-          c.area, baseArea, priceSqm, basePriceSqm, c.bedrooms || 0, baseBedrooms
+          c.area, baseArea, priceSqm, basePriceSqm, c.bedrooms || 0, baseBedrooms, !!isSameCondo
         );
         // Fallback: use Firecrawl's original URL/portal when AI didn't extract them
         const resultIdx = (c.result_index || 1) - 1;
