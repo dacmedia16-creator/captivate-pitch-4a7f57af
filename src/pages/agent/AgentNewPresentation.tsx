@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -44,6 +44,7 @@ export default function AgentNewPresentation() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isComplete, setIsComplete] = useState(false);
   const [createdId, setCreatedId] = useState<string | null>(null);
+  const createdIdRef = useRef<string | null>(null);
 
   const canAdvance = () => {
     if (step === 0) return !!propertyData.title;
@@ -119,6 +120,7 @@ export default function AgentNewPresentation() {
       }
 
       setCreatedId(pres.id);
+      createdIdRef.current = pres.id;
 
       // Generate sections
       await generatePresentationSections({
@@ -135,7 +137,7 @@ export default function AgentNewPresentation() {
   const handleAnimationDone = () => {
     setIsComplete(true);
     setTimeout(() => {
-      if (createdId) navigate(`/presentations/${createdId}/edit`);
+      if (createdIdRef.current) navigate(`/presentations/${createdIdRef.current}/edit`);
     }, 1500);
   };
 
