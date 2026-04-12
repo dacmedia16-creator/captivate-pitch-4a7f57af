@@ -81,6 +81,9 @@ const App = () => (
                 <Route path="/profile" element={<AppLayout><RoleGuard allowedRoles={["agent"]}><AgentProfile /></RoleGuard></AppLayout>} />
                 <Route path="/market-study" element={<AppLayout><RoleGuard allowedRoles={["agent"]}><AgentMarketStudy /></RoleGuard></AppLayout>} />
                 <Route path="/market-study/:id" element={<AppLayout><RoleGuard allowedRoles={["agent"]}><MarketStudyDetail /></RoleGuard></AppLayout>} />
+                <Route path="/market-studies" element={<AppLayout><RoleGuard allowedRoles={["agent"]}><MarketStudies /></RoleGuard></AppLayout>} />
+                <Route path="/market-studies/new" element={<AppLayout><RoleGuard allowedRoles={["agent"]}><NewMarketStudy /></RoleGuard></AppLayout>} />
+                <Route path="/market-studies/:id" element={<AppLayout><RoleGuard allowedRoles={["agent"]}><MarketStudyResult /></RoleGuard></AppLayout>} />
 
                 {/* Public shared route */}
                 <Route path="/share/:token" element={<SharedPresentation />} />
