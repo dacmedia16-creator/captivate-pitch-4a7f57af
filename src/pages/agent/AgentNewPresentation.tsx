@@ -388,6 +388,7 @@ export default function AgentNewPresentation() {
                       price_range_max: result.price_range_max,
                       confidence_level: "medium",
                       executive_summary: summaryText,
+                      research_metadata: researchMetadata as any,
                     });
 
                     // Generate AI summary (non-blocking)
