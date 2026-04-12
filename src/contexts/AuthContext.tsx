@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import React, { createContext, useContext, useEffect, useState, useRef, ReactNode } from "react";
 import { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -34,52 +34,44 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [appRole, setAppRole] = useState<AppRole | null>(null);
   const [tenantName, setTenantName] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const fetchingRef = useRef<string | null>(null);
 
   const fetchUserData = async (userId: string) => {
+    // Prevent duplicate concurrent fetches for the same user
+    if (fetchingRef.current === userId) return;
+    fetchingRef.current = userId;
+
     try {
-      // Fetch profile
-      const { data: profileData } = await supabase
-        .from("profiles")
-        .select("id, full_name, email, avatar_url, tenant_id, role")
-        .eq("id", userId)
-        .single();
+      // Fetch profile and role in parallel
+      const [profileRes, roleRes] = await Promise.all([
+        supabase.from("profiles").select("id, full_name, email, avatar_url, tenant_id, role").eq("id", userId).single(),
+        supabase.from("user_roles").select("role").eq("user_id", userId).single(),
+      ]);
 
-      if (profileData) {
-        setProfile(profileData);
+      if (profileRes.data) {
+        setProfile(profileRes.data);
 
-        // Fetch tenant name if user has a tenant
-        if (profileData.tenant_id) {
-          const { data: tenantData } = await supabase
-            .from("tenants")
-            .select("name")
-            .eq("id", profileData.tenant_id)
-            .single();
+        if (profileRes.data.tenant_id) {
+          const { data: tenantData } = await supabase.from("tenants").select("name").eq("id", profileRes.data.tenant_id).single();
           setTenantName(tenantData?.name ?? null);
         }
       }
 
-      // Fetch role from user_roles table
-      const { data: roleData } = await supabase
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", userId)
-        .single();
-
-      setAppRole((roleData?.role as AppRole) ?? null);
+      setAppRole((roleRes.data?.role as AppRole) ?? null);
     } catch (err) {
       console.error("Error fetching user data:", err);
+    } finally {
+      fetchingRef.current = null;
     }
   };
 
   useEffect(() => {
-    // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, newSession) => {
         setSession(newSession);
         setUser(newSession?.user ?? null);
 
         if (newSession?.user) {
-          // Use setTimeout to avoid potential deadlocks with Supabase client
           setTimeout(() => fetchUserData(newSession.user.id), 0);
         } else {
           setProfile(null);
@@ -90,7 +82,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     );
 
-    // THEN check for existing session
     supabase.auth.getSession().then(({ data: { session: existingSession } }) => {
       setSession(existingSession);
       setUser(existingSession?.user ?? null);

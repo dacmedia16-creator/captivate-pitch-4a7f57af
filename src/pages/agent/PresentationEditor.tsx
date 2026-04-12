@@ -21,6 +21,9 @@ export default function PresentationEditor() {
   const [generatingAI, setGeneratingAI] = useState(false);
   const [exportingPDF, setExportingPDF] = useState(false);
 
+  const userId = profile?.id;
+  const tenantId = profile?.tenant_id;
+
   const { data: presentation, isLoading: loadingPres } = useQuery({
     queryKey: ["presentation", id],
     queryFn: async () => {
@@ -32,12 +35,12 @@ export default function PresentationEditor() {
   });
 
   const { data: branding } = useQuery({
-    queryKey: ["agency-branding", profile?.tenant_id],
+    queryKey: ["agency-branding", tenantId],
     queryFn: async () => {
-      const { data } = await supabase.from("agency_profiles").select("primary_color, secondary_color, logo_url").eq("tenant_id", profile!.tenant_id!).single();
+      const { data } = await supabase.from("agency_profiles").select("primary_color, secondary_color, logo_url").eq("tenant_id", tenantId!).single();
       return data;
     },
-    enabled: !!profile?.tenant_id,
+    enabled: !!tenantId,
   });
 
   const { isLoading: loadingSections } = useQuery({
@@ -55,10 +58,12 @@ export default function PresentationEditor() {
 
   const saveMutation = useMutation({
     mutationFn: async () => {
-      for (const s of localSections) {
-        await supabase.from("presentation_sections").update({ content: s.content as any, title: s.title, is_visible: s.is_visible, sort_order: s.sort_order }).eq("id", s.id);
-      }
-      await logAudit("presentation_saved", "presentation", id!);
+      await Promise.all(
+        localSections.map(s =>
+          supabase.from("presentation_sections").update({ content: s.content as any, title: s.title, is_visible: s.is_visible, sort_order: s.sort_order }).eq("id", s.id)
+        )
+      );
+      await logAudit("presentation_saved", "presentation", id!, undefined, userId, tenantId);
     },
     onSuccess: () => { toast.success("Salvo!"); queryClient.invalidateQueries({ queryKey: ["presentation-sections", id] }); },
     onError: () => toast.error("Erro ao salvar"),
@@ -81,15 +86,15 @@ export default function PresentationEditor() {
     if (error || !newPres) { toast.error("Erro ao duplicar"); return; }
     const newSections = localSections.map(s => ({ ...s, id: undefined, presentation_id: newPres.id, created_at: undefined, updated_at: undefined }));
     await supabase.from("presentation_sections").insert(newSections as any);
-    await logAudit("presentation_duplicated", "presentation", newPres.id);
+    await logAudit("presentation_duplicated", "presentation", newPres.id, undefined, userId, tenantId);
     toast.success("Apresentação duplicada!");
     navigate(`/presentations/${newPres.id}/edit`);
   };
 
   const handleSaveAsTemplate = async () => {
-    if (!presentation || !profile?.tenant_id) return;
+    if (!presentation || !tenantId) return;
     await supabase.from("presentation_templates").insert({
-      tenant_id: profile.tenant_id, broker_id: profile.id, name: presentation.title || "Modelo sem nome",
+      tenant_id: tenantId, broker_id: userId, name: presentation.title || "Modelo sem nome",
       layout: presentation.selected_layout,
       structure: localSections.map(s => ({ section_key: s.section_key, title: s.title, content: s.content, sort_order: s.sort_order, is_visible: s.is_visible })) as any,
     });
@@ -102,7 +107,7 @@ export default function PresentationEditor() {
       const { data, error } = await supabase.functions.invoke("generate-presentation-text", { body: { presentation_id: id } });
       if (error) throw error;
       if (data?.error) { toast.error(data.error); return; }
-      await logAudit("ai_text_generated", "presentation", id!);
+      await logAudit("ai_text_generated", "presentation", id!, undefined, userId, tenantId);
       queryClient.invalidateQueries({ queryKey: ["presentation-sections", id] });
       toast.success("Textos gerados com IA!");
     } catch (e: any) {
@@ -119,7 +124,7 @@ export default function PresentationEditor() {
       if (error) throw error;
       if (data?.url) {
         window.open(data.url, "_blank");
-        await logAudit("pdf_exported", "presentation", id!);
+        await logAudit("pdf_exported", "presentation", id!, undefined, userId, tenantId);
         toast.success("PDF exportado!");
       } else { toast.error(data?.error || "Erro ao exportar"); }
     } catch (e: any) {
