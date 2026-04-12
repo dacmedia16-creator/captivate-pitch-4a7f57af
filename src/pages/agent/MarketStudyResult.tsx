@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import {
   ArrowLeft, Loader2, FileText, Building2, ThumbsUp, ThumbsDown,
   RefreshCw, Sparkles, TrendingUp, DollarSign, BarChart3, Home,
+  FileDown, Presentation,
 } from "lucide-react";
 import { AdjustmentBadge } from "@/components/market-study/AdjustmentBadge";
 import { PriceRangeGauge } from "@/components/market-study/PriceRangeGauge";
@@ -24,6 +25,8 @@ export default function MarketStudyResult() {
   const queryClient = useQueryClient();
   const [recalculating, setRecalculating] = useState(false);
   const [generatingAI, setGeneratingAI] = useState(false);
+  const [exportingPDF, setExportingPDF] = useState(false);
+  const [creatingPresentation, setCreatingPresentation] = useState(false);
 
   const { data: study, isLoading } = useQuery({
     queryKey: ["market-study", id],
@@ -155,6 +158,137 @@ export default function MarketStudyResult() {
     }
   };
 
+  const handleExportPDF = async () => {
+    if (!id) return;
+    setExportingPDF(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("export-market-study-pdf", {
+        body: { market_study_id: id },
+      });
+      if (error) throw error;
+      if (data.error) throw new Error(data.error);
+      window.open(data.url, "_blank");
+      toast.success("PDF gerado com sucesso!");
+    } catch (err: any) {
+      toast.error("Erro ao exportar: " + (err.message || "erro"));
+    } finally {
+      setExportingPDF(false);
+    }
+  };
+
+  const handleCreatePresentation = async () => {
+    if (!study || !id) return;
+    const subject = (study as any).market_study_subject_properties?.[0];
+    const result = (study as any).market_study_results?.[0];
+    const comparables = ((study as any).market_study_comparables ?? []).filter((c: any) => c.is_approved);
+
+    setCreatingPresentation(true);
+    try {
+      // Get user profile for tenant_id
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Não autenticado");
+      const { data: profile } = await supabase.from("profiles").select("tenant_id").eq("id", user.id).single();
+      if (!profile?.tenant_id) throw new Error("Tenant não encontrado");
+
+      // Create presentation
+      const { data: pres, error: presErr } = await supabase.from("presentations").insert({
+        broker_id: user.id,
+        tenant_id: profile.tenant_id,
+        title: study.title || "Apresentação de Captação",
+        property_type: subject?.property_type || subject?.property_category,
+        neighborhood: subject?.neighborhood,
+        city: subject?.city,
+        address: subject?.address,
+        area_total: subject?.area_useful || subject?.area_built,
+        bedrooms: subject?.bedrooms,
+        suites: subject?.suites,
+        parking_spots: subject?.parking_spots,
+        property_standard: subject?.construction_standard,
+        owner_expected_price: subject?.owner_expected_price,
+        condominium: subject?.condominium,
+        status: "draft",
+        creation_mode: "market_study",
+      }).select("id").single();
+
+      if (presErr || !pres) throw presErr || new Error("Erro ao criar apresentação");
+
+      // Create sections
+      const sections: Array<{ presentation_id: string; section_key: string; title: string; sort_order: number; content: any }> = [
+        {
+          presentation_id: pres.id,
+          section_key: "property_summary",
+          title: "Resumo do Imóvel",
+          sort_order: 1,
+          content: {
+            property_type: subject?.property_type || subject?.property_category,
+            area_total: subject?.area_useful || subject?.area_built,
+            bedrooms: subject?.bedrooms,
+            suites: subject?.suites,
+            parking_spots: subject?.parking_spots,
+            property_standard: subject?.construction_standard,
+            highlights: subject?.observations,
+          },
+        },
+        {
+          presentation_id: pres.id,
+          section_key: "pricing_scenarios",
+          title: "Cenários de Preço",
+          sort_order: 2,
+          content: {
+            owner_expected_price: subject?.owner_expected_price,
+            scenarios: [
+              { label: "Venda Acelerada", value: result?.suggested_fast_sale_price },
+              { label: "Preço de Mercado", value: result?.suggested_market_price },
+              { label: "Aspiracional", value: result?.suggested_ad_price },
+            ],
+          },
+        },
+      ];
+
+      if (result?.executive_summary || result?.justification) {
+        sections.push({
+          presentation_id: pres.id,
+          section_key: "market_analysis",
+          title: "Análise de Mercado",
+          sort_order: 3,
+          content: {
+            executive_summary: result.executive_summary || "",
+            justification: result.justification || "",
+          },
+        });
+      }
+
+      if (comparables.length > 0) {
+        sections.push({
+          presentation_id: pres.id,
+          section_key: "comparables",
+          title: "Comparativos de Mercado",
+          sort_order: 4,
+          content: {
+            comparables: comparables.slice(0, 6).map((c: any) => ({
+              title: c.title || c.address,
+              neighborhood: c.neighborhood,
+              price: c.price,
+              adjusted_price: c.adjusted_price,
+              area: c.area,
+              price_per_sqm: c.price_per_sqm,
+              similarity_score: c.similarity_score,
+            })),
+          },
+        });
+      }
+
+      await supabase.from("presentation_sections").insert(sections);
+
+      toast.success("Apresentação criada!");
+      navigate(`/presentations/${pres.id}/edit`);
+    } catch (err: any) {
+      toast.error("Erro ao criar apresentação: " + (err.message || "erro"));
+    } finally {
+      setCreatingPresentation(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[40vh]">
@@ -205,6 +339,14 @@ export default function MarketStudyResult() {
           <Button size="sm" onClick={handleGenerateAI} disabled={generatingAI || !result} className="gold-gradient text-primary-foreground">
             <Sparkles className={`h-4 w-4 mr-2 ${generatingAI ? "animate-pulse" : ""}`} />
             {generatingAI ? "Gerando..." : "Resumo IA"}
+          </Button>
+          <Button variant="outline" size="sm" onClick={handleExportPDF} disabled={exportingPDF || !result}>
+            {exportingPDF ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileDown className="h-4 w-4 mr-2" />}
+            PDF
+          </Button>
+          <Button variant="outline" size="sm" onClick={handleCreatePresentation} disabled={creatingPresentation}>
+            {creatingPresentation ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Presentation className="h-4 w-4 mr-2" />}
+            Apresentação
           </Button>
           <Badge variant={study.status === "completed" ? "default" : "secondary"}>
             {study.status === "completed" ? "Concluído" : study.status === "draft" ? "Rascunho" : study.status}
