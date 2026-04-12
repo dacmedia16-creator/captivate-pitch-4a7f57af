@@ -1,45 +1,40 @@
 
 
-# Aumentar tamanho das letras nos slides
+# Melhorar qualidade dos dados simulados do estudo de mercado
 
-## Problema
-Mesmo com os tamanhos atuais (72px cover, 48px headings, 64px metrics), as letras aparecem pequenas porque o slide de 1920x1080 e escalado para caber no container do editor. A solucao e aumentar ainda mais os tamanhos para que fiquem legiveis mesmo apos a reducao de escala.
+## Problema atual
+O `useSimulateComparables.ts` gera dados completamente fictícios:
+- Endereços genéricos fixos (Av. Paulista, Rua das Flores) que não correspondem à região do imóvel
+- Preços com variação simples de ±20% sem considerar tipo, padrão ou região
+- Nomes de rua hardcoded que não mudam conforme a cidade/bairro
 
-## Mudancas propostas
+## O que será feito
 
-### Novos tamanhos de fonte
+### 1. Endereços baseados na localização real
+- Usar o bairro e cidade do imóvel para gerar endereços mais realistas (ex: "Rua 1, 345 - Parque Campolim, Sorocaba")
+- Gerar nomes de rua variados mas com referência ao bairro informado
 
-| Elemento | Atual | Novo |
-|----------|-------|------|
-| Cover title | 72px | 84px |
-| Heading title | 48px | 56px |
-| Metric numbers | 64px | 72px |
-| Slide label | 16px | 18px |
-| Slide body | 22px | 26px |
-| Broker name | 56px | 64px |
-| Closing title | 56px | 64px |
-| Closing broker | 40px | 48px |
-| Card titles | 24px | 28px |
-| Body/descriptions | 19-20px | 24px |
-| Contact info | 22px | 26px |
-| StatBar metrics | 48px | 56px |
-| StatBar labels | 14px | 18px |
-| Stats inline | 42px | 52px |
-| CRECI | 18px | 22px |
+### 2. Preços mais realistas por padrão do imóvel
+- Ajustar faixas de preço/m² conforme o `property_standard`:
+  - Econômico: R$ 3.000-5.000/m²
+  - Médio: R$ 5.000-8.000/m²
+  - Alto: R$ 8.000-12.000/m²
+  - Luxo: R$ 12.000-20.000/m²
+- Se o proprietário informou preço pretendido, usar como referência central mas com variação mais inteligente
 
-### Arquivos modificados
-1. **`src/index.css`** -- `.slide-label` 16px->18px, `.slide-body` 22px->26px
-2. **`src/components/layouts/themes/theme-executivo.ts`** -- cover 84px, heading 56px, metric 72px, label 18px
-3. **`src/components/layouts/themes/theme-premium.ts`** -- mesmos ajustes
-4. **`src/components/layouts/themes/theme-impacto.ts`** -- mesmos ajustes
-5. **`src/components/layouts/LayoutExecutivo.tsx`** -- todos os fontSize inline aumentados
-6. **`src/components/layouts/LayoutPremium.tsx`** -- mesmos ajustes
-7. **`src/components/layouts/LayoutImpactoComercial.tsx`** -- mesmos ajustes
-8. **`src/components/layouts/slide-components/SlideStatBar.tsx`** -- metric 56px, label 18px
-9. **`src/components/layouts/slide-components/SlideMetricRow.tsx`** -- defaults atualizados
-10. **`src/components/layouts/slide-components/SlideScenarios.tsx`** -- defaults atualizados
-11. **`src/components/layouts/slide-components/SlideItemList.tsx`** -- font sizes aumentados
+### 3. Características coerentes
+- Quartos/suítes/vagas devem variar de forma coerente com a área
+- Títulos mais descritivos incluindo condomínio quando disponível
+
+### 4. Score de similaridade baseado em proximidade real
+- Score mais alto para comparáveis com área e preço/m² mais próximos do imóvel
+
+## Arquivos modificados
+- `src/hooks/useSimulateComparables.ts` — refatoração completa da lógica de geração
+
+## Nota importante
+Esses dados continuam sendo **simulados** (não vêm de portais reais). A melhoria é torná-los mais verossímeis até que uma integração real com APIs de portais seja implementada.
 
 ## Risco
-Nenhum. Apenas ajuste de tamanhos visuais.
+Nenhum. Apenas melhora a qualidade dos dados simulados.
 
