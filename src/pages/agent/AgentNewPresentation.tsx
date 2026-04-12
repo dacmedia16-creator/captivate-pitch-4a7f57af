@@ -94,49 +94,29 @@ export default function AgentNewPresentation() {
 
       if (presError || !pres) throw presError || new Error("Erro ao criar apresentação");
 
-      // Save photos and market job in parallel
+      // === Market analysis (isolated — never blocks presentation generation) ===
       let marketReport: any = null;
       let generatedComparables: any[] = [];
       let marketCalc: any = null;
 
-      const photosPromise = propertyData.photos.length > 0
-        ? supabase.from("presentation_images").insert(
-            propertyData.photos.map((url, i) => ({ presentation_id: pres.id, image_url: url, sort_order: i }))
-          ).then(() => null)
-        : Promise.resolve(null);
+      try {
+        const photosPromise = propertyData.photos.length > 0
+          ? supabase.from("presentation_images").insert(
+              propertyData.photos.map((url, i) => ({ presentation_id: pres.id, image_url: url, sort_order: i }))
+            ).then(() => null)
+          : Promise.resolve(null);
 
-      const portalSourcesPromise = marketData.selectedPortals.length > 0
-        ? Promise.resolve(supabase.from("portal_sources").select("id, name, code").in("id", marketData.selectedPortals))
-        : Promise.resolve(null);
+        const portalSourcesPromise = marketData.selectedPortals.length > 0
+          ? Promise.resolve(supabase.from("portal_sources").select("id, name, code").in("id", marketData.selectedPortals))
+          : Promise.resolve(null);
 
-      const [, portalSourcesRes] = await Promise.all([photosPromise, portalSourcesPromise]);
+        const [, portalSourcesRes] = await Promise.all([photosPromise, portalSourcesPromise]);
 
-      // Market analysis
-      if (marketData.selectedPortals.length > 0) {
-        const { data: job, error: jobError } = await supabase.from("market_analysis_jobs").insert({
-          presentation_id: pres.id,
-          tenant_id: profile.tenant_id,
-          selected_portals: marketData.selectedPortals as any,
-          filters: {
-            searchRadius: marketData.searchRadius,
-            minArea: marketData.minArea,
-            maxArea: marketData.maxArea,
-            minPrice: marketData.minPrice,
-            maxPrice: marketData.maxPrice,
-            maxComparables: marketData.maxComparables,
-          } as any,
-          status: "pending",
-          started_at: new Date().toISOString(),
-        }).select().single();
-
-        if (job && !jobError) {
-          const portals = (portalSourcesRes?.data || []).map((p: any) => ({ id: p.id, name: p.name, code: p.code }));
-
-          // Try Manus first, then Firecrawl, then simulated
-          let useSimulated = false;
-          const analyzeBody = {
-            property: propertyData,
-            portals,
+        if (marketData.selectedPortals.length > 0) {
+          const { data: job, error: jobError } = await supabase.from("market_analysis_jobs").insert({
+            presentation_id: pres.id,
+            tenant_id: profile.tenant_id,
+            selected_portals: marketData.selectedPortals as any,
             filters: {
               searchRadius: marketData.searchRadius,
               minArea: marketData.minArea,
@@ -144,97 +124,114 @@ export default function AgentNewPresentation() {
               minPrice: marketData.minPrice,
               maxPrice: marketData.maxPrice,
               maxComparables: marketData.maxComparables,
-            },
-          };
+            } as any,
+            status: "pending",
+            started_at: new Date().toISOString(),
+          }).select().single();
 
-          try {
-            // Try Manus AI first
-            console.log("Trying Manus AI for market analysis...");
-            const { data: manusResult, error: manusError } = await supabase.functions.invoke("analyze-market-manus", {
-              body: analyzeBody,
-            });
+          if (job && !jobError) {
+            const portals = (portalSourcesRes?.data || []).map((p: any) => ({ id: p.id, name: p.name, code: p.code }));
 
-            if (!manusError && manusResult?.success && manusResult?.comparables?.length) {
-              console.log(`Manus returned ${manusResult.comparables.length} comparables`);
-              generatedComparables = manusResult.comparables.map((c: any) => ({
-                market_analysis_job_id: job.id,
-                ...c,
-              }));
-            } else {
-              console.warn("Manus failed or returned no results, trying Firecrawl...", manusError || manusResult?.message);
+            let useSimulated = false;
+            const analyzeBody = {
+              property: propertyData,
+              portals,
+              filters: {
+                searchRadius: marketData.searchRadius,
+                minArea: marketData.minArea,
+                maxArea: marketData.maxArea,
+                minPrice: marketData.minPrice,
+                maxPrice: marketData.maxPrice,
+                maxComparables: marketData.maxComparables,
+              },
+            };
 
-              // Fallback to Firecrawl
-              const { data: analyzeResult, error: analyzeError } = await supabase.functions.invoke("analyze-market", {
+            try {
+              console.log("Trying Manus AI for market analysis...");
+              const { data: manusResult, error: manusError } = await supabase.functions.invoke("analyze-market-manus", {
                 body: analyzeBody,
               });
 
-              if (!analyzeError && analyzeResult?.success && analyzeResult?.comparables?.length) {
-                console.log(`Firecrawl returned ${analyzeResult.comparables.length} comparables`);
-                generatedComparables = analyzeResult.comparables.map((c: any) => ({
+              if (!manusError && manusResult?.success && manusResult?.comparables?.length) {
+                console.log(`Manus returned ${manusResult.comparables.length} comparables`);
+                generatedComparables = manusResult.comparables.map((c: any) => ({
                   market_analysis_job_id: job.id,
                   ...c,
                 }));
               } else {
-                console.warn("Firecrawl also failed, using simulated:", analyzeError || analyzeResult?.message);
-                useSimulated = true;
+                console.warn("Manus failed or returned no results, trying Firecrawl...", manusError || manusResult?.message);
+
+                const { data: analyzeResult, error: analyzeError } = await supabase.functions.invoke("analyze-market", {
+                  body: analyzeBody,
+                });
+
+                if (!analyzeError && analyzeResult?.success && analyzeResult?.comparables?.length) {
+                  console.log(`Firecrawl returned ${analyzeResult.comparables.length} comparables`);
+                  generatedComparables = analyzeResult.comparables.map((c: any) => ({
+                    market_analysis_job_id: job.id,
+                    ...c,
+                  }));
+                } else {
+                  console.warn("Firecrawl also failed, using simulated:", analyzeError || analyzeResult?.message);
+                  useSimulated = true;
+                }
               }
+            } catch (err) {
+              console.error("Market analysis error, falling back to simulated:", err);
+              useSimulated = true;
             }
-          } catch (err) {
-            console.error("Market analysis error, falling back to simulated:", err);
-            useSimulated = true;
+
+            if (useSimulated) {
+              generatedComparables = generateSimulatedComparables(job.id, propertyData, portals);
+            }
+
+            marketCalc = calculateMarketPrices(generatedComparables.map(c => ({
+              price: c.price,
+              price_per_sqm: c.price_per_sqm,
+              is_approved: c.is_approved,
+            })));
+
+            const confidenceLevel = useSimulated ? "low" : "medium";
+            const summaryText = useSimulated
+              ? `Análise baseada em ${generatedComparables.length} comparáveis simulados.`
+              : `Análise baseada em ${generatedComparables.length} comparáveis reais extraídos de portais.`;
+
+            const [, reportRes] = await Promise.all([
+              supabase.from("market_comparables").insert(generatedComparables),
+              supabase.from("market_reports").insert({
+                market_analysis_job_id: job.id,
+                avg_price: marketCalc.avg_price,
+                median_price: marketCalc.median_price,
+                avg_price_per_sqm: marketCalc.avg_price_per_sqm,
+                suggested_market_price: marketCalc.suggested_market_price,
+                suggested_aspirational_price: marketCalc.suggested_aspirational_price,
+                suggested_fast_sale_price: marketCalc.suggested_fast_sale_price,
+                confidence_level: confidenceLevel,
+                summary: summaryText,
+              }).select().single(),
+              supabase.from("market_analysis_jobs").update({
+                status: "completed",
+                finished_at: new Date().toISOString(),
+              }).eq("id", job.id),
+            ]);
+
+            marketReport = reportRes?.data;
           }
-
-          // Fallback to simulated comparables
-          if (useSimulated) {
-            generatedComparables = generateSimulatedComparables(job.id, propertyData, portals);
-          }
-
-          marketCalc = calculateMarketPrices(generatedComparables.map(c => ({
-            price: c.price,
-            price_per_sqm: c.price_per_sqm,
-            is_approved: c.is_approved,
-          })));
-
-          const confidenceLevel = useSimulated ? "low" : "medium";
-          const summaryText = useSimulated
-            ? `Análise baseada em ${generatedComparables.length} comparáveis simulados.`
-            : `Análise baseada em ${generatedComparables.length} comparáveis reais extraídos de portais.`;
-
-          // Insert comparables and report in parallel
-          const [, reportRes] = await Promise.all([
-            supabase.from("market_comparables").insert(generatedComparables),
-            supabase.from("market_reports").insert({
-              market_analysis_job_id: job.id,
-              avg_price: marketCalc.avg_price,
-              median_price: marketCalc.median_price,
-              avg_price_per_sqm: marketCalc.avg_price_per_sqm,
-              suggested_market_price: marketCalc.suggested_market_price,
-              suggested_aspirational_price: marketCalc.suggested_aspirational_price,
-              suggested_fast_sale_price: marketCalc.suggested_fast_sale_price,
-              confidence_level: confidenceLevel,
-              summary: summaryText,
-            }).select().single(),
-            supabase.from("market_analysis_jobs").update({
-              status: "completed",
-              finished_at: new Date().toISOString(),
-            }).eq("id", job.id),
-          ]);
-
-          marketReport = reportRes?.data;
         }
+      } catch (marketErr: any) {
+        console.error("Market analysis block failed (non-fatal):", marketErr);
       }
 
+      // === Presentation generation — ALWAYS runs ===
       setCreatedId(pres.id);
       createdIdRef.current = pres.id;
 
-      // Generate sections
       await generatePresentationSections({
         presentationId: pres.id,
         tenantId: profile.tenant_id,
         brokerId: user.id,
       });
 
-      // Update pricing_scenarios and market_study_placeholder sections in parallel
       if (marketReport) {
         const chartComparables = generatedComparables.map((c: any) => ({
           title: c.title, price: c.price, area: c.area, price_per_sqm: c.price_per_sqm,

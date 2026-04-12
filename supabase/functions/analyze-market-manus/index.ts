@@ -8,7 +8,7 @@ const corsHeaders = {
 
 const MANUS_API = "https://api.manus.ai/v2";
 const POLL_INTERVAL = 5000;
-const MAX_POLL_TIME = 300_000; // 5 minutes
+const MAX_POLL_TIME = 55_000; // 55s — must finish before edge function runtime kills us
 
 interface PropertyInput {
   title?: string;
@@ -166,48 +166,99 @@ async function createManusTask(prompt: string, apiKey: string): Promise<string> 
   return data.task_id;
 }
 
+async function getTaskStatus(taskId: string, apiKey: string): Promise<any> {
+  // Try task.get first
+  const res = await fetch(`${MANUS_API}/task.get?task_id=${taskId}`, {
+    headers: { "x-manus-api-key": apiKey },
+  });
+  if (res.ok) {
+    return await res.json();
+  }
+  // Consume body to avoid leak
+  await res.text();
+  return null;
+}
+
+async function getTaskMessages(taskId: string, apiKey: string): Promise<any[]> {
+  const res = await fetch(`${MANUS_API}/task.listMessages?task_id=${taskId}&order=desc&limit=50`, {
+    headers: { "x-manus-api-key": apiKey },
+  });
+  if (!res.ok) {
+    const errText = await res.text();
+    console.error(`Manus listMessages error (${res.status}):`, errText);
+    return [];
+  }
+  const data = await res.json();
+  return data.messages || data.data || [];
+}
+
 async function pollManusTask(taskId: string, apiKey: string): Promise<string> {
   const start = Date.now();
+  let consecutive404s = 0;
 
   while (Date.now() - start < MAX_POLL_TIME) {
-    const url = `${MANUS_API}/task.listMessages?task_id=${taskId}&order=desc&limit=50`;
-    const res = await fetch(url, {
-      headers: { "x-manus-api-key": apiKey },
-    });
+    // Try task.get endpoint first for status
+    const taskData = await getTaskStatus(taskId, apiKey);
+    
+    if (taskData) {
+      consecutive404s = 0;
+      const status = taskData.status || taskData.agent_status;
+      console.log("Manus task status:", status);
 
-    if (!res.ok) {
-      console.error("Manus poll error:", res.status, await res.text());
-      await new Promise(r => setTimeout(r, POLL_INTERVAL));
-      continue;
-    }
+      if (status === "error" || status === "failed") {
+        throw new Error(`Manus task failed: ${taskData.error || taskData.message || "Unknown error"}`);
+      }
 
-    const data = await res.json();
-    const messages = data.messages || data.data || [];
-
-    // Check for status updates
-    for (const msg of messages) {
-      if (msg.type === "status_update" || msg.event_type === "status_update") {
-        const status = msg.agent_status || msg.status;
-        console.log("Manus agent status:", status);
-
-        if (status === "error" || status === "failed") {
-          throw new Error(`Manus task failed: ${msg.error || msg.message || "Unknown error"}`);
-        }
-
-        if (status === "stopped" || status === "completed" || status === "done") {
-          // Find assistant messages with content
-          for (const m of messages) {
-            if (m.type === "assistant_message" || m.role === "assistant") {
-              const content = m.content;
-              if (typeof content === "string") return content;
-              if (Array.isArray(content)) {
-                const textPart = content.find((c: any) => c.type === "text");
-                if (textPart?.text) return textPart.text;
-              }
+      if (status === "stopped" || status === "completed" || status === "done") {
+        // Task is done — get messages to extract the result
+        const messages = await getTaskMessages(taskId, apiKey);
+        for (const m of messages) {
+          if (m.type === "assistant_message" || m.role === "assistant") {
+            const content = m.content;
+            if (typeof content === "string") return content;
+            if (Array.isArray(content)) {
+              const textPart = content.find((c: any) => c.type === "text");
+              if (textPart?.text) return textPart.text;
             }
           }
-          // If no assistant message, return full data
-          return JSON.stringify(messages);
+        }
+        return JSON.stringify(messages);
+      }
+    } else {
+      // task.get failed (likely 404)
+      consecutive404s++;
+      console.warn(`Manus task.get failed (attempt ${consecutive404s}/3)`);
+
+      if (consecutive404s >= 3) {
+        throw new Error(`Manus task not found after ${consecutive404s} attempts — task_id may be invalid`);
+      }
+
+      // Try listMessages as fallback
+      const messages = await getTaskMessages(taskId, apiKey);
+      if (messages.length > 0) {
+        consecutive404s = 0; // reset if listMessages works
+        for (const msg of messages) {
+          if (msg.type === "status_update" || msg.event_type === "status_update") {
+            const msgStatus = msg.agent_status || msg.status;
+            console.log("Manus agent status (from messages):", msgStatus);
+
+            if (msgStatus === "error" || msgStatus === "failed") {
+              throw new Error(`Manus task failed: ${msg.error || msg.message || "Unknown error"}`);
+            }
+            if (msgStatus === "stopped" || msgStatus === "completed" || msgStatus === "done") {
+              for (const m of messages) {
+                if (m.type === "assistant_message" || m.role === "assistant") {
+                  const content = m.content;
+                  if (typeof content === "string") return content;
+                  if (Array.isArray(content)) {
+                    const textPart = content.find((c: any) => c.type === "text");
+                    if (textPart?.text) return textPart.text;
+                  }
+                }
+              }
+              return JSON.stringify(messages);
+            }
+          }
         }
       }
     }
@@ -215,7 +266,7 @@ async function pollManusTask(taskId: string, apiKey: string): Promise<string> {
     await new Promise(r => setTimeout(r, POLL_INTERVAL));
   }
 
-  throw new Error("Manus task timed out after 5 minutes");
+  throw new Error("Manus task timed out after 55 seconds");
 }
 
 function extractJsonFromText(text: string): any {
