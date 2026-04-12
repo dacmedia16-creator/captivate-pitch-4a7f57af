@@ -175,6 +175,16 @@ export default function CompanyBranding() {
             <CardContent className="space-y-4">
               <Textarea value={agencyForm.about_global} onChange={(e) => set("about_global", e.target.value)} rows={8} placeholder="Conteúdo institucional global..." />
               <div className="space-y-2"><Label>Imagem do slide</Label><ImageUploader value={agencyForm.about_global_image_url} onChange={(v) => set("about_global_image_url", v)} folder="agency" /></div>
+              <div className="border-t pt-4 space-y-4">
+                <p className="text-sm font-semibold">Estatísticas Mundiais</p>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1"><Label>Ranking (ex: Nº1)</Label><Input value={agencyForm.about_global_stats?.rank || ""} onChange={(e) => set("about_global_stats", { ...(agencyForm.about_global_stats || {}), rank: e.target.value })} /></div>
+                  <div className="space-y-1"><Label>Agências</Label><Input type="number" value={agencyForm.about_global_stats?.agencies || ""} onChange={(e) => set("about_global_stats", { ...(agencyForm.about_global_stats || {}), agencies: Number(e.target.value) || 0 })} /></div>
+                  <div className="space-y-1"><Label>Corretores</Label><Input type="number" value={agencyForm.about_global_stats?.brokers || ""} onChange={(e) => set("about_global_stats", { ...(agencyForm.about_global_stats || {}), brokers: Number(e.target.value) || 0 })} /></div>
+                  <div className="space-y-1"><Label>Franquias</Label><Input type="number" value={agencyForm.about_global_stats?.franchises || ""} onChange={(e) => set("about_global_stats", { ...(agencyForm.about_global_stats || {}), franchises: Number(e.target.value) || 0 })} /></div>
+                </div>
+                <div className="space-y-1"><Label>Texto de presença (ex: PRESENTE EM 100+ PAÍSES)</Label><Input value={agencyForm.about_global_stats?.presence_text || ""} onChange={(e) => set("about_global_stats", { ...(agencyForm.about_global_stats || {}), presence_text: e.target.value })} /></div>
+              </div>
               <Button onClick={() => saveAgency.mutate()} disabled={saveAgency.isPending}><Save className="h-4 w-4 mr-1" />Salvar</Button>
             </CardContent>
           </Card>
