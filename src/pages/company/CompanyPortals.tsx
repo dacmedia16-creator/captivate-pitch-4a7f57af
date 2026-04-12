@@ -13,6 +13,7 @@ interface PortalSetting {
   portal_source_id: string;
   portal_name: string;
   portal_code: string;
+  base_url?: string;
   is_enabled: boolean;
   priority: number;
   weight: number;
