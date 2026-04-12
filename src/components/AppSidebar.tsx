@@ -11,6 +11,7 @@ import {
   FileText,
   Globe,
   Sparkles,
+  Megaphone,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useRole, UserRole } from "@/contexts/RoleContext";
@@ -47,6 +48,8 @@ const adminNav: NavItem[] = [
   { title: "Equipe", url: "/company/team", icon: Users },
   { title: "Marca", url: "/company/branding", icon: Palette },
   { title: "Templates", url: "/company/templates", icon: FileText },
+  { title: "Marketing", url: "/company/marketing", icon: Megaphone },
+  { title: "Portais", url: "/company/portals", icon: Globe },
   { title: "Configurações", url: "/company/settings", icon: Settings },
 ];
 

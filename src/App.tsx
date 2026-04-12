@@ -24,6 +24,8 @@ import CompanyTeam from "@/pages/company/CompanyTeam";
 import CompanyBranding from "@/pages/company/CompanyBranding";
 import CompanyTemplates from "@/pages/company/CompanyTemplates";
 import CompanySettings from "@/pages/company/CompanySettings";
+import CompanyMarketing from "@/pages/company/CompanyMarketing";
+import CompanyPortals from "@/pages/company/CompanyPortals";
 
 // Agent pages
 import AgentDashboard from "@/pages/agent/AgentDashboard";
@@ -63,6 +65,8 @@ const App = () => (
               <Route path="/company/branding" element={<AppLayout><RoleGuard allowedRoles={["admin"]}><CompanyBranding /></RoleGuard></AppLayout>} />
               <Route path="/company/templates" element={<AppLayout><RoleGuard allowedRoles={["admin"]}><CompanyTemplates /></RoleGuard></AppLayout>} />
               <Route path="/company/settings" element={<AppLayout><RoleGuard allowedRoles={["admin"]}><CompanySettings /></RoleGuard></AppLayout>} />
+              <Route path="/company/marketing" element={<AppLayout><RoleGuard allowedRoles={["admin"]}><CompanyMarketing /></RoleGuard></AppLayout>} />
+              <Route path="/company/portals" element={<AppLayout><RoleGuard allowedRoles={["admin"]}><CompanyPortals /></RoleGuard></AppLayout>} />
 
               {/* Super admin routes */}
               <Route path="/admin/dashboard" element={<AppLayout><RoleGuard allowedRoles={["super_admin"]}><AdminDashboard /></RoleGuard></AppLayout>} />
