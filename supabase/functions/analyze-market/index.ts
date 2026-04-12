@@ -165,8 +165,12 @@ serve(async (req) => {
         console.log(`${portal.name}: ${results.length} results`);
 
         for (const r of results) {
-          const content = r.markdown || r.description || r.excerpt || "";
-          if (content || r.title) {
+          const content = [
+            r.title || "",
+            r.description || "",
+            r.markdown?.substring(0, 3000) || "",
+          ].filter(Boolean).join("\n");
+          if (content.trim()) {
             allSearchResults.push({
               portal,
               markdown: content,
