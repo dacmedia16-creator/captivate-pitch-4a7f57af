@@ -13,6 +13,7 @@ interface PortalSetting {
   portal_source_id: string;
   portal_name: string;
   portal_code: string;
+  base_url?: string;
   is_enabled: boolean;
   priority: number;
   weight: number;
@@ -32,13 +33,14 @@ export default function CompanyPortals() {
       if (!sources) return [];
 
       const settingsMap = new Map((settings || []).map((s) => [s.portal_source_id, s]));
-      return sources.map((src): PortalSetting => {
+      return sources.map((src: any): PortalSetting => {
         const s = settingsMap.get(src.id);
         return {
           id: s?.id,
           portal_source_id: src.id,
           portal_name: src.name,
           portal_code: src.code,
+          base_url: src.base_url || undefined,
           is_enabled: s?.is_enabled ?? false,
           priority: s?.priority ?? 1,
           weight: Number(s?.weight ?? 1),
@@ -103,7 +105,11 @@ export default function CompanyPortals() {
                     </div>
                     <div>
                       <p className="font-semibold text-sm">{portal.portal_name}</p>
-                      <p className="text-xs text-muted-foreground">{portal.portal_code}</p>
+                      {portal.base_url ? (
+                        <a href={portal.base_url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline">{portal.base_url}</a>
+                      ) : (
+                        <p className="text-xs text-muted-foreground">{portal.portal_code}</p>
+                      )}
                     </div>
                   </div>
                   <Switch checked={portal.is_enabled} onCheckedChange={() => handleToggle(portal)} />

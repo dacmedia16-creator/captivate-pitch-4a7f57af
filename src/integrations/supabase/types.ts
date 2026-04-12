@@ -496,18 +496,21 @@ export type Database = {
       }
       portal_sources: {
         Row: {
+          base_url: string | null
           code: string
           id: string
           is_global: boolean
           name: string
         }
         Insert: {
+          base_url?: string | null
           code: string
           id?: string
           is_global?: boolean
           name: string
         }
         Update: {
+          base_url?: string | null
           code?: string
           id?: string
           is_global?: boolean
