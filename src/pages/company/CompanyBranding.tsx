@@ -36,6 +36,7 @@ export default function CompanyBranding() {
     about_global: "", about_national: "", about_regional: "", regional_numbers: "",
     about_global_image_url: "" as string | null, about_national_image_url: "" as string | null, about_regional_image_url: "" as string | null,
     objectives: null as any, value_propositions: null as any, global_stats: null as any,
+    about_global_stats: null as any, about_national_stats: null as any, about_regional_stats: null as any,
   });
 
   useEffect(() => {
@@ -57,6 +58,9 @@ export default function CompanyBranding() {
         objectives: a.objectives || null,
         value_propositions: a.value_propositions || null,
         global_stats: a.global_stats || null,
+        about_global_stats: a.about_global_stats || null,
+        about_national_stats: a.about_national_stats || null,
+        about_regional_stats: a.about_regional_stats || null,
       });
     }
   }, [agency]);
