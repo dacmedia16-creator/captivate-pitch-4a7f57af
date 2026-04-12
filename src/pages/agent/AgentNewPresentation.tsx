@@ -105,12 +105,12 @@ export default function AgentNewPresentation() {
         : Promise.resolve(null);
 
       const portalSourcesPromise = marketData.selectedPortals.length > 0
-        ? Promise.resolve(supabase.from("portal_sources").select("id, name").in("id", marketData.selectedPortals))
+        ? Promise.resolve(supabase.from("portal_sources").select("id, name, code").in("id", marketData.selectedPortals))
         : Promise.resolve(null);
 
       const [, portalSourcesRes] = await Promise.all([photosPromise, portalSourcesPromise]);
 
-      // Market analysis (sequential because each step depends on previous)
+      // Market analysis
       if (marketData.selectedPortals.length > 0) {
         const { data: job, error: jobError } = await supabase.from("market_analysis_jobs").insert({
           presentation_id: pres.id,
@@ -129,14 +129,55 @@ export default function AgentNewPresentation() {
         }).select().single();
 
         if (job && !jobError) {
-          const portals = (portalSourcesRes?.data || []).map((p: any) => ({ id: p.id, name: p.name }));
-          generatedComparables = generateSimulatedComparables(job.id, propertyData, portals);
+          const portals = (portalSourcesRes?.data || []).map((p: any) => ({ id: p.id, name: p.name, code: p.code }));
+
+          // Try real market analysis via edge function
+          let useSimulated = false;
+          try {
+            const { data: analyzeResult, error: analyzeError } = await supabase.functions.invoke("analyze-market", {
+              body: {
+                property: propertyData,
+                portals,
+                filters: {
+                  searchRadius: marketData.searchRadius,
+                  minArea: marketData.minArea,
+                  maxArea: marketData.maxArea,
+                  minPrice: marketData.minPrice,
+                  maxPrice: marketData.maxPrice,
+                  maxComparables: marketData.maxComparables,
+                },
+              },
+            });
+
+            if (analyzeError || !analyzeResult?.success || !analyzeResult?.comparables?.length) {
+              console.warn("Real analysis returned no results, falling back to simulated:", analyzeError || analyzeResult?.message);
+              useSimulated = true;
+            } else {
+              generatedComparables = analyzeResult.comparables.map((c: any) => ({
+                market_analysis_job_id: job.id,
+                ...c,
+              }));
+            }
+          } catch (err) {
+            console.error("Edge function error, falling back to simulated:", err);
+            useSimulated = true;
+          }
+
+          // Fallback to simulated comparables
+          if (useSimulated) {
+            generatedComparables = generateSimulatedComparables(job.id, propertyData, portals);
+          }
 
           marketCalc = calculateMarketPrices(generatedComparables.map(c => ({
             price: c.price,
             price_per_sqm: c.price_per_sqm,
             is_approved: c.is_approved,
           })));
+
+          const confidenceLevel = useSimulated ? "low" : "medium";
+          const summaryText = useSimulated
+            ? `Análise baseada em ${generatedComparables.length} comparáveis simulados.`
+            : `Análise baseada em ${generatedComparables.length} comparáveis reais extraídos de portais.`;
 
           // Insert comparables and report in parallel
           const [, reportRes] = await Promise.all([
@@ -149,8 +190,8 @@ export default function AgentNewPresentation() {
               suggested_market_price: marketCalc.suggested_market_price,
               suggested_aspirational_price: marketCalc.suggested_aspirational_price,
               suggested_fast_sale_price: marketCalc.suggested_fast_sale_price,
-              confidence_level: "medium",
-              summary: `Análise baseada em ${generatedComparables.length} comparáveis simulados.`,
+              confidence_level: confidenceLevel,
+              summary: summaryText,
             }).select().single(),
             supabase.from("market_analysis_jobs").update({
               status: "completed",
