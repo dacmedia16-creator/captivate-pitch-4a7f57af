@@ -206,22 +206,26 @@ serve(async (req) => {
         portalResult.urls_found = results.length;
         console.log(`[FASE 1] ${portal.name}: ${results.length} URLs encontradas`);
 
-        for (const r of results) {
-          if (r.url) {
-            allUrls.push({
-              url: r.url,
-              title: r.title || "",
-              portal,
-              snippet: r.description || "",
-            });
-          }
-        }
+        const urls = results.filter((r: any) => r.url).map((r: any) => ({
+          url: r.url,
+          title: r.title || "",
+          portal,
+          snippet: r.description || "",
+        }));
+        return { portalResult, urls, limitation: null as string | null };
       } catch (err) {
         console.error(`[FASE 1] ${portal.name} exception:`, err);
-        limitations.push(`${portal.name}: falha na conexão`);
+        return { portalResult, urls: [] as any[], limitation: `${portal.name}: falha na conexão` };
       }
+    }));
 
-      portalResults.push(portalResult);
+    for (const result of portalSearchResults) {
+      if (result.status === "fulfilled") {
+        const { portalResult, urls, limitation } = result.value;
+        portalResults.push(portalResult);
+        allUrls.push(...urls);
+        if (limitation) limitations.push(limitation);
+      }
     }
 
     console.log(`[FASE 1] Total: ${allUrls.length} URLs coletadas`);
