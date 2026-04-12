@@ -1,26 +1,25 @@
 
 
-# Adicionar Portal Kenlo às Configurações de Portais
+# Busca automática de endereço pelo CEP
 
 ## O que será feito
-Adicionar o portal **Kenlo** (`https://portal.kenlo.com.br/`) à tabela `portal_sources` para que apareça na página de configuração de portais da imobiliária.
+Ao digitar o CEP no formulário de imóvel (Step 1 do wizard), o sistema buscará automaticamente o endereço, bairro e cidade usando a API pública **ViaCEP** (`viacep.com.br/ws/{cep}/json/`). Os campos serão preenchidos automaticamente, mas editáveis.
 
 ## Mudanças
 
-### 1. Migração SQL
-Adicionar coluna `base_url` na tabela `portal_sources` (opcional, para armazenar a URL do portal) e inserir o registro do Kenlo:
+### `src/components/wizard/StepPropertyData.tsx`
+1. Adicionar função `fetchCep` que chama `https://viacep.com.br/ws/{cep}/json/` quando o CEP tiver 8 dígitos
+2. Aplicar máscara de CEP (00000-000) no input
+3. Auto-preencher `address` (logradouro), `neighborhood` (bairro) e `city` (localidade) com os dados retornados
+4. Mostrar indicador de loading enquanto busca
+5. Mostrar feedback se CEP não encontrado
 
-```sql
-ALTER TABLE public.portal_sources ADD COLUMN IF NOT EXISTS base_url TEXT;
-
-INSERT INTO public.portal_sources (code, name, is_global, base_url) VALUES
-  ('kenlo', 'Kenlo', true, 'https://portal.kenlo.com.br/')
-ON CONFLICT (code) DO NOTHING;
-```
-
-### 2. UI (opcional)
-Mostrar a URL do portal no card, abaixo do código, como link clicável. Ajuste pequeno em `CompanyPortals.tsx`.
+## Detalhes técnicos
+- API ViaCEP é gratuita, pública, sem autenticação
+- Disparo automático ao completar 8 dígitos (sem botão extra)
+- Campos preenchidos continuam editáveis pelo usuário
+- Sem dependências adicionais
 
 ## Risco
-Nenhum. Apenas insere um novo registro e uma coluna opcional.
+Nenhum. Apenas adiciona funcionalidade ao formulário existente.
 
