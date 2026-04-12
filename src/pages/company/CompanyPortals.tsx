@@ -33,13 +33,14 @@ export default function CompanyPortals() {
       if (!sources) return [];
 
       const settingsMap = new Map((settings || []).map((s) => [s.portal_source_id, s]));
-      return sources.map((src): PortalSetting => {
+      return sources.map((src: any): PortalSetting => {
         const s = settingsMap.get(src.id);
         return {
           id: s?.id,
           portal_source_id: src.id,
           portal_name: src.name,
           portal_code: src.code,
+          base_url: src.base_url || undefined,
           is_enabled: s?.is_enabled ?? false,
           priority: s?.priority ?? 1,
           weight: Number(s?.weight ?? 1),
