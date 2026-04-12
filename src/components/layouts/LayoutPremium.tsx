@@ -335,7 +335,7 @@ export function LayoutPremium({ section, branding }: Props) {
                   {section.section_key === "about_national" && stats?.presence_states?.length > 0 && (
                     <BrazilPresenceMap states={stats.presence_states} primaryColor={primary} accentColor={accent} />
                   )}
-                  {displayImage && <img src={displayImage} alt="" className="max-h-56 object-cover w-full rounded-lg" />}
+                  {displayImage && <img src={displayImage} alt="" className="w-full object-contain rounded-lg" />}
                 </div>
               )}
             </div>
