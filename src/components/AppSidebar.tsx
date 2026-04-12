@@ -11,7 +11,6 @@ import {
   FileText,
   Globe,
   Sparkles,
-  ChevronDown,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useRole, UserRole } from "@/contexts/RoleContext";
@@ -29,12 +28,6 @@ import {
   SidebarFooter,
   useSidebar,
 } from "@/components/ui/sidebar";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 
 interface NavItem {
   title: string;
@@ -78,10 +71,9 @@ const roleLabels: Record<UserRole, string> = {
 };
 
 export function AppSidebar() {
-  const { role, setRole } = useRole();
+  const { role } = useRole();
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
-  const location = useLocation();
   const items = navByRole[role];
 
   return (
@@ -105,24 +97,11 @@ export function AppSidebar() {
       </SidebarHeader>
 
       <SidebarContent>
-        {/* Role switcher for demo */}
         {!collapsed && (
           <div className="px-3 mb-2">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button className="flex w-full items-center justify-between rounded-lg bg-sidebar-accent px-3 py-2 text-xs font-medium text-sidebar-accent-foreground hover:bg-sidebar-accent/80 transition-colors">
-                  <span>{roleLabels[role]}</span>
-                  <ChevronDown className="h-3.5 w-3.5 opacity-60" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-48">
-                {(Object.keys(roleLabels) as UserRole[]).map((r) => (
-                  <DropdownMenuItem key={r} onClick={() => setRole(r)}>
-                    {roleLabels[r]}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <div className="rounded-lg bg-sidebar-accent px-3 py-2 text-xs font-medium text-sidebar-accent-foreground">
+              {roleLabels[role]}
+            </div>
           </div>
         )}
 

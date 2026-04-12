@@ -1,10 +1,17 @@
-import React, { createContext, useContext, useState, ReactNode } from "react";
+import React, { createContext, useContext, ReactNode } from "react";
+import { useAuth, AppRole } from "@/contexts/AuthContext";
 
 export type UserRole = "super_admin" | "admin" | "agent";
 
+// Map DB roles to frontend roles
+function mapRole(appRole: AppRole | null): UserRole {
+  if (appRole === "super_admin") return "super_admin";
+  if (appRole === "agency_admin") return "admin";
+  return "agent";
+}
+
 interface RoleContextType {
   role: UserRole;
-  setRole: (role: UserRole) => void;
   userName: string;
   companyName: string;
 }
@@ -12,13 +19,14 @@ interface RoleContextType {
 const RoleContext = createContext<RoleContextType | undefined>(undefined);
 
 export function RoleProvider({ children }: { children: ReactNode }) {
-  const [role, setRole] = useState<UserRole>("agent");
+  const { profile, appRole, tenantName } = useAuth();
 
-  const userName = role === "super_admin" ? "Admin Global" : role === "admin" ? "Maria Silva" : "João Santos";
-  const companyName = role === "super_admin" ? "Listing Studio AI" : "Imobiliária Premium";
+  const role = mapRole(appRole);
+  const userName = profile?.full_name || "Usuário";
+  const companyName = tenantName || (role === "super_admin" ? "Listing Studio AI" : "Sem empresa");
 
   return (
-    <RoleContext.Provider value={{ role, setRole, userName, companyName }}>
+    <RoleContext.Provider value={{ role, userName, companyName }}>
       {children}
     </RoleContext.Provider>
   );
