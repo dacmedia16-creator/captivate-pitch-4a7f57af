@@ -131,35 +131,55 @@ export default function AgentNewPresentation() {
         if (job && !jobError) {
           const portals = (portalSourcesRes?.data || []).map((p: any) => ({ id: p.id, name: p.name, code: p.code }));
 
-          // Try real market analysis via edge function
+          // Try Manus first, then Firecrawl, then simulated
           let useSimulated = false;
+          const analyzeBody = {
+            property: propertyData,
+            portals,
+            filters: {
+              searchRadius: marketData.searchRadius,
+              minArea: marketData.minArea,
+              maxArea: marketData.maxArea,
+              minPrice: marketData.minPrice,
+              maxPrice: marketData.maxPrice,
+              maxComparables: marketData.maxComparables,
+            },
+          };
+
           try {
-            const { data: analyzeResult, error: analyzeError } = await supabase.functions.invoke("analyze-market", {
-              body: {
-                property: propertyData,
-                portals,
-                filters: {
-                  searchRadius: marketData.searchRadius,
-                  minArea: marketData.minArea,
-                  maxArea: marketData.maxArea,
-                  minPrice: marketData.minPrice,
-                  maxPrice: marketData.maxPrice,
-                  maxComparables: marketData.maxComparables,
-                },
-              },
+            // Try Manus AI first
+            console.log("Trying Manus AI for market analysis...");
+            const { data: manusResult, error: manusError } = await supabase.functions.invoke("analyze-market-manus", {
+              body: analyzeBody,
             });
 
-            if (analyzeError || !analyzeResult?.success || !analyzeResult?.comparables?.length) {
-              console.warn("Real analysis returned no results, falling back to simulated:", analyzeError || analyzeResult?.message);
-              useSimulated = true;
-            } else {
-              generatedComparables = analyzeResult.comparables.map((c: any) => ({
+            if (!manusError && manusResult?.success && manusResult?.comparables?.length) {
+              console.log(`Manus returned ${manusResult.comparables.length} comparables`);
+              generatedComparables = manusResult.comparables.map((c: any) => ({
                 market_analysis_job_id: job.id,
                 ...c,
               }));
+            } else {
+              console.warn("Manus failed or returned no results, trying Firecrawl...", manusError || manusResult?.message);
+
+              // Fallback to Firecrawl
+              const { data: analyzeResult, error: analyzeError } = await supabase.functions.invoke("analyze-market", {
+                body: analyzeBody,
+              });
+
+              if (!analyzeError && analyzeResult?.success && analyzeResult?.comparables?.length) {
+                console.log(`Firecrawl returned ${analyzeResult.comparables.length} comparables`);
+                generatedComparables = analyzeResult.comparables.map((c: any) => ({
+                  market_analysis_job_id: job.id,
+                  ...c,
+                }));
+              } else {
+                console.warn("Firecrawl also failed, using simulated:", analyzeError || analyzeResult?.message);
+                useSimulated = true;
+              }
             }
           } catch (err) {
-            console.error("Edge function error, falling back to simulated:", err);
+            console.error("Market analysis error, falling back to simulated:", err);
             useSimulated = true;
           }
 
