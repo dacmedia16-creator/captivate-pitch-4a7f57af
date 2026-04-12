@@ -192,13 +192,10 @@ serve(async (req) => {
         if (!searchRes.ok) {
           const errText = await searchRes.text();
           console.error(`[FASE 1] ${portal.name} error: ${searchRes.status}`);
-          if (searchRes.status === 402) {
-            limitations.push(`Firecrawl: créditos insuficientes`);
-          } else {
-            limitations.push(`${portal.name}: erro na busca (${searchRes.status})`);
-          }
-          portalResults.push(portalResult);
-          continue;
+          const limitation = searchRes.status === 402
+            ? `Firecrawl: créditos insuficientes`
+            : `${portal.name}: erro na busca (${searchRes.status})`;
+          return { portalResult, urls: [] as any[], limitation };
         }
 
         const searchData = await searchRes.json();
