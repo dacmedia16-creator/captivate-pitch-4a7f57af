@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button";
 import {
   ArrowLeft, Loader2, FileText, Building2, ThumbsUp, ThumbsDown,
   RefreshCw, Sparkles, TrendingUp, DollarSign, BarChart3, Home,
-  FileDown, Presentation, ScatterChart, ExternalLink,
+  FileDown, Presentation, ScatterChart, ExternalLink, Search,
+  AlertTriangle, CheckCircle, XCircle, Clock,
 } from "lucide-react";
 import { AdjustmentBadge } from "@/components/market-study/AdjustmentBadge";
 import { PriceRangeGauge } from "@/components/market-study/PriceRangeGauge";
