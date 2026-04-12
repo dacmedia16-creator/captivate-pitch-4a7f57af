@@ -1,8 +1,9 @@
-import { Bell, Search, LogOut } from "lucide-react";
+import { Bell, Search, LogOut, RefreshCw } from "lucide-react";
 import { useRole } from "@/contexts/RoleContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -19,6 +20,25 @@ export function TopBar() {
       <SidebarTrigger className="text-muted-foreground hover:text-foreground" />
 
       <div className="flex-1" />
+
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-muted-foreground hover:text-foreground"
+              onClick={() => {
+                sessionStorage.setItem("app_version_reloaded", "1");
+                window.location.reload();
+              }}
+            >
+              <RefreshCw className="h-3.5 w-3.5" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Atualizar sistema</TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
 
       <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground">
         <Search className="h-3.5 w-3.5" />
