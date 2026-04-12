@@ -47,6 +47,8 @@ export function LayoutImpactoComercial({ section, branding }: Props) {
           {c.creci && <p className="text-[11px] tracking-[0.25em] mt-1 mb-6" style={{ color: "#9CA3AF" }}>CRECI {c.creci}</p>}
           <div className="w-10 h-1 mb-5" style={{ backgroundColor: accent }} />
           {c.short_bio && <p className="slide-body max-w-sm" style={{ color: "#6B7280" }}>{c.short_bio}</p>}
+          {c.education && <p className="text-[12px] mt-2" style={{ color: "#9CA3AF" }}>🎓 {c.education}</p>}
+          {c.service_regions && <p className="text-[12px] mt-1" style={{ color: "#9CA3AF" }}>📍 {c.service_regions}</p>}
           <div className="flex gap-5 mt-8">
             {c.years_in_market && (
               <div className="px-6 py-4 text-white" style={{ backgroundColor: accent }}>

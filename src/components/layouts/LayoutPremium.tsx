@@ -60,7 +60,23 @@ export function LayoutPremium({ section, branding }: Props) {
           {c.creci && <p className="text-[11px] text-white/25 tracking-widest mb-6">CRECI {c.creci}</p>}
           <div className="w-12 h-[2px] rounded-full mb-6" style={{ backgroundColor: accent }} />
           {c.short_bio && <p className="slide-body text-white/50 max-w-sm">{c.short_bio}</p>}
+          {c.education && <p className="text-[12px] text-white/35 mt-2">🎓 {c.education}</p>}
+          {c.service_regions && <p className="text-[12px] text-white/35 mt-1">📍 {c.service_regions}</p>}
           {c.vgv_summary && <p className="text-[12px] text-white/25 italic mt-4">{c.vgv_summary}</p>}
+          <div className="flex gap-6 mt-8">
+            {c.years_in_market && (
+              <div>
+                <p className="slide-metric text-[28px] text-white">{c.years_in_market}</p>
+                <p className="slide-label text-white/30 mt-1">Anos</p>
+              </div>
+            )}
+            {c.specialties && (
+              <div>
+                <p className="text-[13px] font-semibold text-white">{c.specialties}</p>
+                <p className="slide-label text-white/30 mt-1">Especialidades</p>
+              </div>
+            )}
+          </div>
         </div>
         {c.avatar_url && (
           <div className="w-[40%] relative">

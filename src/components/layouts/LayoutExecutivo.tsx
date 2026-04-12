@@ -53,6 +53,8 @@ export function LayoutExecutivo({ section, branding }: Props) {
           {c.creci && <p className="text-[11px] text-white/30 tracking-widest mb-6">CRECI {c.creci}</p>}
           <div className="w-10 h-[2px] rounded-full mb-6" style={{ backgroundColor: accent }} />
           {c.short_bio && <p className="slide-body text-white/55 max-w-sm">{c.short_bio}</p>}
+          {c.education && <p className="text-[12px] text-white/40 mt-2">🎓 {c.education}</p>}
+          {c.service_regions && <p className="text-[12px] text-white/40 mt-1">📍 {c.service_regions}</p>}
           {c.vgv_summary && <p className="text-[12px] text-white/30 italic mt-4">{c.vgv_summary}</p>}
           <div className="flex gap-6 mt-8">
             {c.years_in_market && (
