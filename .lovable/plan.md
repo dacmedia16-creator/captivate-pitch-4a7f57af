@@ -1,29 +1,35 @@
 
 
-# Garantir link do imóvel em todos os comparáveis
+# Corrigir proporção do logo no slide de capa
 
 ## Problema
-A URL do anúncio depende da extração da IA, que pode falhar ou retornar vazio. O Firecrawl já retorna a URL real de cada resultado (`r.url`), mas ela não é usada como fallback.
+O logo nos slides de capa usa apenas altura fixa (`h-16` / `h-14` / `h-18`) sem limitar a largura. Logos largos ficam desproporcionais. Apesar de ter `object-contain`, falta um `max-w` para conter logos muito horizontais.
 
 ## Solução
-Na edge function `analyze-market/index.ts`, após a extração da IA, cruzar o `result_index` de cada comparável com o array `allSearchResults` para preencher `source_url` e `source_name` quando a IA não os extrair.
+Adicionar `max-w-[200px]` (ou similar) nas tags `<img>` do logo nos 3 layouts de capa, garantindo que logos largos sejam redimensionados proporcionalmente.
 
-### Mudança no arquivo `supabase/functions/analyze-market/index.ts`
+### Arquivos modificados
 
-No bloco `.map()` (linhas 338-357), adicionar fallback:
+1. **`src/components/layouts/LayoutExecutivo.tsx`** (linha 32)
+   - Adicionar `max-w-[200px]` à classe do logo na cover
 
-```typescript
-// Se a IA não extraiu URL, usar a URL do Firecrawl via result_index
-const resultIdx = (c.result_index || 1) - 1;
-const originalResult = allSearchResults[resultIdx];
-const sourceUrl = c.source_url || originalResult?.url || "";
-const sourceName = c.source_name || originalResult?.portal.name || "";
+2. **`src/components/layouts/LayoutImpactoComercial.tsx`** (linha 27)
+   - Mesmo ajuste
+
+3. **`src/components/layouts/LayoutPremium.tsx`** (linha 28)
+   - Mesmo ajuste
+
+### Exemplo da mudança
+```tsx
+// Antes
+<img src={c.logo_url} alt="" className="absolute top-14 left-16 h-16 object-contain drop-shadow-lg" />
+
+// Depois
+<img src={c.logo_url} alt="" className="absolute top-14 left-16 h-16 max-w-[200px] object-contain drop-shadow-lg" />
 ```
 
-E usar `sourceUrl` / `sourceName` no retorno em vez de `c.source_url` / `c.source_name`.
-
 ## Impacto
-- Todo comparável terá o link real do anúncio no portal
-- O nome do portal será sempre preenchido
-- Já aparece como link clicável na tabela de comparáveis
+- Logos horizontais ficam contidos sem distorção
+- Logos quadrados/verticais mantêm o tamanho atual
+- Afeta os 3 layouts: Executivo, Premium e Impacto Comercial
 
