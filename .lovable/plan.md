@@ -1,120 +1,104 @@
 
 
-# Dashboards, Cadastros e Configurações — Listing Studio AI
+# Wizard, Apresentação e Editor — Listing Studio AI
 
 ## Resumo
 
-Implementar todos os dashboards funcionais (Super Admin e Admin da Imobiliária), CRUD de imobiliárias, CRUD de corretores, configuração institucional com 8 abas, plano de marketing, e configuração de portais. Criar componentes reutilizáveis (MetricCard, DataTable, ImageUploader, etc.).
+Implementar o núcleo do produto: dashboard do corretor funcional, wizard multi-step para criação de apresentações, 3 layouts visuais premium, geração automática de seções, editor com sidebar/preview/painel, modo apresentação fullscreen, e sistema de modelos.
 
-## Pré-requisito: Storage Bucket
+## Escopo de Implementação
 
-Criar um bucket `uploads` (público) para logos, fotos de agência, avatares e imagens de resultados/depoimentos.
+### 1. Dashboard do Corretor (`AgentDashboard.tsx`)
+- MetricCards: total apresentações, apresentações no mês, PDFs gerados, estudos recentes, modelos salvos
+- Botão "Nova Apresentação" com destaque visual
+- 3 listas: apresentações recentes, rascunhos, modelos salvos
+- Queries via `@tanstack/react-query` filtradas por `broker_id = auth.uid()`
 
-## Componentes Reutilizáveis a Criar
+### 2. Wizard de Nova Apresentação (`AgentNewPresentation.tsx`)
+Fluxo em 4 etapas com stepper visual e navegação anterior/próximo:
 
-| Componente | Caminho | Uso |
-|---|---|---|
-| MetricCard | `src/components/shared/MetricCard.tsx` | Cards de métricas nos dashboards |
-| DataTable | `src/components/shared/DataTable.tsx` | Tabelas com busca e paginação |
-| FormModal | `src/components/shared/FormModal.tsx` | Dialog genérico para CRUD |
-| ImageUploader | `src/components/shared/ImageUploader.tsx` | Upload de imagens para Supabase Storage |
-| StatusBadge | `src/components/shared/StatusBadge.tsx` | Badge de status (ativo/bloqueado/pendente) |
-| ConfirmDialog | `src/components/shared/ConfirmDialog.tsx` | Confirmação de ações destrutivas |
-| SortableList | `src/components/shared/SortableList.tsx` | Lista reordenável para itens com sort_order |
+**Etapa 1 — Dados do Imóvel**: Formulário completo com todos os campos (nome, proprietário, tipo, finalidade, endereço, áreas, cômodos, padrão, idade, diferenciais, valor pretendido, observações) + upload de fotos múltiplas via ImageUploader para `presentation_images`
 
-## Páginas a Implementar
+**Etapa 2 — Layout e Estilo**: Seleção visual de layout (Executivo/Premium/Impacto Comercial), tom (técnico/executivo/premium/comercial), e modo (automático/guiado/avançado) com cards de preview
 
-### 1. Super Admin Dashboard (`AdminDashboard.tsx`)
-- 6 MetricCards: imobiliárias, usuários, corretores, apresentações, estudos de mercado, PDFs exportados
-- Queries agregadas via Supabase (count de cada tabela)
-- Tabela de imobiliárias com logo, nome, status, total corretores, total apresentações, data criação, ações
+**Etapa 3 — Estudo de Mercado**: Seleção de portais (via `tenant_portal_settings`), raio de busca, faixas de metragem/preço, número de comparáveis. Salva configuração em `market_analysis_jobs`
 
-### 2. Gestão de Imobiliárias (`AdminTenants.tsx`)
-- DataTable com todas as imobiliárias
-- FormModal para criar/editar tenant (nome, slug, status, plano via subscription_plans)
-- Ações: editar, bloquear/ativar, visualizar detalhes
-- Ao criar tenant, criar também um registro em `agency_profiles`
+**Etapa 4 — Geração**: Animação de loading com 4 etapas visuais progressivas. Ao finalizar, salva a apresentação e gera as seções automaticamente
 
-### 3. Gestão de Usuários (`AdminUsers.tsx`)
-- Tabela de todos os usuários com perfil, tenant, papel, status
-- Filtros por tenant e papel
+### 3. Geração Automática de Seções
+Ao concluir o wizard, uma função client-side:
+- Busca `broker_profiles`, `agency_profiles`, `marketing_actions`, `competitive_differentials`, `sales_results`, `testimonials` do tenant
+- Monta 12 seções automáticas em `presentation_sections` com `section_key`:
+  - `cover`, `broker_intro`, `about_global`, `about_national`, `about_regional`, `property_summary`, `marketing_plan`, `differentials`, `results`, `market_study_placeholder`, `pricing_scenarios`, `closing`
+- Cada seção tem `content` JSONB com dados estruturados e `sort_order`
 
-### 4. Company Dashboard (`CompanyDashboard.tsx`)
-- MetricCards: corretores ativos, apresentações, estudos, PDFs
-- Tabela de últimas apresentações do tenant
-- Tabela de corretores recentes
-- Top corretores por número de apresentações
+### 4. Três Layouts Visuais Premium
+Criar componentes de renderização em `src/components/layouts/`:
+- **LayoutExecutivo**: Clean, corporativo, fundo claro, tipografia sóbria, gráficos lineares
+- **LayoutPremium**: Elegante, grandes imagens, fundo escuro/dourado, visual de alto padrão
+- **LayoutImpactoComercial**: Energia comercial, foco em métricas e prova social, cores vibrantes
 
-### 5. Gestão de Corretores (`CompanyTeam.tsx`)
-- DataTable com foto, nome, email, telefone, status, total apresentações, data cadastro
-- FormModal para criar/editar corretor (todos os campos de profiles + broker_profiles)
-- Criar corretor: insere em profiles + user_roles (broker) + broker_profiles
-- Ações: editar, ativar/desativar
+Cada layout renderiza as 12 seções com estilo diferente mas mesma estrutura de dados. Todos respeitam `primary_color`/`secondary_color` do branding.
 
-### 6. Configuração Institucional (`CompanyBranding.tsx`)
-- Página com 8 abas usando Tabs do shadcn:
-  - **Dados da empresa**: nome, logo (ImageUploader), foto da agência
-  - **Branding**: cor principal, cor secundária, preview visual
-  - **Apresentação mundial**: textarea/rich-text para about_global
-  - **Apresentação nacional**: textarea para about_national
-  - **Apresentação regional**: textarea para about_regional + regional_numbers
-  - **Diferenciais**: CRUD inline (competitive_differentials) — título, descrição, ordem, ativo
-  - **Resultados**: CRUD inline (sales_results) — título, descrição, métrica, imagem, ordem
-  - **Depoimentos**: CRUD inline (testimonials) — nome, cargo, texto, imagem, ordem
+### 5. Editor da Apresentação (`/presentations/:id/edit`)
+Página com 3 áreas:
+- **Sidebar esquerda**: Lista de slides/seções com thumbnails, drag-and-drop para reordenar, toggle de visibilidade
+- **Preview central**: Renderização do slide selecionado no layout escolhido
+- **Painel direito**: Formulário de edição do conteúdo da seção selecionada (textos, imagens)
 
-### 7. Plano de Marketing (`CompanySettings.tsx` ou nova rota)
-- CRUD de marketing_actions do tenant
-- Cada ação: título, descrição, ícone (select com opções Lucide), imagem, ordem, ativo/inativo
-- Lista reordenável
+Ações no toolbar: duplicar apresentação, salvar como modelo, abrir modo apresentação, exportar PDF (placeholder), gerar link compartilhável (via `share_token`)
 
-### 8. Configuração de Portais (dentro de CompanySettings ou nova aba)
-- Lista de portal_sources com toggle habilitado/desabilitado
-- Campos: prioridade, peso
-- Usa tenant_portal_settings para persistir
+### 6. Modo Apresentação (`/presentations/:id/present`)
+Tela fullscreen sem sidebar/topbar:
+- Navegação anterior/próximo via botões e teclas de seta
+- Barra de progresso sutil
+- Botão fullscreen nativo
+- Renderiza cada seção visível no layout selecionado
 
-## Sidebar — Novas rotas
+### 7. Modelos (`AgentPresentations.tsx`)
+- Tab "Modelos" na lista de apresentações
+- Ação "Salvar como modelo" no editor → insere em `presentation_templates` com `structure` JSONB contendo as seções
+- Ação "Usar modelo" → cria nova apresentação a partir do template
 
-Adicionar ao adminNav:
-- Marketing → `/company/marketing`
-- Portais → `/company/portals`
+## Novas Rotas
 
-## Navegação atualizada
+| Rota | Componente |
+|------|-----------|
+| `/presentations/:id/edit` | PresentationEditor |
+| `/presentations/:id/present` | PresentationMode |
 
-Novas rotas no App.tsx:
-- `/company/marketing` → CompanyMarketing
-- `/company/portals` → CompanyPortals
-
-## Migração SQL
-
-- Criar bucket `uploads` no storage com policies públicas de leitura e autenticadas de escrita
-- Não há alteração de schema (todas as tabelas já existem)
-
-## Detalhes técnicos
-
-- Todas as queries usam `@tanstack/react-query` com `useQuery` / `useMutation`
-- Formulários com `react-hook-form` + `zod` para validação
-- Contagens no dashboard via `.select('id', { count: 'exact', head: true })`
-- Upload de imagens via `supabase.storage.from('uploads').upload()`
-- Todas as operações respeitam RLS existente (tenant_id é setado automaticamente via AuthContext)
-
-## Arquivos a criar
+## Arquivos a Criar
 
 | Arquivo | Descrição |
-|---|---|
-| `src/components/shared/MetricCard.tsx` | Card de métrica reutilizável |
-| `src/components/shared/DataTable.tsx` | Tabela com busca e paginação |
-| `src/components/shared/FormModal.tsx` | Modal de formulário |
-| `src/components/shared/ImageUploader.tsx` | Upload de imagem |
-| `src/components/shared/StatusBadge.tsx` | Badge de status |
-| `src/components/shared/ConfirmDialog.tsx` | Dialog de confirmação |
-| `src/pages/admin/AdminDashboard.tsx` | Dashboard super admin (reescrever) |
-| `src/pages/admin/AdminTenants.tsx` | CRUD imobiliárias (reescrever) |
-| `src/pages/admin/AdminUsers.tsx` | Listagem de usuários (reescrever) |
-| `src/pages/company/CompanyDashboard.tsx` | Dashboard imobiliária (reescrever) |
-| `src/pages/company/CompanyTeam.tsx` | CRUD corretores (reescrever) |
-| `src/pages/company/CompanyBranding.tsx` | 8 abas institucional (reescrever) |
-| `src/pages/company/CompanyMarketing.tsx` | CRUD marketing actions (novo) |
-| `src/pages/company/CompanyPortals.tsx` | Config portais (novo) |
-| `src/App.tsx` | Adicionar novas rotas |
-| `src/components/AppSidebar.tsx` | Adicionar Marketing e Portais ao menu |
+|---------|-----------|
+| `src/pages/agent/AgentDashboard.tsx` | Dashboard funcional (reescrever) |
+| `src/pages/agent/AgentNewPresentation.tsx` | Wizard 4 etapas (reescrever) |
+| `src/pages/agent/AgentPresentations.tsx` | Lista + modelos (reescrever) |
+| `src/pages/agent/PresentationEditor.tsx` | Editor 3 painéis |
+| `src/pages/agent/PresentationMode.tsx` | Modo apresentação fullscreen |
+| `src/components/wizard/WizardStepper.tsx` | Stepper visual |
+| `src/components/wizard/StepPropertyData.tsx` | Etapa 1 — Dados do imóvel |
+| `src/components/wizard/StepLayoutStyle.tsx` | Etapa 2 — Layout e estilo |
+| `src/components/wizard/StepMarketStudy.tsx` | Etapa 3 — Estudo de mercado |
+| `src/components/wizard/StepGeneration.tsx` | Etapa 4 — Geração |
+| `src/components/layouts/LayoutExecutivo.tsx` | Layout executivo |
+| `src/components/layouts/LayoutPremium.tsx` | Layout premium |
+| `src/components/layouts/LayoutImpactoComercial.tsx` | Layout impacto |
+| `src/components/layouts/SectionRenderer.tsx` | Renderizador de seção por layout |
+| `src/components/editor/SlidesSidebar.tsx` | Sidebar de slides |
+| `src/components/editor/EditPanel.tsx` | Painel de edição |
+| `src/components/editor/EditorToolbar.tsx` | Toolbar do editor |
+| `src/hooks/useGeneratePresentation.ts` | Hook para gerar seções automáticas |
+| `src/App.tsx` | Adicionar rotas do editor e modo apresentação |
+
+## Detalhes Técnicos
+
+- Formulários com `react-hook-form` + `zod`
+- Upload de múltiplas fotos via `supabase.storage.from('uploads')`
+- Geração de `share_token` com `crypto.randomUUID()`
+- Estado do wizard gerenciado com `useState` local (dados temporários até salvar)
+- Queries com `useQuery`/`useMutation` para todas as operações CRUD
+- Layout selection via cards clicáveis com preview visual
+- Editor usa `useParams` para carregar apresentação por ID
+- Modo apresentação filtra `presentation_sections` onde `is_visible = true` e ordena por `sort_order`
 
