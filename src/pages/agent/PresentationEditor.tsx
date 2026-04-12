@@ -9,6 +9,7 @@ import { EditorToolbar } from "@/components/editor/EditorToolbar";
 import { SectionRenderer, SectionData } from "@/components/layouts/SectionRenderer";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { logAudit } from "@/hooks/useAuditLog";
 
 export default function PresentationEditor() {
   const { id } = useParams<{ id: string }>();
@@ -17,6 +18,8 @@ export default function PresentationEditor() {
   const queryClient = useQueryClient();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [localSections, setLocalSections] = useState<SectionData[]>([]);
+  const [generatingAI, setGeneratingAI] = useState(false);
+  const [exportingPDF, setExportingPDF] = useState(false);
 
   const { data: presentation, isLoading: loadingPres } = useQuery({
     queryKey: ["presentation", id],
@@ -55,6 +58,7 @@ export default function PresentationEditor() {
       for (const s of localSections) {
         await supabase.from("presentation_sections").update({ content: s.content as any, title: s.title, is_visible: s.is_visible, sort_order: s.sort_order }).eq("id", s.id);
       }
+      await logAudit("presentation_saved", "presentation", id!);
     },
     onSuccess: () => { toast.success("Salvo!"); queryClient.invalidateQueries({ queryKey: ["presentation-sections", id] }); },
     onError: () => toast.error("Erro ao salvar"),
@@ -81,6 +85,7 @@ export default function PresentationEditor() {
     if (error || !newPres) { toast.error("Erro ao duplicar"); return; }
     const newSections = localSections.map(s => ({ ...s, id: undefined, presentation_id: newPres.id, created_at: undefined, updated_at: undefined }));
     await supabase.from("presentation_sections").insert(newSections as any);
+    await logAudit("presentation_duplicated", "presentation", newPres.id);
     toast.success("Apresentação duplicada!");
     navigate(`/presentations/${newPres.id}/edit`);
   };
@@ -95,6 +100,48 @@ export default function PresentationEditor() {
       structure: localSections.map(s => ({ section_key: s.section_key, title: s.title, content: s.content, sort_order: s.sort_order, is_visible: s.is_visible })) as any,
     });
     toast.success("Modelo salvo!");
+  };
+
+  const handleGenerateAI = async () => {
+    setGeneratingAI(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("generate-presentation-text", {
+        body: { presentation_id: id },
+      });
+      if (error) throw error;
+      if (data?.error) {
+        toast.error(data.error);
+        return;
+      }
+      await logAudit("ai_text_generated", "presentation", id!);
+      queryClient.invalidateQueries({ queryKey: ["presentation-sections", id] });
+      toast.success("Textos gerados com IA!");
+    } catch (e: any) {
+      toast.error(e.message || "Erro ao gerar textos");
+    } finally {
+      setGeneratingAI(false);
+    }
+  };
+
+  const handleExportPDF = async () => {
+    setExportingPDF(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("export-pdf", {
+        body: { presentation_id: id },
+      });
+      if (error) throw error;
+      if (data?.url) {
+        window.open(data.url, "_blank");
+        await logAudit("pdf_exported", "presentation", id!);
+        toast.success("PDF exportado!");
+      } else {
+        toast.error(data?.error || "Erro ao exportar");
+      }
+    } catch (e: any) {
+      toast.error(e.message || "Erro ao exportar PDF");
+    } finally {
+      setExportingPDF(false);
+    }
   };
 
   if (loadingPres || loadingSections) {
@@ -113,6 +160,10 @@ export default function PresentationEditor() {
         onPresent={() => navigate(`/presentations/${id}/present`)}
         onSave={() => saveMutation.mutate()}
         saving={saveMutation.isPending}
+        onGenerateAI={handleGenerateAI}
+        generatingAI={generatingAI}
+        onExportPDF={handleExportPDF}
+        exportingPDF={exportingPDF}
       />
       <div className="flex flex-1 overflow-hidden">
         <SlidesSidebar sections={localSections} selectedId={selectedId} onSelect={setSelectedId} onToggleVisibility={toggleVisibility} />

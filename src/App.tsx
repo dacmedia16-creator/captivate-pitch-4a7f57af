@@ -33,8 +33,10 @@ import AgentPresentations from "@/pages/agent/AgentPresentations";
 import AgentNewPresentation from "@/pages/agent/AgentNewPresentation";
 import AgentProfile from "@/pages/agent/AgentProfile";
 import AgentMarketStudy from "@/pages/agent/AgentMarketStudy";
+import MarketStudyDetail from "@/pages/agent/MarketStudyDetail";
 import PresentationEditor from "@/pages/agent/PresentationEditor";
 import PresentationMode from "@/pages/agent/PresentationMode";
+import SharedPresentation from "@/pages/shared/SharedPresentation";
 
 import NotFound from "@/pages/NotFound";
 
@@ -62,6 +64,10 @@ const App = () => (
               <Route path="/presentations/:id/present" element={<RoleGuard allowedRoles={["agent"]}><PresentationMode /></RoleGuard>} />
               <Route path="/profile" element={<AppLayout><RoleGuard allowedRoles={["agent"]}><AgentProfile /></RoleGuard></AppLayout>} />
               <Route path="/market-study" element={<AppLayout><RoleGuard allowedRoles={["agent"]}><AgentMarketStudy /></RoleGuard></AppLayout>} />
+              <Route path="/market-study/:id" element={<AppLayout><RoleGuard allowedRoles={["agent"]}><MarketStudyDetail /></RoleGuard></AppLayout>} />
+
+              {/* Public shared route */}
+              <Route path="/share/:token" element={<SharedPresentation />} />
 
               {/* Company admin routes */}
               <Route path="/company/dashboard" element={<AppLayout><RoleGuard allowedRoles={["admin"]}><CompanyDashboard /></RoleGuard></AppLayout>} />
