@@ -1,41 +1,19 @@
 
 
-# Adicionar Preferência "Mesmo Condomínio"
+# Adicionar Links dos Comparáveis na Tabela de Resultados
 
-## O que muda
+## Problema
+A tabela de comparáveis em `MarketStudyResult.tsx` não exibe o `source_url` de cada imóvel. O campo já existe no banco de dados (`market_study_comparables.source_url`), mas não é renderizado na UI.
 
-### 1. Novo campo `preferSameCondominium` na interface e UI
+## Solução
 
-**Arquivo:** `src/components/wizard/StepMarketStudy.tsx`
+**Arquivo:** `src/pages/agent/MarketStudyResult.tsx`
 
-- Adicionar `preferSameCondominium: boolean` à interface `MarketStudyData`
-- Adicionar um novo card ou item dentro do card "Filtros de pesquisa" com um Switch: **"Priorizar imóveis no mesmo condomínio"** com descrição explicativa
+Na tabela de comparáveis (linha ~516-578):
+- Adicionar coluna "Fonte" no header
+- Na célula do imóvel (ou em coluna separada), exibir `source_url` como link clicável que abre em nova aba
+- Se `source_url` existir, mostrar `source_name` como texto do link; senão, mostrar apenas o nome da fonte como texto
+- Importar `ExternalLink` do lucide-react para o ícone
 
-### 2. Estado inicial
-
-**Arquivo:** `src/pages/agent/AgentNewPresentation.tsx`
-
-- Adicionar `preferSameCondominium: false` ao `emptyMarket`
-- Passar esse flag nos filtros enviados ao `market_analysis_jobs` e à edge function `analyze-market`
-
-### 3. Usar a preferência no scraping/IA
-
-**Arquivo:** `supabase/functions/analyze-market/index.ts`
-
-- Quando `filters.preferSameCondominium === true` e `property.condominium` estiver preenchido, adicionar o nome do condomínio à query de busca do Firecrawl para priorizar resultados do mesmo condomínio
-- No prompt do AI, instruir para dar preferência a imóveis do mesmo condomínio
-
-### 4. Boost de similaridade
-
-**Arquivo:** `supabase/functions/analyze-market/index.ts`
-
-- Na função `computeSimilarity`, quando `preferSameCondominium` estiver ativo e o comparable tiver o mesmo condomínio (extraído pela IA), adicionar +10 pontos de similaridade
-
-## Arquivos
-
-| Arquivo | Ação |
-|---------|------|
-| `src/components/wizard/StepMarketStudy.tsx` | Modificar — adicionar `preferSameCondominium` à interface + Switch na UI |
-| `src/pages/agent/AgentNewPresentation.tsx` | Modificar — `emptyMarket` + filtros |
-| `supabase/functions/analyze-market/index.ts` | Modificar — query de busca + prompt + similaridade |
+A mudança é em um único arquivo, apenas adicionando uma coluna `<th>` e `<td>` correspondente na tabela existente.
 
