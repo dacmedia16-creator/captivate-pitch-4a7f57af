@@ -24,7 +24,7 @@ export function LayoutImpactoComercial({ section, branding, theme, colors }: Pro
       <div className="relative w-full h-full overflow-hidden flex flex-col justify-end text-white" style={{ fontFamily: FONT }}>
         {c.cover_image && <img src={c.cover_image} alt="" className="absolute inset-0 w-full h-full object-cover" />}
         <div className="absolute inset-0" style={{ background: theme.cover.overlay(primary, deep) }} />
-        {c.logo_url && <img src={c.logo_url} alt="" className="absolute top-12 right-14 h-14 object-contain opacity-80" />}
+        {c.logo_url && <img src={c.logo_url} alt="" className="absolute top-12 right-14 h-14 max-w-[200px] object-contain opacity-80" />}
         <div className="relative z-10 p-16 pb-20">
           <div className="w-24 h-1.5 mb-8" style={{ backgroundColor: accent }} />
           <h1 className="slide-title text-white uppercase leading-[1] max-w-[1100px]" style={{ fontSize: theme.cover.titleSize }}>{c.title}</h1>
