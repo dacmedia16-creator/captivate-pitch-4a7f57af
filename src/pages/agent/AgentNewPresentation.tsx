@@ -40,7 +40,7 @@ const emptyLayout: LayoutStyleData = { layout: "executivo", tone: "executivo", m
 const emptyMarket: MarketStudyData = {
   selectedPortals: [], searchRadius: "2km", minArea: "", maxArea: "",
   minPrice: "", maxPrice: "", minComparables: "5", maxComparables: "20",
-  preferSameCondominium: false, maxListingAgeMonths: "6",
+  preferSameCondominium: false, preferSameCondominium: false, maxListingAgeMonths: "12",,
 };
 
 export default function AgentNewPresentation() {
