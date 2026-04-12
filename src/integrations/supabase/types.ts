@@ -25,13 +25,16 @@ export type Database = {
           branch_photo_url: string | null
           company_name: string | null
           created_at: string
+          global_stats: Json | null
           id: string
           logo_url: string | null
+          objectives: Json | null
           primary_color: string | null
           regional_numbers: string | null
           secondary_color: string | null
           tenant_id: string
           updated_at: string
+          value_propositions: Json | null
         }
         Insert: {
           about_global?: string | null
@@ -43,13 +46,16 @@ export type Database = {
           branch_photo_url?: string | null
           company_name?: string | null
           created_at?: string
+          global_stats?: Json | null
           id?: string
           logo_url?: string | null
+          objectives?: Json | null
           primary_color?: string | null
           regional_numbers?: string | null
           secondary_color?: string | null
           tenant_id: string
           updated_at?: string
+          value_propositions?: Json | null
         }
         Update: {
           about_global?: string | null
@@ -61,13 +67,16 @@ export type Database = {
           branch_photo_url?: string | null
           company_name?: string | null
           created_at?: string
+          global_stats?: Json | null
           id?: string
           logo_url?: string | null
+          objectives?: Json | null
           primary_color?: string | null
           regional_numbers?: string | null
           secondary_color?: string | null
           tenant_id?: string
           updated_at?: string
+          value_propositions?: Json | null
         }
         Relationships: [
           {
@@ -646,6 +655,7 @@ export type Database = {
           property_purpose: string | null
           property_standard: string | null
           property_type: string | null
+          required_documents: Json | null
           selected_layout: string | null
           selected_tone: string | null
           share_expires_at: string | null
@@ -680,6 +690,7 @@ export type Database = {
           property_purpose?: string | null
           property_standard?: string | null
           property_type?: string | null
+          required_documents?: Json | null
           selected_layout?: string | null
           selected_tone?: string | null
           share_expires_at?: string | null
@@ -714,6 +725,7 @@ export type Database = {
           property_purpose?: string | null
           property_standard?: string | null
           property_type?: string | null
+          required_documents?: Json | null
           selected_layout?: string | null
           selected_tone?: string | null
           share_expires_at?: string | null
@@ -1018,6 +1030,7 @@ export type Database = {
           property_purpose: string | null
           property_standard: string | null
           property_type: string | null
+          required_documents: Json | null
           selected_layout: string | null
           selected_tone: string | null
           share_expires_at: string | null
