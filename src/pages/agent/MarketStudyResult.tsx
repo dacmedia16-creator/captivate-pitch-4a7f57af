@@ -4,8 +4,15 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Loader2, FileText, Building2, ThumbsUp, ThumbsDown, RefreshCw } from "lucide-react";
+import {
+  ArrowLeft, Loader2, FileText, Building2, ThumbsUp, ThumbsDown,
+  RefreshCw, Sparkles, TrendingUp, DollarSign, BarChart3, Home,
+} from "lucide-react";
 import { AdjustmentBadge } from "@/components/market-study/AdjustmentBadge";
+import { PriceRangeGauge } from "@/components/market-study/PriceRangeGauge";
+import { MarketInsights, generateAutoInsights } from "@/components/market-study/MarketInsights";
+import { PricePerSqmChart } from "@/components/market-study/PricePerSqmChart";
+import { MetricCard } from "@/components/shared/MetricCard";
 import { scoredComparables } from "@/hooks/useMarketSimilarity";
 import { calculateAllAdjustments, calculateMarketResult } from "@/hooks/useMarketAdjustments";
 import { toast } from "sonner";
@@ -16,6 +23,7 @@ export default function MarketStudyResult() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [recalculating, setRecalculating] = useState(false);
+  const [generatingAI, setGeneratingAI] = useState(false);
 
   const { data: study, isLoading } = useQuery({
     queryKey: ["market-study", id],
@@ -59,9 +67,7 @@ export default function MarketStudyResult() {
         .eq("id", compId);
       if (error) throw error;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["market-study", id] });
-    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["market-study", id] }),
   });
 
   const handleRecalculate = async () => {
@@ -70,78 +76,43 @@ export default function MarketStudyResult() {
     try {
       const subject = (study as any).market_study_subject_properties?.[0];
       const comparables = ((study as any).market_study_comparables ?? []).filter((c: any) => c.is_approved);
-
       if (!subject || comparables.length === 0) {
         toast.error("Nenhum comparável aprovado para recalcular");
         return;
       }
-
-      // Recalculate similarity
       const scored = scoredComparables(subject, comparables, undefined, 0);
       for (const comp of scored) {
-        await supabase
-          .from("market_study_comparables")
-          .update({ similarity_score: comp.similarity_score })
-          .eq("id", comp.id);
+        await supabase.from("market_study_comparables").update({ similarity_score: comp.similarity_score }).eq("id", comp.id);
       }
-
-      // Recalculate adjustments
       const adjusted = calculateAllAdjustments(subject, scored.map(c => ({
-        id: c.id,
-        price: Number(c.price),
-        suites: c.suites,
-        parking_spots: c.parking_spots,
-        conservation_state: c.conservation_state,
-        construction_standard: c.construction_standard,
-        area: Number(c.area),
-        differentials: c.differentials,
+        id: c.id, price: Number(c.price), suites: c.suites, parking_spots: c.parking_spots,
+        conservation_state: c.conservation_state, construction_standard: c.construction_standard,
+        area: Number(c.area), differentials: c.differentials,
       })));
-
-      // Clear old adjustments and save new ones
       const compIds = comparables.map((c: any) => c.id);
       await supabase.from("market_study_adjustments").delete().in("comparable_id", compIds);
-
       for (const comp of adjusted) {
-        await supabase
-          .from("market_study_comparables")
-          .update({ adjusted_price: comp.adjusted_price })
-          .eq("id", comp.comparable_id);
-
+        await supabase.from("market_study_comparables").update({ adjusted_price: comp.adjusted_price }).eq("id", comp.comparable_id);
         if (comp.adjustments.length > 0) {
           await supabase.from("market_study_adjustments").insert(
             comp.adjustments.map((a) => ({
-              comparable_id: comp.comparable_id,
-              adjustment_type: a.adjustment_type,
-              label: a.label,
-              percentage: a.percentage,
-              value: a.value,
-              direction: a.direction,
+              comparable_id: comp.comparable_id, adjustment_type: a.adjustment_type,
+              label: a.label, percentage: a.percentage, value: a.value, direction: a.direction,
             }))
           );
         }
       }
-
-      // Update results
       const result = calculateMarketResult(adjusted);
       const subjectArea = subject.area_useful || subject.area_built || subject.area_land;
-      const avgPricePerSqm = subjectArea && subjectArea > 0
-        ? Math.round(result.avg_price / subjectArea)
-        : 0;
-
+      const avgPricePerSqm = subjectArea && subjectArea > 0 ? Math.round(result.avg_price / subjectArea) : 0;
       await supabase.from("market_study_results").delete().eq("market_study_id", id!);
       await supabase.from("market_study_results").insert({
-        market_study_id: id!,
-        avg_price: result.avg_price,
-        median_price: result.median_price,
-        avg_price_per_sqm: avgPricePerSqm,
-        suggested_ad_price: result.suggested_ad_price,
-        suggested_market_price: result.suggested_market_price,
-        suggested_fast_sale_price: result.suggested_fast_sale_price,
-        price_range_min: result.price_range_min,
-        price_range_max: result.price_range_max,
+        market_study_id: id!, avg_price: result.avg_price, median_price: result.median_price,
+        avg_price_per_sqm: avgPricePerSqm, suggested_ad_price: result.suggested_ad_price,
+        suggested_market_price: result.suggested_market_price, suggested_fast_sale_price: result.suggested_fast_sale_price,
+        price_range_min: result.price_range_min, price_range_max: result.price_range_max,
         confidence_level: adjusted.length >= 5 ? "high" : adjusted.length >= 3 ? "medium" : "low",
       });
-
       queryClient.invalidateQueries({ queryKey: ["market-study", id] });
       queryClient.invalidateQueries({ queryKey: ["market-study-adjustments", id] });
       toast.success("Recálculo concluído!");
@@ -149,6 +120,38 @@ export default function MarketStudyResult() {
       toast.error("Erro ao recalcular: " + (err.message || "erro"));
     } finally {
       setRecalculating(false);
+    }
+  };
+
+  const handleGenerateAI = async () => {
+    if (!study) return;
+    const subject = (study as any).market_study_subject_properties?.[0];
+    const result = (study as any).market_study_results?.[0];
+    const comparables = ((study as any).market_study_comparables ?? []).filter((c: any) => c.is_approved);
+    if (!result || comparables.length === 0) {
+      toast.error("Calcule os resultados antes de gerar o resumo com IA");
+      return;
+    }
+    setGeneratingAI(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("generate-market-summary", {
+        body: { subject, comparables, result },
+      });
+      if (error) throw error;
+      if (data.error) throw new Error(data.error);
+
+      await supabase.from("market_study_results").update({
+        executive_summary: data.executive_summary,
+        justification: data.justification,
+        market_insights: data.insights,
+      }).eq("id", result.id);
+
+      queryClient.invalidateQueries({ queryKey: ["market-study", id] });
+      toast.success("Resumo executivo gerado com sucesso!");
+    } catch (err: any) {
+      toast.error("Erro ao gerar resumo: " + (err.message || "erro"));
+    } finally {
+      setGeneratingAI(false);
     }
   };
 
@@ -164,9 +167,7 @@ export default function MarketStudyResult() {
     return (
       <div className="text-center py-20">
         <p className="text-lg text-muted-foreground">Estudo não encontrado</p>
-        <Button variant="outline" className="mt-4" onClick={() => navigate("/market-studies")}>
-          Voltar
-        </Button>
+        <Button variant="outline" className="mt-4" onClick={() => navigate("/market-studies")}>Voltar</Button>
       </div>
     );
   }
@@ -174,28 +175,36 @@ export default function MarketStudyResult() {
   const subject = (study as any).market_study_subject_properties?.[0];
   const result = (study as any).market_study_results?.[0];
   const comparables = (study as any).market_study_comparables ?? [];
+  const approvedComparables = comparables.filter((c: any) => c.is_approved);
 
   const fmt = (v?: number | null) =>
-    v != null
-      ? v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 })
-      : "—";
+    v != null ? v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 }) : "—";
+
+  const aiInsights = result?.market_insights as any[] | null;
+  const autoInsights = result ? generateAutoInsights(result, subject?.owner_expected_price, approvedComparables.length) : [];
+  const displayInsights = aiInsights && aiInsights.length > 0 ? aiInsights : autoInsights;
 
   return (
-    <div className="space-y-6 max-w-5xl mx-auto">
-      <div className="flex items-center gap-4">
+    <div className="space-y-6 max-w-6xl mx-auto">
+      {/* Header */}
+      <div className="flex items-center gap-4 flex-wrap">
         <Button variant="ghost" size="icon" onClick={() => navigate("/market-studies")}>
           <ArrowLeft className="h-5 w-5" />
         </Button>
-        <div>
-          <h1 className="text-2xl font-bold font-display">{study.title || "Estudo de Mercado"}</h1>
+        <div className="flex-1 min-w-0">
+          <h1 className="text-2xl font-bold font-display truncate">{study.title || "Estudo de Mercado"}</h1>
           <p className="text-sm text-muted-foreground">
             {[subject?.neighborhood, subject?.city].filter(Boolean).join(", ")}
           </p>
         </div>
-        <div className="ml-auto flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <Button variant="outline" size="sm" onClick={handleRecalculate} disabled={recalculating}>
             <RefreshCw className={`h-4 w-4 mr-2 ${recalculating ? "animate-spin" : ""}`} />
             Recalcular
+          </Button>
+          <Button size="sm" onClick={handleGenerateAI} disabled={generatingAI || !result} className="gold-gradient text-primary-foreground">
+            <Sparkles className={`h-4 w-4 mr-2 ${generatingAI ? "animate-pulse" : ""}`} />
+            {generatingAI ? "Gerando..." : "Resumo IA"}
           </Button>
           <Badge variant={study.status === "completed" ? "default" : "secondary"}>
             {study.status === "completed" ? "Concluído" : study.status === "draft" ? "Rascunho" : study.status}
@@ -203,9 +212,9 @@ export default function MarketStudyResult() {
         </div>
       </div>
 
-      {/* Subject Property Summary */}
+      {/* Subject Property */}
       <Card className="glass-card">
-        <CardHeader>
+        <CardHeader className="pb-3">
           <CardTitle className="text-lg flex items-center gap-2">
             <Building2 className="h-5 w-5" />
             Imóvel Avaliado
@@ -229,30 +238,89 @@ export default function MarketStudyResult() {
         </CardContent>
       </Card>
 
-      {/* Results */}
+      {/* Results Section */}
       {result ? (
         <>
+          {/* Metric Cards */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {[
-              { label: "Preço Médio", value: fmt(result.avg_price) },
-              { label: "R$/m² Médio", value: fmt(result.avg_price_per_sqm) },
-              { label: "Sugestão Anúncio", value: fmt(result.suggested_ad_price) },
-              { label: "Venda Rápida", value: fmt(result.suggested_fast_sale_price) },
-            ].map((m) => (
-              <Card key={m.label} className="glass-card">
-                <CardContent className="p-4 text-center">
-                  <p className="text-xs text-muted-foreground">{m.label}</p>
-                  <p className="text-xl font-bold text-primary mt-1">{m.value}</p>
-                </CardContent>
-              </Card>
-            ))}
+            <MetricCard title="Preço Médio" value={fmt(result.avg_price)} icon={DollarSign} />
+            <MetricCard title="R$/m² Médio" value={fmt(result.avg_price_per_sqm)} icon={Home} />
+            <MetricCard title="Sugestão Anúncio" value={fmt(result.suggested_ad_price)} icon={TrendingUp} />
+            <MetricCard title="Venda Rápida" value={fmt(result.suggested_fast_sale_price)} icon={BarChart3} />
           </div>
 
+          {/* Price Range Gauge */}
+          {result.price_range_min && result.price_range_max && (
+            <Card className="glass-card">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg">Faixa de Preço</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <PriceRangeGauge
+                  min={Number(result.price_range_min)}
+                  max={Number(result.price_range_max)}
+                  fastSale={Number(result.suggested_fast_sale_price)}
+                  market={Number(result.suggested_market_price)}
+                  adPrice={Number(result.suggested_ad_price)}
+                  ownerExpected={subject?.owner_expected_price ? Number(subject.owner_expected_price) : null}
+                />
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Market Insights */}
+          {displayInsights.length > 0 && (
+            <div className="space-y-3">
+              <h2 className="text-lg font-semibold flex items-center gap-2">
+                <Sparkles className="h-5 w-5 text-primary" />
+                Insights de Mercado
+                {aiInsights && aiInsights.length > 0 && (
+                  <Badge variant="secondary" className="text-xs">IA</Badge>
+                )}
+              </h2>
+              <MarketInsights insights={displayInsights} />
+            </div>
+          )}
+
+          {/* Executive Summary */}
           {result.executive_summary && (
             <Card className="glass-card">
-              <CardHeader><CardTitle className="text-lg">Resumo Executivo</CardTitle></CardHeader>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <FileText className="h-5 w-5" />
+                  Resumo Executivo
+                  <Badge variant="secondary" className="text-xs">IA</Badge>
+                </CardTitle>
+              </CardHeader>
               <CardContent>
                 <p className="text-sm leading-relaxed whitespace-pre-line">{result.executive_summary}</p>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Justification */}
+          {result.justification && (
+            <Card className="glass-card">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg">Justificativa Técnica</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm leading-relaxed whitespace-pre-line">{result.justification}</p>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Charts */}
+          {approvedComparables.length > 0 && (
+            <Card className="glass-card">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <BarChart3 className="h-5 w-5" />
+                  R$/m² por Comparável
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <PricePerSqmChart comparables={approvedComparables} avgPricePerSqm={result.avg_price_per_sqm ? Number(result.avg_price_per_sqm) : undefined} />
               </CardContent>
             </Card>
           )}
@@ -270,10 +338,10 @@ export default function MarketStudyResult() {
         </Card>
       )}
 
-      {/* Comparables */}
+      {/* Comparables Table */}
       {comparables.length > 0 && (
         <Card className="glass-card">
-          <CardHeader>
+          <CardHeader className="pb-3">
             <CardTitle className="text-lg">
               Comparáveis ({comparables.length})
             </CardTitle>
@@ -316,15 +384,9 @@ export default function MarketStudyResult() {
                           <div className="flex flex-wrap gap-1 justify-center">
                             {compAdjustments.length > 0
                               ? compAdjustments.slice(0, 3).map((a: any) => (
-                                  <AdjustmentBadge
-                                    key={a.id}
-                                    direction={a.direction}
-                                    percentage={Number(a.percentage)}
-                                    label={a.label}
-                                  />
+                                  <AdjustmentBadge key={a.id} direction={a.direction} percentage={Number(a.percentage)} label={a.label} />
                                 ))
-                              : <span className="text-xs text-muted-foreground">—</span>
-                            }
+                              : <span className="text-xs text-muted-foreground">—</span>}
                             {compAdjustments.length > 3 && (
                               <span className="text-xs text-muted-foreground">+{compAdjustments.length - 3}</span>
                             )}
@@ -336,20 +398,16 @@ export default function MarketStudyResult() {
                           </Badge>
                         </td>
                         <td className="text-center py-2 pl-2">
-                          <div className="flex gap-1 justify-center">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-7 w-7"
-                              onClick={() => toggleApproval.mutate({ compId: c.id, approved: !c.is_approved })}
-                            >
-                              {c.is_approved ? (
-                                <ThumbsDown className="h-3.5 w-3.5 text-muted-foreground" />
-                              ) : (
-                                <ThumbsUp className="h-3.5 w-3.5 text-muted-foreground" />
-                              )}
-                            </Button>
-                          </div>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7"
+                            onClick={() => toggleApproval.mutate({ compId: c.id, approved: !c.is_approved })}
+                          >
+                            {c.is_approved
+                              ? <ThumbsDown className="h-3.5 w-3.5 text-muted-foreground" />
+                              : <ThumbsUp className="h-3.5 w-3.5 text-muted-foreground" />}
+                          </Button>
                         </td>
                       </tr>
                     );
