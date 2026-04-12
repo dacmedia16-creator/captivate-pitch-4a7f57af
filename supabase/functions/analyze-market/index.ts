@@ -296,8 +296,12 @@ Extraia APENAS imóveis que sejam comparáveis relevantes (mesmo tipo, região s
     let extracted: { comparables: any[] };
     try {
       extracted = JSON.parse(toolCall.function.arguments);
-    } catch {
-      console.error("Failed to parse AI tool call arguments");
+      console.log(`AI extracted ${extracted.comparables?.length || 0} raw comparables`);
+      if (extracted.comparables?.length > 0) {
+        console.log("Sample:", JSON.stringify(extracted.comparables[0]));
+      }
+    } catch (parseErr) {
+      console.error("Failed to parse AI tool call arguments:", toolCall.function.arguments?.substring(0, 500));
       return new Response(
         JSON.stringify({ success: true, comparables: [], message: "Erro ao processar dados da IA" }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -312,7 +316,11 @@ Extraia APENAS imóveis que sejam comparáveis relevantes (mesmo tipo, região s
       : 0;
 
     const comparables = extracted.comparables
-      .filter((c: any) => c.price > 0 && c.area > 0)
+      .filter((c: any) => {
+        const valid = c.price > 0 && c.area > 0;
+        if (!valid) console.log(`Filtered out: price=${c.price}, area=${c.area}, title=${c.title?.substring(0, 50)}`);
+        return valid;
+      })
       .map((c: any) => {
         const priceSqm = Math.round(c.price / c.area);
         const similarity = computeSimilarity(
