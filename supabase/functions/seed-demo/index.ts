@@ -37,6 +37,24 @@ Deno.serve(async (req) => {
       regional_numbers: "500+ imóveis vendidos | R$ 2bi em VGV | 15 anos de mercado",
     });
 
+    // 2b. Link global portals to tenant
+    const { data: globalPortals } = await supabaseAdmin
+      .from("portal_sources")
+      .select("id")
+      .eq("is_global", true);
+
+    if (globalPortals && globalPortals.length > 0) {
+      await supabaseAdmin.from("tenant_portal_settings").insert(
+        globalPortals.map((p: any, i: number) => ({
+          tenant_id: tenant.id,
+          portal_source_id: p.id,
+          is_enabled: true,
+          priority: i + 1,
+          weight: 1,
+        }))
+      );
+    }
+
     // 3. Create users via admin API
     const users = [
       { email: "admin@demo.com", fullName: "Ana Souza", role: "agency_admin" as const },
