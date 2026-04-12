@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { generatePresentationSections } from "@/hooks/useGeneratePresentation";
+import { generateSimulatedComparables } from "@/hooks/useSimulateComparables";
+import { calculateMarketPrices } from "@/hooks/useMarketCalculations";
 import { WizardStepper } from "@/components/wizard/WizardStepper";
 import { StepPropertyData, PropertyData } from "@/components/wizard/StepPropertyData";
 import { StepLayoutStyle, LayoutStyleData } from "@/components/wizard/StepLayoutStyle";
