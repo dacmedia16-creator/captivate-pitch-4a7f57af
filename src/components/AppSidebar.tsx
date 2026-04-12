@@ -33,7 +33,7 @@ const agentNav: NavItem[] = [
   { title: "Apresentações", url: "/presentations", icon: Presentation },
   { title: "Nova Apresentação", url: "/presentations/new", icon: PlusCircle },
   { title: "Meu Perfil", url: "/profile", icon: UserCircle },
-  { title: "Estudo de Mercado", url: "/market-study", icon: BarChart3 },
+  { title: "Estudos de Mercado", url: "/market-studies", icon: BarChart3 },
 ];
 
 const navByRole: Record<UserRole, NavItem[]> = { super_admin: superAdminNav, admin: adminNav, agent: agentNav };
