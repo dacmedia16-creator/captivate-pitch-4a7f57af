@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { generatePresentationSections } from "@/hooks/useGeneratePresentation";
+import { generateSimulatedComparables } from "@/hooks/useSimulateComparables";
+import { calculateMarketPrices } from "@/hooks/useMarketCalculations";
 import { WizardStepper } from "@/components/wizard/WizardStepper";
 import { StepPropertyData, PropertyData } from "@/components/wizard/StepPropertyData";
 import { StepLayoutStyle, LayoutStyleData } from "@/components/wizard/StepLayoutStyle";
@@ -101,9 +103,16 @@ export default function AgentNewPresentation() {
         await supabase.from("presentation_images").insert(images);
       }
 
-      // Save market analysis job if portals selected
+      // Save market analysis job if portals selected, generate simulated comparables
+      let marketReport: any = null;
       if (marketData.selectedPortals.length > 0) {
-        await supabase.from("market_analysis_jobs").insert({
+        // Fetch portal names for simulation
+        const { data: portalSources } = await supabase
+          .from("portal_sources")
+          .select("id, name")
+          .in("id", marketData.selectedPortals);
+
+        const { data: job, error: jobError } = await supabase.from("market_analysis_jobs").insert({
           presentation_id: pres.id,
           tenant_id: profile.tenant_id,
           selected_portals: marketData.selectedPortals as any,
@@ -116,7 +125,39 @@ export default function AgentNewPresentation() {
             maxComparables: marketData.maxComparables,
           } as any,
           status: "pending",
-        });
+          started_at: new Date().toISOString(),
+        }).select().single();
+
+        if (job && !jobError) {
+          const portals = (portalSources || []).map(p => ({ id: p.id, name: p.name }));
+          const comparables = generateSimulatedComparables(job.id, propertyData, portals);
+          await supabase.from("market_comparables").insert(comparables);
+
+          const calc = calculateMarketPrices(comparables.map(c => ({
+            price: c.price,
+            price_per_sqm: c.price_per_sqm,
+            is_approved: c.is_approved,
+          })));
+
+          const { data: report } = await supabase.from("market_reports").insert({
+            market_analysis_job_id: job.id,
+            avg_price: calc.avg_price,
+            median_price: calc.median_price,
+            avg_price_per_sqm: calc.avg_price_per_sqm,
+            suggested_market_price: calc.suggested_market_price,
+            suggested_aspirational_price: calc.suggested_aspirational_price,
+            suggested_fast_sale_price: calc.suggested_fast_sale_price,
+            confidence_level: "medium",
+            summary: `Análise baseada em ${comparables.length} comparáveis simulados.`,
+          }).select().single();
+
+          marketReport = report;
+
+          await supabase.from("market_analysis_jobs").update({
+            status: "completed",
+            finished_at: new Date().toISOString(),
+          }).eq("id", job.id);
+        }
       }
 
       setCreatedId(pres.id);
@@ -128,6 +169,23 @@ export default function AgentNewPresentation() {
         tenantId: profile.tenant_id,
         brokerId: user.id,
       });
+
+      // Update pricing_scenarios section with market report data
+      if (marketReport) {
+        await supabase.from("presentation_sections")
+          .update({
+            content: {
+              owner_expected_price: propertyData.owner_expected_price ? Number(propertyData.owner_expected_price) : null,
+              scenarios: [
+                { label: "Preço aspiracional", value: marketReport.suggested_aspirational_price },
+                { label: "Preço de mercado", value: marketReport.suggested_market_price },
+                { label: "Preço de venda rápida", value: marketReport.suggested_fast_sale_price },
+              ],
+            } as any,
+          })
+          .eq("presentation_id", pres.id)
+          .eq("section_key", "pricing_scenarios");
+      }
     } catch (err: any) {
       toast.error("Erro ao gerar: " + (err.message || "erro desconhecido"));
       setIsGenerating(false);
