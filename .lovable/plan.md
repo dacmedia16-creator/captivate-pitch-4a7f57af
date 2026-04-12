@@ -1,82 +1,55 @@
 
 
-# Redesign dos Slides — Branding RE/MAX + Tipografia Gotham
+# Aplicar Paleta RE/MAX ao Site Inteiro
 
-## Templates identificados no projeto
+## Situação Atual
+O site usa uma paleta azul escuro genérico (`hsl(213 55% 20%)`) com acentos dourados (`hsl(42 55% 54%)`). Os slides já foram atualizados para RE/MAX, mas a UI do site (login, sidebar, topbar, cards, botões) ainda usa o tema antigo.
 
-| Template | Arquivo | Linhas |
-|----------|---------|--------|
-| **Executivo** | `src/components/layouts/LayoutExecutivo.tsx` | 263 linhas |
-| **Premium** | `src/components/layouts/LayoutPremium.tsx` | 235 linhas |
-| **Impacto Comercial** | `src/components/layouts/LayoutImpactoComercial.tsx` | 240 linhas |
+## Mudanças
 
-Cada template renderiza os mesmos section_keys (`cover`, `broker_intro`, `property_summary`, `market_study_placeholder`, `pricing_scenarios`, `closing`, genéricos) com estilos distintos. A interface `Props` com `branding` (primary_color, secondary_color, logo_url) é mantida.
+### 1. CSS Variables (`src/index.css`)
+Substituir a paleta inteira por cores RE/MAX:
 
-## Gotham — Limitação técnica e solução
+| Variable | Antes (HSL) | Depois (baseado em RE/MAX) |
+|----------|-------------|---------------------------|
+| `--primary` | `213 55% 20%` (azul genérico) | `216 100% 32%` (#003DA5) |
+| `--accent` | `42 55% 54%` (dourado) | `352 83% 47%` (#DC1431) |
+| `--gold` | `42 55% 54%` | `352 83% 47%` (vermelho RE/MAX substitui o dourado) |
+| `--ring` | azul genérico | azul RE/MAX |
+| `--sidebar-background` | azul escuro genérico | azul RE/MAX escuro |
+| `--sidebar-primary` | dourado | vermelho RE/MAX |
+| `--sidebar-ring` | dourado | vermelho RE/MAX |
+| Dark mode | mesma lógica | mesma conversão |
 
-Gotham é uma fonte **comercial licenciada** (Hoefler&Co). Não está disponível no Google Fonts. Soluções:
+### 2. Utilitários CSS (`src/index.css`)
+- `.gold-gradient` → gradiente vermelho RE/MAX (será renomeado conceitualmente mas mantido como classe para não quebrar referências)
+- `.text-gradient-gold` → gradiente vermelho RE/MAX
+- `.animate-shimmer-gold` → shimmer vermelho
 
-- **Fallback imediato**: usar `"Montserrat"` do Google Fonts — é a alternativa gratuita mais próxima de Gotham (geométrica, moderna, excelente hierarquia de pesos).
-- **Estrutura preparada**: todas as referências tipográficas serão declaradas como `font-family: 'Gotham', 'Montserrat', sans-serif`. Se o cliente fornecer os arquivos .woff2 de Gotham no futuro, basta adicioná-los via `@font-face` e tudo funciona automaticamente.
+### 3. Componentes afetados (sem mudança de código)
+Como usam variáveis CSS, mudam automaticamente:
+- `Button` (usa `--primary`)
+- `Card` (usa `--card`)
+- `TopBar` (usa `--background`, `gold-gradient`)
+- `AppSidebar` (usa `--sidebar-*`, `gold-gradient`)
+- `MetricCard` (usa `gold-gradient`)
+- `Login` (usa gradientes inline com HSL antigos — precisa atualizar)
 
-## Paleta RE/MAX nos slides
+### 4. Arquivos com cores inline hardcoded
+- **`src/pages/auth/Login.tsx`**: gradiente de fundo e círculos decorativos usam HSL antigos — atualizar para azul RE/MAX e vermelho
+- **`src/components/TopBar.tsx`**: shadow usa `hsl(215 30% 12%)` — atualizar
+- **`src/components/shared/MetricCard.tsx`**: usa `gold-gradient` — funciona automaticamente
 
-| Uso | Cor | Hex |
-|-----|-----|-----|
-| Base institucional, fundos escuros, títulos | Azul RE/MAX | `#003DA5` |
-| Destaques, CTAs, barras de acento, badges | Vermelho RE/MAX | `#DC1431` |
-| Fundos claros, texto sobre escuro, respiro | Branco/Neutro | `#FFFFFF` / `#F5F6F8` |
-| Texto secundário, labels | Cinza neutro | `#6B7280` / `#9CA3AF` |
+### 5. Tailwind config (`tailwind.config.ts`)
+Sem mudanças necessárias — já referencia variáveis CSS.
 
-**Distribuição por tipo de slide:**
-- **Tipo 1 (Impacto)**: fundo azul escuro com overlay, vermelho como barra de acento lateral, títulos brancos
-- **Tipo 2 (Conteúdo)**: fundo branco/neutro claro, azul nos títulos e numerações, vermelho em métricas de destaque e separadores
-- **Tipo 3 (Fechamento)**: fundo azul escuro, vermelho em nome/CTA, branco no texto
+## Arquivos a editar
+1. `src/index.css` — paleta completa (light + dark) + utilitários
+2. `src/pages/auth/Login.tsx` — cores inline do gradiente de fundo
+3. `src/components/TopBar.tsx` — shadow inline
 
-## Hierarquia tipográfica Gotham/Montserrat
-
-| Elemento | Peso | Tamanho | Tracking |
-|----------|------|---------|----------|
-| `.slide-title` | 800 (Black) | 44-56px | -0.03em |
-| `.slide-metric` | 700 (Bold) | 28-48px | -0.02em |
-| `.slide-label` | 600 (SemiBold) | 10-11px | 0.20em, uppercase |
-| `.slide-body` | 400 (Regular) | 14-15px | normal |
-
-Nota: Playfair Display será **removida** dos slides (permanece na UI geral se desejado). Gotham/Montserrat é geométrica sans-serif — o oposto de Playfair serif.
-
-## Mudanças por arquivo
-
-### `index.html`
-- Adicionar import do Google Fonts Montserrat (wght 400;500;600;700;800)
-
-### `src/index.css`
-- Substituir Playfair Display por `'Gotham', 'Montserrat'` nas classes `.slide-title`, `.slide-metric`
-- Manter `.slide-label` e `.slide-body` em `'Gotham', 'Montserrat'` (tudo na mesma família agora)
-- Atualizar `.editorial-divider` com cor vermelha RE/MAX
-
-### `src/components/layouts/LayoutExecutivo.tsx`
-- Rewrite completo: paleta azul/vermelho/branco RE/MAX
-- Cover: fundo azul com overlay, barra vermelha vertical, título Gotham Black branco
-- Broker intro: split 60/40 azul/foto, nome em Gotham Bold, bio em Gotham Regular
-- Property summary: fundo branco, métricas em azul, destaques com acento vermelho
-- Market study: fundo neutro claro, stats com vermelho nos valores, gráfico refinado
-- Pricing scenarios: 3 colunas com separadores vermelhos finos
-- Closing: fundo azul, nome em vermelho, contato em branco
-
-### `src/components/layouts/LayoutPremium.tsx`
-- Rewrite completo: versão mais luxuosa com gradientes azul mais profundos
-- Elementos decorativos: linhas vermelhas finas, radial gradients sutis
-- Cover com composição cinematográfica e tipografia Gotham Black oversize
-- Closing com aspas decorativas e composição centrada premium
-
-### `src/components/layouts/LayoutImpactoComercial.tsx`
-- Rewrite completo: versão bold/comercial
-- Cover com título uppercase Gotham Black, barra vermelha larga
-- Conteúdo com blocos de cor sólida vermelha para métricas de destaque
-- Contraste mais agressivo, uppercase frequente, peso visual alto
-
-### Sem alterações em:
-- `SectionRenderer.tsx` (interface mantida)
-- Lógica de negócio, rotas, Edge Functions, banco de dados
-- `MarketCharts.tsx` (apenas receberá novas cores via props)
+## O que NÃO muda
+- Lógica de negócio, rotas, banco de dados
+- Estrutura de componentes
+- Layouts de slides (já atualizados)
 
