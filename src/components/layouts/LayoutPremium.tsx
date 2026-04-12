@@ -1,4 +1,5 @@
 import { SectionData } from "./SectionRenderer";
+import { MarketPriceBarChart, MarketStats } from "@/components/charts/MarketCharts";
 
 interface Props {
   section: SectionData;
@@ -103,6 +104,19 @@ export function LayoutPremium({ section, branding }: Props) {
           <p className="font-semibold text-lg" style={{ color: gold }}>{c.broker_name}</p>
           {c.broker_phone && <p>{c.broker_phone}</p>}
           {c.broker_email && <p>{c.broker_email}</p>}
+        </div>
+      </div>
+    );
+  }
+
+  if (section.section_key === "market_study_placeholder" && c.comparables?.length > 0) {
+    return (
+      <div className="min-h-[500px] rounded-xl p-8 md:p-12 bg-white">
+        <h2 className="text-2xl font-bold font-serif mb-1 tracking-tight" style={{ color: primary }}>{section.title}</h2>
+        <GoldDivider />
+        <MarketStats avgPrice={c.avg_price} medianPrice={c.median_price} avgPricePerSqm={c.avg_price_per_sqm} totalComparables={c.comparables.length} compact />
+        <div className="mt-4">
+          <MarketPriceBarChart comparables={c.comparables} ownerExpectedPrice={c.owner_expected_price} compact primaryColor={primary} accentColor={gold} />
         </div>
       </div>
     );

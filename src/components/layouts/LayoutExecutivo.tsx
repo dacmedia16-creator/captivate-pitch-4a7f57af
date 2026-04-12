@@ -1,5 +1,6 @@
 import { SectionData } from "./SectionRenderer";
 import { Building, User, Globe, MapPin, Home, Target, Award, TrendingUp, BarChart3, DollarSign, Phone } from "lucide-react";
+import { MarketPriceBarChart, MarketStats } from "@/components/charts/MarketCharts";
 
 interface Props {
   section: SectionData;
@@ -123,6 +124,16 @@ export function LayoutExecutivo({ section, branding }: Props) {
               </div>
             ))}
           </div>
+        </div>
+      ) : section.section_key === "market_study_placeholder" && c.comparables?.length > 0 ? (
+        <div className="flex-1 space-y-4">
+          <div className="flex items-center gap-3 mb-2">
+            <Icon className="h-5 w-5" style={{ color: primary }} />
+            <h2 className="text-2xl font-bold" style={{ color: primary }}>{section.title}</h2>
+          </div>
+          <AccentLine />
+          <MarketStats avgPrice={c.avg_price} medianPrice={c.median_price} avgPricePerSqm={c.avg_price_per_sqm} totalComparables={c.comparables.length} compact />
+          <MarketPriceBarChart comparables={c.comparables} ownerExpectedPrice={c.owner_expected_price} compact primaryColor={primary} accentColor={gold} />
         </div>
       ) : section.section_key === "pricing_scenarios" ? (
         <div className="flex-1 space-y-4">

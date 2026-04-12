@@ -1,4 +1,5 @@
 import { SectionData } from "./SectionRenderer";
+import { MarketPriceBarChart, MarketStats } from "@/components/charts/MarketCharts";
 
 interface Props {
   section: SectionData;
@@ -123,6 +124,19 @@ export function LayoutImpactoComercial({ section, branding }: Props) {
         <div className="space-y-1 text-sm opacity-60 mt-4">
           {c.broker_phone && <p>{c.broker_phone}</p>}
           {c.broker_email && <p>{c.broker_email}</p>}
+        </div>
+      </div>
+    );
+  }
+
+  if (section.section_key === "market_study_placeholder" && c.comparables?.length > 0) {
+    return (
+      <div className="min-h-[500px] rounded-xl p-8 bg-white">
+        <p className="text-[10px] font-bold uppercase tracking-[0.2em] mb-2" style={{ color: accent }}>Análise de mercado</p>
+        <h2 className="text-2xl font-extrabold mb-4" style={{ color: primary }}>{section.title}</h2>
+        <MarketStats avgPrice={c.avg_price} medianPrice={c.median_price} avgPricePerSqm={c.avg_price_per_sqm} totalComparables={c.comparables.length} compact />
+        <div className="mt-4">
+          <MarketPriceBarChart comparables={c.comparables} ownerExpectedPrice={c.owner_expected_price} compact primaryColor={primary} accentColor={accent} />
         </div>
       </div>
     );

@@ -105,6 +105,8 @@ export default function AgentNewPresentation() {
 
       // Save market analysis job if portals selected, generate simulated comparables
       let marketReport: any = null;
+      let generatedComparables: any[] = [];
+      let marketCalc: any = null;
       if (marketData.selectedPortals.length > 0) {
         // Fetch portal names for simulation
         const { data: portalSources } = await supabase
@@ -130,10 +132,10 @@ export default function AgentNewPresentation() {
 
         if (job && !jobError) {
           const portals = (portalSources || []).map(p => ({ id: p.id, name: p.name }));
-          const comparables = generateSimulatedComparables(job.id, propertyData, portals);
-          await supabase.from("market_comparables").insert(comparables);
+          generatedComparables = generateSimulatedComparables(job.id, propertyData, portals);
+          await supabase.from("market_comparables").insert(generatedComparables);
 
-          const calc = calculateMarketPrices(comparables.map(c => ({
+          marketCalc = calculateMarketPrices(generatedComparables.map(c => ({
             price: c.price,
             price_per_sqm: c.price_per_sqm,
             is_approved: c.is_approved,
@@ -141,14 +143,14 @@ export default function AgentNewPresentation() {
 
           const { data: report } = await supabase.from("market_reports").insert({
             market_analysis_job_id: job.id,
-            avg_price: calc.avg_price,
-            median_price: calc.median_price,
-            avg_price_per_sqm: calc.avg_price_per_sqm,
-            suggested_market_price: calc.suggested_market_price,
-            suggested_aspirational_price: calc.suggested_aspirational_price,
-            suggested_fast_sale_price: calc.suggested_fast_sale_price,
+            avg_price: marketCalc.avg_price,
+            median_price: marketCalc.median_price,
+            avg_price_per_sqm: marketCalc.avg_price_per_sqm,
+            suggested_market_price: marketCalc.suggested_market_price,
+            suggested_aspirational_price: marketCalc.suggested_aspirational_price,
+            suggested_fast_sale_price: marketCalc.suggested_fast_sale_price,
             confidence_level: "medium",
-            summary: `Análise baseada em ${comparables.length} comparáveis simulados.`,
+            summary: `Análise baseada em ${generatedComparables.length} comparáveis simulados.`,
           }).select().single();
 
           marketReport = report;
@@ -170,8 +172,9 @@ export default function AgentNewPresentation() {
         brokerId: user.id,
       });
 
-      // Update pricing_scenarios section with market report data
+      // Update pricing_scenarios and market_study_placeholder sections
       if (marketReport) {
+        // Update pricing_scenarios
         await supabase.from("presentation_sections")
           .update({
             content: {
@@ -185,6 +188,28 @@ export default function AgentNewPresentation() {
           })
           .eq("presentation_id", pres.id)
           .eq("section_key", "pricing_scenarios");
+
+        // Update market_study_placeholder with chart data
+        const chartComparables = generatedComparables.map((c: any) => ({
+          title: c.title,
+          price: c.price,
+          area: c.area,
+          price_per_sqm: c.price_per_sqm,
+        }));
+
+        await supabase.from("presentation_sections")
+          .update({
+            content: {
+              comparables: chartComparables,
+              owner_expected_price: propertyData.owner_expected_price ? Number(propertyData.owner_expected_price) : null,
+              avg_price: marketCalc?.avg_price,
+              median_price: marketCalc?.median_price,
+              avg_price_per_sqm: marketCalc?.avg_price_per_sqm,
+              status: "completed",
+            } as any,
+          })
+          .eq("presentation_id", pres.id)
+          .eq("section_key", "market_study_placeholder");
       }
     } catch (err: any) {
       toast.error("Erro ao gerar: " + (err.message || "erro desconhecido"));
