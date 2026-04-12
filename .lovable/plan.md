@@ -1,33 +1,46 @@
 
 
-# Ativar Portais e Testar Estudo de Mercado
+# Geração Automática de Comparáveis Simulados no Wizard
 
 ## Problema
-A tabela `tenant_portal_settings` está vazia para o tenant demo (`fa4322ce-bdbe-4221-b1f7-2bd38c4dd79c`). Por isso, o Step 3 do wizard mostra "Nenhum portal configurado" e não é possível selecionar portais para gerar estudo de mercado.
+Quando o wizard cria um `market_analysis_job` com portais selecionados, o job fica com status "pending" e sem comparáveis. O corretor precisa ir manualmente à página de estudo de mercado e encontra uma tabela vazia.
 
 ## Solução
+Após criar o `market_analysis_job` no wizard, gerar automaticamente 6-10 comparáveis simulados (com preços, áreas, scores realistas baseados nos dados do imóvel), calcular o relatório de mercado, e atualizar o job para "completed". Também atualizar a section `pricing_scenarios` da apresentação com os cenários calculados.
 
-### 1. Inserir dados de portais para o tenant demo
-Inserir registros em `tenant_portal_settings` vinculando os portais existentes (ZAP, Viva Real, OLX, Imovel Web) ao tenant demo com `is_enabled = true`.
+## Mudanças
 
-### 2. Atualizar seed-demo
-Adicionar inserção de `tenant_portal_settings` no edge function `seed-demo` para que futuros seeds já incluam portais configurados.
+### 1. Criar helper `src/hooks/useSimulateComparables.ts`
+Função pura que recebe os dados do imóvel (preço, área, bairro, quartos, vagas, tipo) e gera 6-10 comparáveis simulados com:
+- Preços variando ±20% do preço esperado (ou baseado em área se preço não informado)
+- Áreas variando ±30%
+- Quartos/vagas similares (±1)
+- Scores de similaridade (60-95%)
+- Fontes aleatórias dos portais selecionados
+- Títulos e bairros realistas
 
-### Detalhes técnicos
+### 2. Atualizar `src/pages/agent/AgentNewPresentation.tsx`
+Após inserir o `market_analysis_job`:
+1. Gerar comparáveis simulados via helper
+2. Inserir em `market_comparables`
+3. Calcular cenários via `calculateMarketPrices`
+4. Inserir `market_report`
+5. Atualizar job status para "completed"
+6. Atualizar section `pricing_scenarios` com cenários calculados
 
-**Insert via tool** — 4 registros em `tenant_portal_settings`:
-- ZAP Imóveis (`40b7bfcf-...`), priority 1
-- Viva Real (`9c91d108-...`), priority 2  
-- OLX (`4b85175d-...`), priority 3
-- Imovel Web (`10ccdbda-...`), priority 4
+### 3. Atualizar `src/hooks/useGeneratePresentation.ts`
+Na section `pricing_scenarios`, após gerar as sections, verificar se existe market_report e preencher os cenários reais (em vez de `null`).
 
-Tenant: `fa4322ce-bdbe-4221-b1f7-2bd38c4dd79c`
-
-**Atualizar `supabase/functions/seed-demo/index.ts`** — após criar o tenant, inserir `tenant_portal_settings` com os portais globais.
-
-### Arquivos
+## Arquivos
 | Arquivo | Mudança |
 |---------|---------|
-| DB (insert) | 4 rows em `tenant_portal_settings` |
-| `supabase/functions/seed-demo/index.ts` | Adicionar bloco de inserção de portal settings |
+| `src/hooks/useSimulateComparables.ts` | Novo — gera comparáveis fictícios |
+| `src/pages/agent/AgentNewPresentation.tsx` | Insere comparáveis + report + atualiza job |
+| `src/hooks/useGeneratePresentation.ts` | Preenche pricing_scenarios com dados do report |
 
+## Detalhes técnicos
+- Comparáveis usam nomes de portais reais (ZAP, Viva Real, etc.) baseados nos `selectedPortals`
+- Se `owner_expected_price` não informado, usa base de R$ 500.000
+- Preço/m² calculado automaticamente
+- `similarity_score` entre 60 e 95 distribuído aleatoriamente
+- Endereços e títulos gerados com templates ("Apartamento 3 quartos - Bairro X")
