@@ -561,6 +561,21 @@ export default function MarketStudyResult() {
                             {c.listing_status === "active" ? "Ativo" : c.listing_status === "sold" ? "Vendido" : c.listing_status || "—"}
                           </Badge>
                         </td>
+                        <td className="text-center py-2 px-2">
+                          {c.source_url ? (
+                            <a
+                              href={c.source_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                            >
+                              {c.source_name || "Link"}
+                              <ExternalLink className="h-3 w-3" />
+                            </a>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">{c.source_name || "—"}</span>
+                          )}
+                        </td>
                         <td className="text-center py-2 pl-2">
                           <Button
                             variant="ghost"
