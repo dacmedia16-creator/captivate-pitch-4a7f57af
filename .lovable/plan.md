@@ -1,33 +1,39 @@
 
 
-# Exibir Foto da Agência nos Slides
+# Adicionar Upload de Imagem nos Slides Mundial, Nacional e Regional
 
 ## Problema
-
-A foto da agência (`branch_photo_url`) está salva no banco de dados corretamente na seção `about_regional`, mas:
-1. **LayoutPremium** e **LayoutImpactoComercial** — NÃO renderizam `branch_photo_url` no bloco genérico
-2. **LayoutExecutivo** — renderiza, mas como imagem pequena (`max-h-48`)
-3. Nenhum dos 3 layouts tem um bloco dedicado para `about_regional` — todos caem no fallback genérico
+As abas "Mundial", "Nacional" e "Regional" na página Marca e Personalização só têm campo de texto. O usuário quer anexar uma imagem para cada uma, que será usada no slide correspondente da apresentação.
 
 ## Solução
 
-Adicionar `{c.branch_photo_url && <img ...>}` no bloco genérico de **LayoutPremium** e **LayoutImpactoComercial**, e melhorar o tamanho da imagem nos 3 layouts para que fique visível e com boa apresentação.
+### 1. Migração — Adicionar colunas na tabela `agency_profiles`
+```sql
+ALTER TABLE public.agency_profiles
+  ADD COLUMN about_global_image_url text,
+  ADD COLUMN about_national_image_url text,
+  ADD COLUMN about_regional_image_url text;
+```
 
-## Arquivos a editar
+### 2. `src/pages/company/CompanyBranding.tsx`
+- Adicionar `about_global_image_url`, `about_national_image_url`, `about_regional_image_url` ao `agencyForm` state
+- Adicionar `<ImageUploader>` em cada aba (Mundial, Nacional, Regional) abaixo do Textarea, com label "Imagem do slide"
 
-### 1. `src/components/layouts/LayoutPremium.tsx` (generic, ~linha 204)
-- Adicionar renderização de `c.branch_photo_url` após `c.text`
+### 3. `src/hooks/useGeneratePresentation.ts`
+- Passar `image_url: agency?.about_global_image_url` no content de `about_global`
+- Passar `image_url: agency?.about_national_image_url` no content de `about_national`
+- Passar `image_url: agency?.about_regional_image_url` no content de `about_regional`
 
-### 2. `src/components/layouts/LayoutImpactoComercial.tsx` (generic, ~linha 195)
-- Adicionar renderização de `c.branch_photo_url` após `c.text`
-
-### 3. `src/components/layouts/LayoutExecutivo.tsx` (linha 206)
-- Aumentar tamanho da imagem de `max-h-48` para `max-h-64` com `rounded-lg`
-
-Todas as adições seguem o mesmo padrão:
+### 4. Layouts (3 arquivos)
+No bloco genérico de cada layout, adicionar renderização de `c.image_url` (além do já existente `c.branch_photo_url`):
 ```tsx
-{c.branch_photo_url && (
-  <img src={c.branch_photo_url} alt="" className="max-h-64 object-cover w-full rounded-lg mt-4" />
+{c.image_url && (
+  <img src={c.image_url} alt="" className="max-h-64 object-cover w-full rounded-lg mt-4" />
 )}
 ```
+
+Arquivos: `LayoutExecutivo.tsx`, `LayoutPremium.tsx`, `LayoutImpactoComercial.tsx`
+
+## Sem alterações em
+- Rotas, autenticação, RLS (colunas text sem restrição especial)
 
