@@ -14,14 +14,14 @@ export const themeImpacto: SlideTheme = {
   },
   cover: {
     overlay: (_primary, deep) => `linear-gradient(180deg, transparent 5%, ${deep}99 40%, ${deep} 100%)`,
-    titleSize: "72px",
+    titleSize: "84px",
     locationStyle: "dot",
     barType: "horizontal",
     logoPosition: "top-right",
   },
   heading: {
     textTransform: "uppercase",
-    titleSize: "48px",
+    titleSize: "56px",
   },
   divider: {
     width: "60px",
@@ -34,8 +34,8 @@ export const themeImpacto: SlideTheme = {
     shadow: false,
   },
   metric: {
-    size: "64px",
-    labelSize: "16px",
+    size: "72px",
+    labelSize: "18px",
     labelTracking: "0.25em",
   },
   closing: {

@@ -16,8 +16,8 @@ interface SlideMetricRowProps {
 export function SlideMetricRow({
   items,
   colors,
-  metricSize = "64px",
-  labelSize = "16px",
+  metricSize = "72px",
+  labelSize = "18px",
   labelTracking = "0.20em",
 }: SlideMetricRowProps) {
   const filtered = items.filter((i) => i.value != null && i.value !== "");

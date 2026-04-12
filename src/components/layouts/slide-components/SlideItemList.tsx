@@ -38,7 +38,7 @@ export function SlideItemList({
           {numbered && (
             <span
               className="slide-metric shrink-0"
-              style={{ fontSize: "28px", color: colors.accent }}
+              style={{ fontSize: "32px", color: colors.accent }}
             >
               {String(i + 1).padStart(2, "0")}
             </span>
@@ -46,14 +46,14 @@ export function SlideItemList({
           <div>
             <h4
               className="font-semibold"
-              style={{ fontSize: "20px", color: colors.primary }}
+              style={{ fontSize: "24px", color: colors.primary }}
             >
               {item.title || item.author_name}
             </h4>
             {(item.description || item.content) && (
               <p
                 className="mt-2 leading-relaxed"
-                style={{ fontSize: "17px", color: colors.textLight }}
+                style={{ fontSize: "20px", color: colors.textLight }}
               >
                 {item.description || item.content}
               </p>

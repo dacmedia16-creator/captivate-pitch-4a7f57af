@@ -47,7 +47,7 @@ export function SlideStatBar({
     >
       {filtered.map((s, i) => (
         <div key={i} className="text-center flex-1">
-          <p className="slide-metric" style={{ fontSize: "48px", color: metricColor }}>
+          <p className="slide-metric" style={{ fontSize: "56px", color: metricColor }}>
             {typeof s.value === "number"
               ? s.value.toLocaleString("pt-BR")
               : s.value}
@@ -55,7 +55,7 @@ export function SlideStatBar({
           <p
             className="mt-2"
             style={{
-              fontSize: "14px",
+              fontSize: "18px",
               fontWeight: 600,
               letterSpacing: "0.20em",
               textTransform: "uppercase",
