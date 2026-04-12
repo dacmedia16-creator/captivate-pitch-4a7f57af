@@ -447,6 +447,409 @@ export type Database = {
           },
         ]
       }
+      market_studies: {
+        Row: {
+          broker_id: string
+          created_at: string
+          id: string
+          purpose: string | null
+          status: string
+          tenant_id: string
+          title: string | null
+          updated_at: string
+        }
+        Insert: {
+          broker_id: string
+          created_at?: string
+          id?: string
+          purpose?: string | null
+          status?: string
+          tenant_id: string
+          title?: string | null
+          updated_at?: string
+        }
+        Update: {
+          broker_id?: string
+          created_at?: string
+          id?: string
+          purpose?: string | null
+          status?: string
+          tenant_id?: string
+          title?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "market_studies_broker_id_fkey"
+            columns: ["broker_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "market_studies_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      market_study_adjustments: {
+        Row: {
+          adjustment_type: string
+          comparable_id: string
+          created_at: string
+          direction: string
+          id: string
+          label: string
+          percentage: number | null
+          value: number | null
+        }
+        Insert: {
+          adjustment_type: string
+          comparable_id: string
+          created_at?: string
+          direction?: string
+          id?: string
+          label: string
+          percentage?: number | null
+          value?: number | null
+        }
+        Update: {
+          adjustment_type?: string
+          comparable_id?: string
+          created_at?: string
+          direction?: string
+          id?: string
+          label?: string
+          percentage?: number | null
+          value?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "market_study_adjustments_comparable_id_fkey"
+            columns: ["comparable_id"]
+            isOneToOne: false
+            referencedRelation: "market_study_comparables"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      market_study_comparables: {
+        Row: {
+          address: string | null
+          adjusted_price: number | null
+          area: number | null
+          bathrooms: number | null
+          bedrooms: number | null
+          city: string | null
+          condominium: string | null
+          conservation_state: string | null
+          construction_standard: string | null
+          created_at: string
+          differentials: Json | null
+          external_id: string | null
+          id: string
+          image_url: string | null
+          is_approved: boolean
+          listing_status: string | null
+          market_study_id: string
+          neighborhood: string | null
+          parking_spots: number | null
+          price: number | null
+          price_per_sqm: number | null
+          property_type: string | null
+          raw_data: Json | null
+          similarity_score: number | null
+          source_name: string | null
+          source_url: string | null
+          suites: number | null
+          title: string | null
+        }
+        Insert: {
+          address?: string | null
+          adjusted_price?: number | null
+          area?: number | null
+          bathrooms?: number | null
+          bedrooms?: number | null
+          city?: string | null
+          condominium?: string | null
+          conservation_state?: string | null
+          construction_standard?: string | null
+          created_at?: string
+          differentials?: Json | null
+          external_id?: string | null
+          id?: string
+          image_url?: string | null
+          is_approved?: boolean
+          listing_status?: string | null
+          market_study_id: string
+          neighborhood?: string | null
+          parking_spots?: number | null
+          price?: number | null
+          price_per_sqm?: number | null
+          property_type?: string | null
+          raw_data?: Json | null
+          similarity_score?: number | null
+          source_name?: string | null
+          source_url?: string | null
+          suites?: number | null
+          title?: string | null
+        }
+        Update: {
+          address?: string | null
+          adjusted_price?: number | null
+          area?: number | null
+          bathrooms?: number | null
+          bedrooms?: number | null
+          city?: string | null
+          condominium?: string | null
+          conservation_state?: string | null
+          construction_standard?: string | null
+          created_at?: string
+          differentials?: Json | null
+          external_id?: string | null
+          id?: string
+          image_url?: string | null
+          is_approved?: boolean
+          listing_status?: string | null
+          market_study_id?: string
+          neighborhood?: string | null
+          parking_spots?: number | null
+          price?: number | null
+          price_per_sqm?: number | null
+          property_type?: string | null
+          raw_data?: Json | null
+          similarity_score?: number | null
+          source_name?: string | null
+          source_url?: string | null
+          suites?: number | null
+          title?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "market_study_comparables_market_study_id_fkey"
+            columns: ["market_study_id"]
+            isOneToOne: false
+            referencedRelation: "market_studies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      market_study_results: {
+        Row: {
+          avg_price: number | null
+          avg_price_per_sqm: number | null
+          confidence_level: string | null
+          created_at: string
+          executive_summary: string | null
+          id: string
+          justification: string | null
+          market_insights: Json | null
+          market_study_id: string
+          median_price: number | null
+          price_range_max: number | null
+          price_range_min: number | null
+          suggested_ad_price: number | null
+          suggested_fast_sale_price: number | null
+          suggested_market_price: number | null
+          updated_at: string
+        }
+        Insert: {
+          avg_price?: number | null
+          avg_price_per_sqm?: number | null
+          confidence_level?: string | null
+          created_at?: string
+          executive_summary?: string | null
+          id?: string
+          justification?: string | null
+          market_insights?: Json | null
+          market_study_id: string
+          median_price?: number | null
+          price_range_max?: number | null
+          price_range_min?: number | null
+          suggested_ad_price?: number | null
+          suggested_fast_sale_price?: number | null
+          suggested_market_price?: number | null
+          updated_at?: string
+        }
+        Update: {
+          avg_price?: number | null
+          avg_price_per_sqm?: number | null
+          confidence_level?: string | null
+          created_at?: string
+          executive_summary?: string | null
+          id?: string
+          justification?: string | null
+          market_insights?: Json | null
+          market_study_id?: string
+          median_price?: number | null
+          price_range_max?: number | null
+          price_range_min?: number | null
+          suggested_ad_price?: number | null
+          suggested_fast_sale_price?: number | null
+          suggested_market_price?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "market_study_results_market_study_id_fkey"
+            columns: ["market_study_id"]
+            isOneToOne: false
+            referencedRelation: "market_studies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      market_study_settings: {
+        Row: {
+          adjustment_weights: Json | null
+          created_at: string
+          default_filters: Json | null
+          id: string
+          similarity_weights: Json | null
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          adjustment_weights?: Json | null
+          created_at?: string
+          default_filters?: Json | null
+          id?: string
+          similarity_weights?: Json | null
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          adjustment_weights?: Json | null
+          created_at?: string
+          default_filters?: Json | null
+          id?: string
+          similarity_weights?: Json | null
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "market_study_settings_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: true
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      market_study_subject_properties: {
+        Row: {
+          address: string | null
+          area_built: number | null
+          area_land: number | null
+          area_useful: number | null
+          bathrooms: number | null
+          bedrooms: number | null
+          cep: string | null
+          city: string | null
+          condominium: string | null
+          condominium_fee: number | null
+          conservation_state: string | null
+          construction_standard: string | null
+          created_at: string
+          differentials: Json | null
+          id: string
+          iptu: number | null
+          living_rooms: number | null
+          market_study_id: string
+          neighborhood: string | null
+          observations: string | null
+          owner_expected_price: number | null
+          parking_spots: number | null
+          powder_rooms: number | null
+          pricing_objective: string | null
+          property_age: string | null
+          property_category: string | null
+          property_type: string | null
+          purpose: string | null
+          state: string | null
+          suites: number | null
+          updated_at: string
+        }
+        Insert: {
+          address?: string | null
+          area_built?: number | null
+          area_land?: number | null
+          area_useful?: number | null
+          bathrooms?: number | null
+          bedrooms?: number | null
+          cep?: string | null
+          city?: string | null
+          condominium?: string | null
+          condominium_fee?: number | null
+          conservation_state?: string | null
+          construction_standard?: string | null
+          created_at?: string
+          differentials?: Json | null
+          id?: string
+          iptu?: number | null
+          living_rooms?: number | null
+          market_study_id: string
+          neighborhood?: string | null
+          observations?: string | null
+          owner_expected_price?: number | null
+          parking_spots?: number | null
+          powder_rooms?: number | null
+          pricing_objective?: string | null
+          property_age?: string | null
+          property_category?: string | null
+          property_type?: string | null
+          purpose?: string | null
+          state?: string | null
+          suites?: number | null
+          updated_at?: string
+        }
+        Update: {
+          address?: string | null
+          area_built?: number | null
+          area_land?: number | null
+          area_useful?: number | null
+          bathrooms?: number | null
+          bedrooms?: number | null
+          cep?: string | null
+          city?: string | null
+          condominium?: string | null
+          condominium_fee?: number | null
+          conservation_state?: string | null
+          construction_standard?: string | null
+          created_at?: string
+          differentials?: Json | null
+          id?: string
+          iptu?: number | null
+          living_rooms?: number | null
+          market_study_id?: string
+          neighborhood?: string | null
+          observations?: string | null
+          owner_expected_price?: number | null
+          parking_spots?: number | null
+          powder_rooms?: number | null
+          pricing_objective?: string | null
+          property_age?: string | null
+          property_category?: string | null
+          property_type?: string | null
+          purpose?: string | null
+          state?: string | null
+          suites?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "market_study_subject_properties_market_study_id_fkey"
+            columns: ["market_study_id"]
+            isOneToOne: false
+            referencedRelation: "market_studies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       marketing_actions: {
         Row: {
           created_at: string
