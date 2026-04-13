@@ -1,81 +1,63 @@
 
 
-# Integrar Manus como Busca Principal com Firecrawl como Fallback
+# Fix: Manus API v2 Integration — Wrong Endpoints and Response Parsing
 
-## Situação Atual
-- `AgentNewPresentation.tsx` chama `analyze-market-deep` (Firecrawl nativo + Google) como principal
-- Se falhar, cai para `analyze-market` (Firecrawl básico)
-- `analyze-market-manus` existe mas **não é chamado** de lugar nenhum no frontend
+## Root Cause
+The edge function uses **incorrect API endpoints and response structures**:
 
-## Problema do Manus
-O Manus navega portais como um humano (ideal para SPAs como Kenlo), mas o edge function tem timeout de 55s para polling. Tarefas Manus costumam levar mais que isso. Precisamos de uma estratégia que aproveite o Manus sem travar.
+1. `task.get` does not exist in Manus API v2 → correct endpoint is `task.detail`
+2. Response is `{ ok, task: { status } }` but code reads `data.status` directly
+3. Status values are `running | stopped | waiting | error` — code checks for `completed`, `done`, `failed` which don't exist in the API
+4. `task.listMessages` response has typed message objects (`user_message.content`, `assistant_message.content` as nested objects), not flat `role`/`content` fields
+5. 55s polling timeout is too short — Manus browser tasks often take 3-10 minutes
 
-## Solução: Cascata Manus → Firecrawl Deep → Firecrawl Básico
+## Solution
 
-### Alteração em `src/pages/agent/AgentNewPresentation.tsx` (linhas 178-207)
+### Fix `supabase/functions/analyze-market-manus/index.ts`
 
-Nova ordem de tentativas no `runMarketAnalysisBackground`:
-
-```text
-1. Tentar analyze-market-manus (55s timeout)
-   → Se retornar comparáveis: usar esses resultados ✓
-   → Se timeout ou falhar: ir para passo 2
-
-2. Tentar analyze-market-deep (Firecrawl nativo + Google)
-   → Se retornar comparáveis: usar esses resultados ✓
-   → Se falhar: ir para passo 3
-
-3. Tentar analyze-market (Firecrawl básico)
-   → Último recurso
+**1. Fix `getTaskStatus`** — change `task.get` to `task.detail`, extract `data.task`
+```typescript
+async function getTaskStatus(taskId: string, apiKey: string): Promise<any> {
+  const res = await fetch(`${MANUS_API}/task.detail?task_id=${taskId}`, {
+    headers: { "x-manus-api-key": apiKey },
+  });
+  if (res.ok) {
+    const data = await res.json();
+    return data.task || null;  // task object is nested under "task" key
+  }
+  await res.text();
+  return null;
+}
 ```
 
-### Código da cascata
+**2. Fix status checks in `pollManusTask`** — use correct enum values
+```text
+- "completed"/"done" → "stopped" (only valid terminal success status)
+- "failed" → "error"  
+- Keep "running" and "waiting" as continue-polling states
+```
 
-Substituir o bloco try/catch (linhas 181-207) por:
-
+**3. Fix message extraction** — use v2 message structure
 ```typescript
-// 1. Try Manus (navigates portals like a human — best for SPAs)
-try {
-  console.log("Trying analyze-market-manus (browser navigation)...");
-  const { data: manusResult, error: manusError } = await supabase.functions.invoke("analyze-market-manus", { body: analyzeBody });
-  
-  if (!manusError && manusResult?.success && manusResult?.comparables?.length) {
-    console.log(`Manus returned ${manusResult.comparables.length} comparables`);
-    scrapedComparables = manusResult.comparables;
-    toast.success(`Manus encontrou ${manusResult.comparables.length} comparáveis`);
-  } else {
-    throw new Error(manusError?.message || manusResult?.message || "Manus returned no results");
-  }
-} catch (manusErr) {
-  console.warn("Manus failed, falling back to Firecrawl deep...", manusErr);
-  
-  // 2. Firecrawl Deep (native portal scrape + Google)
-  try {
-    const { data: deepResult, error: deepError } = await supabase.functions.invoke("analyze-market-deep", { body: analyzeBody });
-    if (!deepError && deepResult?.success && deepResult?.comparables?.length) {
-      scrapedComparables = deepResult.comparables;
-      researchMetadata = deepResult.research_metadata || null;
-    } else {
-      throw new Error("deep failed");
-    }
-  } catch {
-    // 3. Basic Firecrawl fallback
-    const { data: basicResult } = await supabase.functions.invoke("analyze-market", { body: analyzeBody });
-    if (basicResult?.success && basicResult?.comparables?.length) {
-      scrapedComparables = basicResult.comparables;
-    } else {
-      toast.warning("Não foi possível buscar comparáveis nos portais.");
-    }
+// v2 messages have type-specific nested objects:
+// { type: "assistant_message", assistant_message: { content: "..." } }
+for (const m of messages) {
+  if (m.type === "assistant_message" && m.assistant_message?.content) {
+    return m.assistant_message.content;
   }
 }
 ```
 
-### Nenhuma alteração no edge function `analyze-market-manus`
-A função já está pronta — aceita o mesmo formato `{ property, portals, filters }` e retorna `{ success, comparables }`.
+**4. Increase tolerance for timeout** — since Manus tasks are long-running, keep 55s but make the timeout a graceful fallback (not an error), returning `{ success: false }` so the cascade continues to Firecrawl.
 
-## Resultado
-- Manus tenta primeiro (55s) — melhor para portais SPA como Kenlo
-- Se Manus não completar a tempo, Firecrawl Deep assume
-- Se Firecrawl Deep falhar, Firecrawl básico é o último recurso
-- Tudo roda em background (não trava a UI)
+**5. Add initial delay** — Manus needs a few seconds to initialize the task before `task.detail` will return valid data. Add a 3-second initial wait before first poll.
+
+## Files Changed
+- `supabase/functions/analyze-market-manus/index.ts` — fix endpoints, response parsing, status values, message extraction
+
+## Result
+- `task.detail` returns valid status instead of 404
+- Correct status checks (`stopped` = done, `error` = failed)
+- Proper message content extraction from v2 response format
+- Graceful timeout that allows Firecrawl fallback to work
 
