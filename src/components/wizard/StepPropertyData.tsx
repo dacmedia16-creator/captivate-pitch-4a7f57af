@@ -26,7 +26,11 @@ export interface PropertyData {
 const DIFFERENTIALS = [
   "Piscina", "Área Gourmet", "Escritório", "Energia Solar", "Automação",
   "Planejados", "Vista Privilegiada", "Esquina", "Quintal Amplo", "Varanda",
-  "Elevador", "Mobiliado",
+  "Elevador", "Mobiliado", "Quadra", "Churrasqueira", "Sauna", "Academia",
+  "Salão de Festas", "Playground", "Brinquedoteca", "Portaria 24h",
+  "Jardim", "Lavabo", "Despensa", "Closet", "Aquecimento Central",
+  "Ar Condicionado", "Lareira", "Depósito", "Coworking", "Pet Place",
+  "Bicicletário", "Spa",
 ];
 
 interface StepPropertyDataProps {
@@ -288,7 +292,7 @@ export function StepPropertyData({ data, onChange }: StepPropertyDataProps) {
           </div>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
             {DIFFERENTIALS.map((d) => (
               <label key={d} className="flex items-center gap-2 cursor-pointer">
                 <Checkbox
