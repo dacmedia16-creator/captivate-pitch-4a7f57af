@@ -8,7 +8,8 @@ const corsHeaders = {
 
 const MANUS_API = "https://api.manus.ai/v2";
 const POLL_INTERVAL = 5000;
-const MAX_POLL_TIME = 55_000; // 55s — must finish before edge function runtime kills us
+const INITIAL_DELAY = 3000;
+const MAX_POLL_TIME = 55_000;
 
 interface PropertyInput {
   title?: string;
@@ -167,14 +168,13 @@ async function createManusTask(prompt: string, apiKey: string): Promise<string> 
 }
 
 async function getTaskStatus(taskId: string, apiKey: string): Promise<any> {
-  // Try task.get first
-  const res = await fetch(`${MANUS_API}/task.get?task_id=${taskId}`, {
+  const res = await fetch(`${MANUS_API}/task.detail?task_id=${taskId}`, {
     headers: { "x-manus-api-key": apiKey },
   });
   if (res.ok) {
-    return await res.json();
+    const data = await res.json();
+    return data.task || null;
   }
-  // Consume body to avoid leak
   await res.text();
   return null;
 }
@@ -192,81 +192,68 @@ async function getTaskMessages(taskId: string, apiKey: string): Promise<any[]> {
   return data.messages || data.data || [];
 }
 
+function extractAssistantContent(messages: any[]): string | null {
+  for (const m of messages) {
+    // v2 format: { type: "assistant_message", assistant_message: { content: "..." } }
+    if (m.type === "assistant_message" && m.assistant_message?.content) {
+      const content = m.assistant_message.content;
+      if (typeof content === "string") return content;
+      if (Array.isArray(content)) {
+        const textPart = content.find((c: any) => c.type === "text");
+        if (textPart?.text) return textPart.text;
+      }
+    }
+    // fallback: flat structure
+    if ((m.type === "assistant_message" || m.role === "assistant") && typeof m.content === "string") {
+      return m.content;
+    }
+  }
+  return null;
+}
+
 async function pollManusTask(taskId: string, apiKey: string): Promise<string> {
+  // Initial delay — let Manus initialize the task
+  await new Promise(r => setTimeout(r, INITIAL_DELAY));
+
   const start = Date.now();
   let consecutive404s = 0;
 
   while (Date.now() - start < MAX_POLL_TIME) {
-    // Try task.get endpoint first for status
     const taskData = await getTaskStatus(taskId, apiKey);
-    
+
     if (taskData) {
       consecutive404s = 0;
-      const status = taskData.status || taskData.agent_status;
+      const status = taskData.status;
       console.log("Manus task status:", status);
 
-      if (status === "error" || status === "failed") {
-        throw new Error(`Manus task failed: ${taskData.error || taskData.message || "Unknown error"}`);
+      if (status === "error") {
+        throw new Error(`Manus task failed: ${taskData.error || "Unknown error"}`);
       }
 
-      if (status === "stopped" || status === "completed" || status === "done") {
-        // Task is done — get messages to extract the result
+      if (status === "stopped") {
+        // Task completed — extract result from messages
         const messages = await getTaskMessages(taskId, apiKey);
-        for (const m of messages) {
-          if (m.type === "assistant_message" || m.role === "assistant") {
-            const content = m.content;
-            if (typeof content === "string") return content;
-            if (Array.isArray(content)) {
-              const textPart = content.find((c: any) => c.type === "text");
-              if (textPart?.text) return textPart.text;
-            }
-          }
-        }
+        const content = extractAssistantContent(messages);
+        if (content) return content;
         return JSON.stringify(messages);
       }
+
+      // "running" or "waiting" — continue polling
     } else {
-      // task.get failed (likely 404)
       consecutive404s++;
-      console.warn(`Manus task.get failed (attempt ${consecutive404s}/3)`);
+      console.warn(`Manus task.detail failed (attempt ${consecutive404s}/5)`);
 
-      if (consecutive404s >= 3) {
-        throw new Error(`Manus task not found after ${consecutive404s} attempts — task_id may be invalid`);
-      }
-
-      // Try listMessages as fallback
-      const messages = await getTaskMessages(taskId, apiKey);
-      if (messages.length > 0) {
-        consecutive404s = 0; // reset if listMessages works
-        for (const msg of messages) {
-          if (msg.type === "status_update" || msg.event_type === "status_update") {
-            const msgStatus = msg.agent_status || msg.status;
-            console.log("Manus agent status (from messages):", msgStatus);
-
-            if (msgStatus === "error" || msgStatus === "failed") {
-              throw new Error(`Manus task failed: ${msg.error || msg.message || "Unknown error"}`);
-            }
-            if (msgStatus === "stopped" || msgStatus === "completed" || msgStatus === "done") {
-              for (const m of messages) {
-                if (m.type === "assistant_message" || m.role === "assistant") {
-                  const content = m.content;
-                  if (typeof content === "string") return content;
-                  if (Array.isArray(content)) {
-                    const textPart = content.find((c: any) => c.type === "text");
-                    if (textPart?.text) return textPart.text;
-                  }
-                }
-              }
-              return JSON.stringify(messages);
-            }
-          }
-        }
+      if (consecutive404s >= 5) {
+        throw new Error(`Manus task not found after ${consecutive404s} attempts`);
       }
     }
 
     await new Promise(r => setTimeout(r, POLL_INTERVAL));
   }
 
-  throw new Error("Manus task timed out after 55 seconds");
+  // Graceful timeout — return failure so cascade continues to Firecrawl
+  console.warn("Manus task timed out after 55s — returning graceful failure for cascade fallback");
+  return "";
 }
 
 function extractJsonFromText(text: string): any {
@@ -363,6 +350,16 @@ serve(async (req) => {
     console.log("Manus task created:", taskId);
 
     const rawResult = await pollManusTask(taskId, MANUS_API_KEY);
+
+    // Graceful timeout — empty result means task didn't finish in time
+    if (!rawResult) {
+      console.log("Manus returned empty result (likely timeout)");
+      return new Response(
+        JSON.stringify({ success: false, message: "Manus task still running — falling back", task_id: taskId }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     console.log("Manus task completed, raw result length:", rawResult.length);
 
     let comparables: any[] = [];
