@@ -1,46 +1,47 @@
 
 
-# Melhorar Qualidade e Quantidade de Resultados por Portal
+# Adicionar Filtro de Similaridade Mínima e Scoring de Diferenciais
 
-## Problemas Identificados
-
-1. **`resultsPerPortal` muito baixo**: Com 5 portais e maxComparables=15, cada portal busca apenas 3 URLs. Muitas são descartadas, sobrando pouquíssimos comparáveis válidos.
-
-2. **Nome do condomínio na query**: `"Cannes"` entre aspas restringe demais — Google só retorna resultados que mencionam exatamente "Cannes", ignorando apartamentos similares na mesma região.
-
-3. **OLX misturando aluguel/venda**: O `site:olx.com.br/imoveis` não filtra por tipo de transação. Precisa usar paths específicos (`site:olx.com.br/imoveis/venda` ou `site:olx.com.br/imoveis/aluguel`).
+## Problema
+A edge function `analyze-market-deep` aceita qualquer imóvel que tenha preço e área válidos. Não há score mínimo de similaridade, então um apartamento de 2 quartos / 94m² sem piscina pode entrar como comparável de um de 3 quartos com piscina e academia.
 
 ## Alterações
 
 ### `supabase/functions/analyze-market-deep/index.ts`
 
-**Linha 156 — Aumentar `resultsPerPortal`:**
+**1. Adicionar filtro de similaridade mínima (após linha 619):**
 ```typescript
-// Antes: Math.min(Math.ceil(maxResults / limitedPortals.length), 8)
-// Depois: mínimo 5 por portal, máximo 10
-const resultsPerPortal = Math.max(5, Math.min(Math.ceil((maxResults * 2) / limitedPortals.length), 10));
-```
-Isso garante pelo menos 5 URLs por portal (25 total com 5 portais), compensando a taxa de descarte.
-
-**Linhas 67-81 — Melhorar `buildSearchQuery`:**
-- Remover nome do condomínio da query (muito restritivo). O condomínio será usado apenas na fase de ranking/similaridade, não na busca.
-- Corrigir OLX: usar `site:olx.com.br/imoveis/venda` ou `site:olx.com.br/imoveis/aluguel` conforme o `property_purpose`.
-- Remover metragem exata da query (ex: "98m²") — isso elimina resultados de 95m² ou 102m² que seriam perfeitamente válidos.
-
-Query resultante (exemplo para ZAP):
-```
-Apartamento 3 quartos Parque Campolim Sorocaba venda site:zapimoveis.com.br
+const minSimilarity = 40; // Score mínimo para ser considerado comparável
+if (similarity < minSimilarity) {
+  discardReasons.push({
+    url: c.source_url || "unknown",
+    portal: c.source_name || "unknown",
+    reason: `Similaridade muito baixa (${similarity}/100)`,
+  });
+  continue;
+}
 ```
 
-**Ajustar PORTAL_SITE_MAP para OLX** (linhas ~30-40):
+**2. Adicionar scoring de diferenciais no cálculo de similaridade (após rooms score, ~linha 609):**
+
+Comparar os diferenciais do imóvel de referência com os do comparável extraído pela IA. Se compartilham diferenciais como piscina, academia, churrasqueira, adicionar pontos extras.
+
 ```typescript
-// Dinâmico baseado no purpose
-const olxPath = purpose === "aluguel" ? "aluguel" : "venda";
-// site:olx.com.br/imoveis/venda
+// Differentials overlap
+if (property.differentials?.length && c.differentials?.length) {
+  const subjectDiffs = property.differentials.map(d => d.toLowerCase());
+  const compDiffs = c.differentials.map(d => d.toLowerCase());
+  const overlap = subjectDiffs.filter(d => compDiffs.some(cd => cd.includes(d) || d.includes(cd)));
+  const ratio = overlap.length / subjectDiffs.length;
+  if (ratio >= 0.5) score += 5;
+  else if (ratio >= 0.25) score += 3;
+}
 ```
+
+**3. Melhorar o prompt da IA (linha 462)** para enfatizar a extração de diferenciais de cada anúncio (piscina, academia, churrasqueira, etc.)
 
 ## Resultado Esperado
-- ~25-50 URLs coletadas (vs 12 atual)
-- Queries mais amplas trazem mais comparáveis relevantes
-- OLX retorna apenas venda quando o imóvel é para venda
+- Imóveis com score < 40 são descartados com motivo claro nos logs
+- Diferenciais passam a influenciar o ranking de similaridade
+- O apartamento de 2 quartos sem piscina/academia seria descartado por baixa similaridade
 
