@@ -9,11 +9,20 @@ const corsHeaders = {
 const PORTAL_SITE_MAP: Record<string, string> = {
   zap: "site:zapimoveis.com.br",
   vivareal: "site:vivareal.com.br",
-  olx: "site:olx.com.br/imoveis",
+  olx_venda: "site:olx.com.br/imoveis/venda",
+  olx_aluguel: "site:olx.com.br/imoveis/aluguel",
   imovelweb: "site:imovelweb.com.br",
   chavesnamao: "site:chavesnamao.com.br",
   kenlo: "site:portal.kenlo.com.br",
 };
+
+function getPortalSiteFilter(portalCode: string, purpose?: string): string | undefined {
+  if (portalCode === "olx") {
+    const isRental = purpose === "aluguel" || purpose === "rent";
+    return isRental ? PORTAL_SITE_MAP.olx_aluguel : PORTAL_SITE_MAP.olx_venda;
+  }
+  return PORTAL_SITE_MAP[portalCode];
+}
 
 interface PropertyData {
   property_type?: string;
@@ -66,17 +75,15 @@ interface PortalResult {
 
 function buildSearchQuery(property: PropertyData, portal: PortalInfo, filters?: Filters): string {
   const parts: string[] = [];
-  if (filters?.preferSameCondominium && property.condominium) {
-    parts.push(`"${property.condominium}"`);
-  }
+  // Não incluir condomínio na query — muito restritivo. Será usado no ranking.
   if (property.property_type) parts.push(property.property_type);
   if (property.bedrooms) parts.push(`${property.bedrooms} quartos`);
-  if (property.area_total || property.area_built) parts.push(`${property.area_total || property.area_built}m²`);
+  // Não incluir metragem exata — elimina resultados próximos válidos
   if (property.neighborhood) parts.push(property.neighborhood);
   if (property.city) parts.push(property.city);
   const purpose = property.property_purpose?.toLowerCase();
   parts.push(purpose === "aluguel" || purpose === "rent" ? "aluguel" : "venda");
-  const siteFilter = PORTAL_SITE_MAP[portal.code];
+  const siteFilter = getPortalSiteFilter(portal.code, purpose);
   if (siteFilter) parts.push(siteFilter);
   return parts.join(" ");
 }
@@ -122,7 +129,7 @@ serve(async (req) => {
       );
     }
 
-    const searchablePortals = portals.filter((p) => PORTAL_SITE_MAP[p.code]);
+    const searchablePortals = portals.filter((p) => PORTAL_SITE_MAP[p.code] || p.code === "olx");
     const portalResults: PortalResult[] = [];
     const discardReasons: DiscardReason[] = [];
     const limitations: string[] = [];
@@ -153,7 +160,7 @@ serve(async (req) => {
     const limitedPortals = searchablePortals;
 
     const maxResults = Math.min(Number(filters.maxComparables) || 15, 20);
-    const resultsPerPortal = Math.min(Math.ceil(maxResults / limitedPortals.length), 8);
+    const resultsPerPortal = Math.max(5, Math.min(Math.ceil((maxResults * 2) / limitedPortals.length), 10));
 
     // ==========================================
     // FASE 1: Busca ampla por portal (Firecrawl Search) — em paralelo
