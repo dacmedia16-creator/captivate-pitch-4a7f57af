@@ -412,7 +412,7 @@ IMÓVEL DE REFERÊNCIA:
 - Suítes: ${property.suites || "Não informado"}
 - Vagas: ${property.parking_spots || "Não informado"}
 - Padrão: ${property.property_standard || "Não informado"}
-- Preço esperado: ${property.owner_expected_price ? \`R$ \${Number(property.owner_expected_price).toLocaleString("pt-BR")}\` : "Não informado"}
+- Preço esperado: ${property.owner_expected_price ? "R$ " + Number(property.owner_expected_price).toLocaleString("pt-BR") : "Não informado"}
 
 IMPORTANTE - DIFERENCIAIS:
 Extraia com atenção TODOS os diferenciais e comodidades do imóvel e do condomínio. Exemplos:
