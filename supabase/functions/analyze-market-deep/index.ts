@@ -584,7 +584,7 @@ serve(async (req) => {
           comparables: [],
           research_metadata: {
             portals_checked: portalResults,
-            total_listings_found: allUrls.length,
+            total_listings_found: mergedUrls.length,
             listings_opened: listingsOpened,
             listings_discarded: discardReasons.length,
             discard_reasons: discardReasons,
@@ -727,7 +727,7 @@ Extraia todos os imóveis relevantes. Descarte apenas se claramente incompatíve
           comparables: [],
           research_metadata: {
             portals_checked: portalResults,
-            total_listings_found: allUrls.length,
+            total_listings_found: mergedUrls.length,
             listings_opened: listingsOpened,
             listings_discarded: discardReasons.length,
             discard_reasons: discardReasons,
@@ -749,7 +749,7 @@ Extraia todos os imóveis relevantes. Descarte apenas se claramente incompatíve
       console.error("[FASE 3] Failed to parse AI response");
       return new Response(
         JSON.stringify({ success: true, comparables: [], research_metadata: {
-          portals_checked: portalResults, total_listings_found: allUrls.length,
+          portals_checked: portalResults, total_listings_found: mergedUrls.length,
           listings_opened: listingsOpened, listings_discarded: discardReasons.length,
           discard_reasons: discardReasons, filters_used: filters,
           collected_at: new Date().toISOString(), limitations: [...limitations, "Erro ao processar resposta da IA"],
@@ -935,7 +935,7 @@ Extraia todos os imóveis relevantes. Descarte apenas se claramente incompatíve
     // Build research metadata
     const researchMetadata = {
       portals_checked: portalResults,
-      total_listings_found: allUrls.length,
+      total_listings_found: mergedUrls.length,
       listings_opened: listingsOpened,
       listings_discarded: discardReasons.length,
       discard_reasons: discardReasons,
