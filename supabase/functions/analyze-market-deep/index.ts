@@ -412,7 +412,14 @@ IMÓVEL DE REFERÊNCIA:
 - Suítes: ${property.suites || "Não informado"}
 - Vagas: ${property.parking_spots || "Não informado"}
 - Padrão: ${property.property_standard || "Não informado"}
-- Preço esperado: ${property.owner_expected_price ? `R$ ${Number(property.owner_expected_price).toLocaleString("pt-BR")}` : "Não informado"}
+- Preço esperado: ${property.owner_expected_price ? "R$ " + Number(property.owner_expected_price).toLocaleString("pt-BR") : "Não informado"}
+
+IMPORTANTE - DIFERENCIAIS:
+Extraia com atenção TODOS os diferenciais e comodidades do imóvel e do condomínio. Exemplos:
+Piscina, Academia, Churrasqueira, Sauna, Salão de Festas, Playground, Portaria 24h, Elevador, 
+Varanda/Sacada, Área Gourmet, Mobiliado, Planejados, Vista Privilegiada, Energia Solar, Automação,
+Quadra, Brinquedoteca, Jardim, Lavabo, Closet, Ar Condicionado, Lareira, Coworking, Pet Place, Spa.
+Inclua no campo "differentials" como array de strings. Se não houver diferenciais mencionados, retorne array vazio.
 
 IMPORTANTE: Extraia também a data do anúncio (listing_date) quando disponível. Procure por textos como "Anúncio criado em", "Publicado em", "Atualizado em", "Atualizado há X dias/meses", datas no formato DD/MM/YYYY ou similar. Se encontrar "Atualizado há 3 meses", calcule a data aproximada. Retorne no formato YYYY-MM-DD.
 
@@ -612,11 +619,34 @@ Extraia todos os imóveis relevantes. Descarte apenas se claramente incompatíve
       if (c.construction_standard && property.property_standard &&
         c.construction_standard.toLowerCase().includes(property.property_standard.toLowerCase())) score += 10;
 
+      // Differentials overlap
+      const subjectDiffs: string[] = (property as any).differentials || [];
+      const compDiffs: string[] = c.differentials || [];
+      if (subjectDiffs.length > 0 && compDiffs.length > 0) {
+        const subNorm = subjectDiffs.map((d: string) => d.toLowerCase());
+        const compNorm = compDiffs.map((d: string) => d.toLowerCase());
+        const overlap = subNorm.filter((d: string) => compNorm.some((cd: string) => cd.includes(d) || d.includes(cd)));
+        const ratio = overlap.length / subNorm.length;
+        if (ratio >= 0.5) score += 5;
+        else if (ratio >= 0.25) score += 3;
+      }
+
       // City match + profile bonus
       if (c.city && property.city &&
         c.city.toLowerCase().includes(property.city.toLowerCase()) && score >= 30) score += 5;
 
       const similarity = Math.min(100, Math.round(score));
+
+      // Minimum similarity filter
+      const minSimilarity = 40;
+      if (similarity < minSimilarity) {
+        discardReasons.push({
+          url: c.source_url || "unknown",
+          portal: c.source_name || "unknown",
+          reason: `Similaridade muito baixa (${similarity}/100)`,
+        });
+        continue;
+      }
 
       // Update portal valid count
       const pr = portalResults.find(p => p.portal_name === c.source_name || p.portal_code === c.source_name?.toLowerCase());
