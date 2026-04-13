@@ -75,10 +75,8 @@ interface PortalResult {
 
 function buildSearchQuery(property: PropertyData, portal: PortalInfo, filters?: Filters): string {
   const parts: string[] = [];
-  // Não incluir condomínio na query — muito restritivo. Será usado no ranking.
   if (property.property_type) parts.push(property.property_type);
   if (property.bedrooms) parts.push(`${property.bedrooms} quartos`);
-  // Não incluir metragem exata — elimina resultados próximos válidos
   if (property.neighborhood) parts.push(property.neighborhood);
   if (property.city) parts.push(property.city);
   const purpose = property.property_purpose?.toLowerCase();
@@ -86,6 +84,79 @@ function buildSearchQuery(property: PropertyData, portal: PortalInfo, filters?: 
   const siteFilter = getPortalSiteFilter(portal.code, purpose);
   if (siteFilter) parts.push(siteFilter);
   return parts.join(" ");
+}
+
+// Remove accents and normalize for URL slugs
+function slugify(text: string): string {
+  return text
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/\s+/g, "-")
+    .replace(/[^a-z0-9-]/g, "");
+}
+
+// Map property types to portal-specific slugs
+function getPropertyTypeSlug(type: string | undefined, portal: string): string {
+  const t = (type || "apartamento").toLowerCase();
+  if (portal === "zap" || portal === "vivareal") {
+    if (t.includes("casa")) return "casas";
+    if (t.includes("cobertura")) return "coberturas";
+    if (t.includes("terreno")) return "terrenos";
+    return "apartamentos";
+  }
+  if (portal === "kenlo") {
+    if (t.includes("casa")) return "casa";
+    if (t.includes("cobertura")) return "cobertura";
+    if (t.includes("terreno")) return "terreno";
+    return "apartamento";
+  }
+  if (t.includes("casa")) return "casas";
+  return "apartamentos";
+}
+
+// Build native search URL for each portal
+function buildPortalNativeUrl(property: PropertyData, portal: PortalInfo): string | null {
+  const city = slugify(property.city || "");
+  const neighborhood = slugify(property.neighborhood || "");
+  const purpose = property.property_purpose?.toLowerCase();
+  const isRental = purpose === "aluguel" || purpose === "rent";
+  const purposeSlug = isRental ? "aluguel" : "venda";
+  const typeSlug = getPropertyTypeSlug(property.property_type, portal.code);
+  const bedrooms = property.bedrooms || "";
+
+  if (!city || !neighborhood) return null;
+
+  // State code — default to "sp" if not available
+  const state = slugify(property.state || "sp");
+
+  switch (portal.code) {
+    case "zap":
+      // zapimoveis.com.br/venda/apartamentos/sp+sorocaba+parque-campolim/
+      return `https://www.zapimoveis.com.br/${purposeSlug}/${typeSlug}/${state}+${city}+${neighborhood}/`;
+
+    case "vivareal":
+      // vivareal.com.br/venda/sp/sorocaba/parque-campolim/apartamento_residencial/
+      return `https://www.vivareal.com.br/${purposeSlug}/${state}/${city}/${neighborhood}/apartamento_residencial/`;
+
+    case "kenlo":
+      // portal.kenlo.com.br/imoveis/a-venda/apartamento/sorocaba/parque-campolim?quartos=3+
+      const kenloAction = isRental ? "para-alugar" : "a-venda";
+      let kenloUrl = `https://portal.kenlo.com.br/imoveis/${kenloAction}/${typeSlug}/${city}/${neighborhood}`;
+      if (bedrooms) kenloUrl += `?quartos=${bedrooms}+`;
+      return kenloUrl;
+
+    case "olx":
+      // olx.com.br/imoveis/venda/apartamentos/estado-sp/sorocaba-e-regiao/parque-campolim
+      return `https://www.olx.com.br/imoveis/${purposeSlug}/${typeSlug}/estado-${state}/${city}-e-regiao/${neighborhood}`;
+
+    case "imovelweb":
+      // imovelweb.com.br/apartamentos-venda-parque-campolim-sorocaba.html
+      return `https://www.imovelweb.com.br/${typeSlug}-${purposeSlug}-${neighborhood}-${city}.html`;
+
+    default:
+      return null;
+  }
 }
 
 // Deduplicate by address+area+price similarity
