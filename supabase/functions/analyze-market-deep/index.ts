@@ -38,6 +38,8 @@ interface PropertyData {
   property_standard?: string;
   property_purpose?: string;
   differentials?: string[];
+  state?: string;
+  parking_spots?: string;
   [key: string]: any;
 }
 
