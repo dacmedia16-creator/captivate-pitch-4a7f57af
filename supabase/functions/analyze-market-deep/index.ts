@@ -161,6 +161,39 @@ function buildPortalNativeUrl(property: PropertyData, portal: PortalInfo): strin
   }
 }
 
+// Detect multi-listing pages (condominium, search results, etc.)
+function isMultiListingUrl(url: string): boolean {
+  const patterns = [
+    /\/condominio\//i,
+    /\/busca\//i,
+    /\/resultado\//i,
+    /[?&]pagina=/i,
+    /[?&]page=/i,
+  ];
+  return patterns.some(p => p.test(url));
+}
+
+// Check if markdown content looks like multiple listings
+function looksLikeMultiListing(markdown: string): boolean {
+  const priceMatches = markdown.match(/R\$\s*[\d.,]+/g) || [];
+  const areaMatches = markdown.match(/\d+\s*m²/g) || [];
+  return priceMatches.length >= 3 && areaMatches.length >= 3 && markdown.length > 2000;
+}
+
+// Extract individual listing URLs from a list of links for a given portal
+function extractIndividualListingUrls(links: string[], portalCode: string): string[] {
+  const listingPatterns: Record<string, RegExp> = {
+    zap: /zapimoveis\.com\.br\/imovel\//,
+    vivareal: /vivareal\.com\.br\/imovel\//,
+    kenlo: /portal\.kenlo\.com\.br\/imovel\//,
+    olx: /olx\.com\.br\/.*\/imoveis\//,
+    imovelweb: /imovelweb\.com\.br\/propriedades\//,
+  };
+  const pattern = listingPatterns[portalCode];
+  if (!pattern) return [];
+  return [...new Set(links.filter(l => pattern.test(l)))];
+}
+
 // Deduplicate by address+area+price similarity
 function isDuplicate(
   comp: any,
