@@ -237,29 +237,42 @@ function isDuplicate(comp: any, existing: any[]): boolean {
 
 // ============================================================
 // City pre-filter: discard URLs that clearly belong to wrong city
+// Uses POSITIVE matching: if URL contains a known city that is NOT the target, discard it.
 // ============================================================
 function isWrongCityUrl(url: string, targetCity: string | undefined): boolean {
   if (!targetCity) return false;
   const targetSlug = slugify(targetCity);
   if (!targetSlug) return false;
 
-  // Known city slugs that appear in portal URLs
-  const cityPatterns = [
-    /vivareal\.com\.br\/imovel\/[^/]*-([a-z-]+)-\w{2}-id/i,
-    /zapimoveis\.com\.br\/imovel\/[^/]*-([a-z-]+)-\w{2}-id/i,
-  ];
-
-  // Simpler: check if URL contains a different major city name
-  const majorCities = [
-    "rio-de-janeiro", "sao-paulo", "belo-horizonte", "curitiba", "porto-alegre",
-    "salvador", "brasilia", "fortaleza", "recife", "manaus", "goiania",
-    "campinas", "santos", "guarulhos", "niteroi",
-  ];
-
   const urlLower = url.toLowerCase();
-  for (const city of majorCities) {
-    if (city === targetSlug) continue; // same city, OK
-    if (urlLower.includes(`/${city}/`) || urlLower.includes(`-${city}-`)) {
+
+  // If URL contains the target city slug anywhere, it's OK
+  if (urlLower.includes(targetSlug)) return false;
+
+  // Known Brazilian city slugs that commonly appear in portal URLs
+  const knownCities = [
+    "rio-de-janeiro", "sao-paulo", "belo-horizonte", "curitiba",
+    "porto-alegre", "salvador", "brasilia", "fortaleza", "recife",
+    "manaus", "goiania", "campinas", "santos", "guarulhos", "niteroi",
+    "sorocaba", "jundiai", "piracicaba", "bauru", "ribeirao-preto",
+    "uberlandia", "joinville", "florianopolis", "londrina", "maringa",
+    "osasco", "santo-andre", "sao-bernardo", "sao-jose-dos-campos",
+    "mogi-das-cruzes", "diadema", "carapicuiba", "maua", "suzano",
+    "taubate", "limeira", "franca", "praia-grande", "sao-vicente",
+    "americana", "itu", "indaiatuba", "tatui", "votorantim",
+  ];
+
+  for (const city of knownCities) {
+    if (city === targetSlug) continue; // same city as target, skip
+    // Check with various URL delimiters (/, -, +, etc.)
+    if (
+      urlLower.includes(`/${city}/`) ||
+      urlLower.includes(`/${city}?`) ||
+      urlLower.includes(`/${city}-e-regiao`) ||
+      urlLower.includes(`+${city}+`) ||
+      urlLower.includes(`+${city}/`) ||
+      urlLower.includes(`-${city}-`)
+    ) {
       return true;
     }
   }
