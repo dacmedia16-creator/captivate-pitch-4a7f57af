@@ -556,11 +556,13 @@ export type Database = {
           listing_status: string | null
           market_study_id: string
           neighborhood: string | null
+          origin: string
           parking_spots: number | null
           price: number | null
           price_per_sqm: number | null
           property_type: string | null
           raw_data: Json | null
+          raw_listing_id: string | null
           similarity_score: number | null
           source_name: string | null
           source_url: string | null
@@ -586,11 +588,13 @@ export type Database = {
           listing_status?: string | null
           market_study_id: string
           neighborhood?: string | null
+          origin?: string
           parking_spots?: number | null
           price?: number | null
           price_per_sqm?: number | null
           property_type?: string | null
           raw_data?: Json | null
+          raw_listing_id?: string | null
           similarity_score?: number | null
           source_name?: string | null
           source_url?: string | null
@@ -616,11 +620,13 @@ export type Database = {
           listing_status?: string | null
           market_study_id?: string
           neighborhood?: string | null
+          origin?: string
           parking_spots?: number | null
           price?: number | null
           price_per_sqm?: number | null
           property_type?: string | null
           raw_data?: Json | null
+          raw_listing_id?: string | null
           similarity_score?: number | null
           source_name?: string | null
           source_url?: string | null
@@ -633,6 +639,140 @@ export type Database = {
             columns: ["market_study_id"]
             isOneToOne: false
             referencedRelation: "market_studies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "market_study_comparables_raw_listing_id_fkey"
+            columns: ["raw_listing_id"]
+            isOneToOne: false
+            referencedRelation: "market_study_raw_listings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      market_study_executions: {
+        Row: {
+          created_at: string
+          error_message: string | null
+          finished_at: string | null
+          id: string
+          listings_found: number | null
+          listings_matched: number | null
+          market_study_id: string
+          metadata: Json | null
+          portal_source_id: string | null
+          started_at: string | null
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          error_message?: string | null
+          finished_at?: string | null
+          id?: string
+          listings_found?: number | null
+          listings_matched?: number | null
+          market_study_id: string
+          metadata?: Json | null
+          portal_source_id?: string | null
+          started_at?: string | null
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          error_message?: string | null
+          finished_at?: string | null
+          id?: string
+          listings_found?: number | null
+          listings_matched?: number | null
+          market_study_id?: string
+          metadata?: Json | null
+          portal_source_id?: string | null
+          started_at?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "market_study_executions_market_study_id_fkey"
+            columns: ["market_study_id"]
+            isOneToOne: false
+            referencedRelation: "market_studies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "market_study_executions_portal_source_id_fkey"
+            columns: ["portal_source_id"]
+            isOneToOne: false
+            referencedRelation: "portal_sources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      market_study_raw_listings: {
+        Row: {
+          area: number | null
+          bedrooms: number | null
+          created_at: string
+          execution_id: string | null
+          external_id: string | null
+          external_url: string | null
+          id: string
+          market_study_id: string
+          portal_source_id: string | null
+          price: number | null
+          raw_data: Json | null
+          status: string
+          title: string | null
+        }
+        Insert: {
+          area?: number | null
+          bedrooms?: number | null
+          created_at?: string
+          execution_id?: string | null
+          external_id?: string | null
+          external_url?: string | null
+          id?: string
+          market_study_id: string
+          portal_source_id?: string | null
+          price?: number | null
+          raw_data?: Json | null
+          status?: string
+          title?: string | null
+        }
+        Update: {
+          area?: number | null
+          bedrooms?: number | null
+          created_at?: string
+          execution_id?: string | null
+          external_id?: string | null
+          external_url?: string | null
+          id?: string
+          market_study_id?: string
+          portal_source_id?: string | null
+          price?: number | null
+          raw_data?: Json | null
+          status?: string
+          title?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "market_study_raw_listings_execution_id_fkey"
+            columns: ["execution_id"]
+            isOneToOne: false
+            referencedRelation: "market_study_executions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "market_study_raw_listings_market_study_id_fkey"
+            columns: ["market_study_id"]
+            isOneToOne: false
+            referencedRelation: "market_studies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "market_study_raw_listings_portal_source_id_fkey"
+            columns: ["portal_source_id"]
+            isOneToOne: false
+            referencedRelation: "portal_sources"
             referencedColumns: ["id"]
           },
         ]
@@ -1064,6 +1204,7 @@ export type Database = {
           creation_mode: string | null
           highlights: string | null
           id: string
+          market_study_id: string | null
           neighborhood: string | null
           notes: string | null
           owner_expected_price: number | null
@@ -1099,6 +1240,7 @@ export type Database = {
           creation_mode?: string | null
           highlights?: string | null
           id?: string
+          market_study_id?: string | null
           neighborhood?: string | null
           notes?: string | null
           owner_expected_price?: number | null
@@ -1134,6 +1276,7 @@ export type Database = {
           creation_mode?: string | null
           highlights?: string | null
           id?: string
+          market_study_id?: string | null
           neighborhood?: string | null
           notes?: string | null
           owner_expected_price?: number | null
@@ -1160,6 +1303,13 @@ export type Database = {
             columns: ["broker_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "presentations_market_study_id_fkey"
+            columns: ["market_study_id"]
+            isOneToOne: false
+            referencedRelation: "market_studies"
             referencedColumns: ["id"]
           },
           {
@@ -1439,6 +1589,7 @@ export type Database = {
           creation_mode: string | null
           highlights: string | null
           id: string
+          market_study_id: string | null
           neighborhood: string | null
           notes: string | null
           owner_expected_price: number | null
