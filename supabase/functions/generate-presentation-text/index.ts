@@ -13,12 +13,11 @@ serve(async (req) => {
     const { presentation_id } = await req.json();
     if (!presentation_id) throw new Error("presentation_id is required");
 
-    // --- AUTH: Require authenticated user ---
+    // --- AUTH ---
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
@@ -34,13 +33,11 @@ serve(async (req) => {
     const { data: claims, error: claimsErr } = await authClient.auth.getClaims(token);
     if (claimsErr || !claims?.claims?.sub) {
       return new Response(JSON.stringify({ error: "Invalid token" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     const userId = claims.claims.sub as string;
-
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
 
@@ -58,36 +55,46 @@ serve(async (req) => {
     const isSameTenant = userProfile?.tenant_id === pres.tenant_id;
 
     if (!isSuperAdmin && !isOwner && !isSameTenant) {
-      return new Response(JSON.stringify({ error: "Forbidden: you don't have access to this presentation" }), {
-        status: 403,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      return new Response(JSON.stringify({ error: "Forbidden" }), {
+        status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    // --- END AUTH ---
 
-    // Fetch branding, broker, profile, and jobs in parallel
-    const [brandingRes, brokerRes, brokerProfileRes, jobsRes] = await Promise.all([
+    // Fetch branding, broker, profile in parallel
+    const [brandingRes, brokerRes, brokerProfileRes] = await Promise.all([
       supabase.from("agency_profiles").select("*").eq("tenant_id", pres.tenant_id).single(),
       supabase.from("broker_profiles").select("*").eq("user_id", pres.broker_id).single(),
       supabase.from("profiles").select("full_name, email, phone").eq("id", pres.broker_id).single(),
-      supabase.from("market_analysis_jobs").select("id").eq("presentation_id", presentation_id),
     ]);
 
     const branding = brandingRes.data;
     const broker = brokerRes.data;
     const brokerProfile = brokerProfileRes.data;
-    const jobs = jobsRes.data;
 
+    // --- OFFICIAL FLOW: read from market_study_comparables & market_study_results ---
     let comparables: any[] = [];
     let report: any = null;
-    if (jobs && jobs.length > 0) {
-      const jobId = jobs[0].id;
+
+    if (pres.market_study_id) {
+      // New official flow
       const [compsRes, repRes] = await Promise.all([
-        supabase.from("market_comparables").select("*").eq("market_analysis_job_id", jobId).eq("is_approved", true),
-        supabase.from("market_reports").select("*").eq("market_analysis_job_id", jobId).single(),
+        supabase.from("market_study_comparables").select("*").eq("market_study_id", pres.market_study_id).eq("is_approved", true),
+        supabase.from("market_study_results").select("*").eq("market_study_id", pres.market_study_id).single(),
       ]);
       comparables = compsRes.data || [];
       report = repRes.data;
+    } else {
+      // Legacy fallback: market_analysis_jobs
+      const { data: jobs } = await supabase.from("market_analysis_jobs").select("id").eq("presentation_id", presentation_id);
+      if (jobs && jobs.length > 0) {
+        const jobId = jobs[0].id;
+        const [compsRes, repRes] = await Promise.all([
+          supabase.from("market_comparables").select("*").eq("market_analysis_job_id", jobId).eq("is_approved", true),
+          supabase.from("market_reports").select("*").eq("market_analysis_job_id", jobId).single(),
+        ]);
+        comparables = compsRes.data || [];
+        report = repRes.data;
+      }
     }
 
     // Build AI prompt
@@ -119,7 +126,7 @@ ${comparables.map(c => `- ${c.title}: R$ ${c.price}, ${c.area}m², ${c.bedrooms}
 ${report ? `Relatório de mercado:
 - Preço médio: R$ ${report.avg_price}
 - Mediana: R$ ${report.median_price}
-- Preço aspiracional: R$ ${report.suggested_aspirational_price}
+- Preço sugerido anúncio: R$ ${report.suggested_ad_price || report.suggested_aspirational_price}
 - Preço de mercado: R$ ${report.suggested_market_price}
 - Venda acelerada: R$ ${report.suggested_fast_sale_price}` : ""}
 
@@ -206,8 +213,7 @@ Gere os textos para cada seção da apresentação.`;
   } catch (e) {
     console.error("Error:", e);
     return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 });
