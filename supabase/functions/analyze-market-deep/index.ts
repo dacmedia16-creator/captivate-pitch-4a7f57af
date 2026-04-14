@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -79,7 +80,6 @@ function buildSearchQuery(property: PropertyData, portal: PortalInfo, filters?: 
   const parts: string[] = [];
   if (property.property_type) parts.push(property.property_type);
   if (property.bedrooms) parts.push(`${property.bedrooms} quartos`);
-  // Include condominium name in search query when available (Bug 3 fix)
   if (property.condominium) parts.push(property.condominium);
   if (property.neighborhood) parts.push(property.neighborhood);
   if (property.city) parts.push(property.city);
@@ -90,12 +90,10 @@ function buildSearchQuery(property: PropertyData, portal: PortalInfo, filters?: 
   return parts.join(" ");
 }
 
-// Check if URL is an individual listing (not a search/listing page)
 function isIndividualListingUrl(url: string): boolean {
   return /\/imovel\//i.test(url) || /\/propriedades\//i.test(url);
 }
 
-// Remove accents and normalize for URL slugs
 function slugify(text: string): string {
   return text
     .normalize("NFD")
@@ -105,7 +103,6 @@ function slugify(text: string): string {
     .replace(/[^a-z0-9-]/g, "");
 }
 
-// Map property types to portal-specific slugs
 function getPropertyTypeSlug(type: string | undefined, portal: string): string {
   const t = (type || "apartamento").toLowerCase();
   if (portal === "zap" || portal === "vivareal") {
@@ -124,7 +121,6 @@ function getPropertyTypeSlug(type: string | undefined, portal: string): string {
   return "apartamentos";
 }
 
-// Build native search URL for each portal
 function buildPortalNativeUrl(property: PropertyData, portal: PortalInfo): string | null {
   const city = slugify(property.city || "");
   const neighborhood = slugify(property.neighborhood || "");
@@ -136,18 +132,14 @@ function buildPortalNativeUrl(property: PropertyData, portal: PortalInfo): strin
 
   if (!city || !neighborhood) return null;
 
-  // State code — default to "sp" if not available
   const state = slugify(property.state || "sp");
 
   switch (portal.code) {
     case "zap":
-      // zapimoveis.com.br/venda/apartamentos/sp+sorocaba+parque-campolim/
       return `https://www.zapimoveis.com.br/${purposeSlug}/${typeSlug}/${state}+${city}+${neighborhood}/`;
 
     case "vivareal": {
-      // vivareal.com.br/venda/sp/sorocaba/parque-campolim/apartamento_residencial/
       const baseVivaUrl = `https://www.vivareal.com.br/${purposeSlug}/${state}/${city}/${neighborhood}/apartamento_residencial/`;
-      // When condominium is specified, add it as a filter parameter
       if (property.condominium) {
         const condoSlug = slugify(property.condominium);
         return `${baseVivaUrl}?filtro=condominium:${condoSlug}`;
@@ -155,19 +147,17 @@ function buildPortalNativeUrl(property: PropertyData, portal: PortalInfo): strin
       return baseVivaUrl;
     }
 
-    case "kenlo":
-      // portal.kenlo.com.br/imoveis/a-venda/apartamento/sorocaba/parque-campolim?quartos=3+
+    case "kenlo": {
       const kenloAction = isRental ? "para-alugar" : "a-venda";
       let kenloUrl = `https://portal.kenlo.com.br/imoveis/${kenloAction}/${typeSlug}/${city}/${neighborhood}`;
       if (bedrooms) kenloUrl += `?quartos=${bedrooms}+`;
       return kenloUrl;
+    }
 
     case "olx":
-      // olx.com.br/imoveis/venda/apartamentos/estado-sp/sorocaba-e-regiao/parque-campolim
       return `https://www.olx.com.br/imoveis/${purposeSlug}/${typeSlug}/estado-${state}/${city}-e-regiao/${neighborhood}`;
 
     case "imovelweb":
-      // imovelweb.com.br/apartamentos-venda-parque-campolim-sorocaba.html
       return `https://www.imovelweb.com.br/${typeSlug}-${purposeSlug}-${neighborhood}-${city}.html`;
 
     default:
@@ -175,7 +165,6 @@ function buildPortalNativeUrl(property: PropertyData, portal: PortalInfo): strin
   }
 }
 
-// Detect multi-listing pages (condominium, search results, etc.)
 function isMultiListingUrl(url: string): boolean {
   const patterns = [
     /\/condominio\//i,
@@ -187,14 +176,12 @@ function isMultiListingUrl(url: string): boolean {
   return patterns.some(p => p.test(url));
 }
 
-// Check if markdown content looks like multiple listings
 function looksLikeMultiListing(markdown: string): boolean {
   const priceMatches = markdown.match(/R\$\s*[\d.,]+/g) || [];
   const areaMatches = markdown.match(/\d+\s*m²/g) || [];
   return priceMatches.length >= 3 && areaMatches.length >= 3 && markdown.length > 2000;
 }
 
-// Extract individual listing URLs from a list of links for a given portal
 function extractIndividualListingUrls(links: string[], portalCode: string): string[] {
   const listingPatterns: Record<string, RegExp> = {
     zap: /zapimoveis\.com\.br\/imovel\//,
@@ -208,8 +195,6 @@ function extractIndividualListingUrls(links: string[], portalCode: string): stri
   return [...new Set(links.filter(l => pattern.test(l)))];
 }
 
-// Generate pagination URLs from a multi-listing URL
-// e.g. ?pagina=2 → also fetch pagina=1, pagina=3 (up to MAX_PAGES)
 function generatePaginationUrls(url: string, maxPages = 5): string[] {
   const urls: string[] = [];
   const paginaMatch = url.match(/([?&])pagina=(\d+)/i);
@@ -230,24 +215,18 @@ function generatePaginationUrls(url: string, maxPages = 5): string[] {
       urls.push(url.replace(/([?&])page=\d+/i, `$1page=${p}`));
     }
   } else if (/\/condominio\//i.test(url) || /\/busca\//i.test(url)) {
-    // No pagination param yet — add pagina=1..maxPages
     const separator = url.includes("?") ? "&" : "?";
     for (let p = 1; p <= Math.min(maxPages, 3); p++) {
       urls.push(`${url}${separator}pagina=${p}`);
     }
   }
 
-  // Deduplicate and exclude the original URL
   const normalized = url.replace(/\/$/, "").toLowerCase();
   return [...new Set(urls)]
     .filter(u => u.replace(/\/$/, "").toLowerCase() !== normalized);
 }
 
-// Deduplicate by address+area+price similarity
-function isDuplicate(
-  comp: any,
-  existing: any[]
-): boolean {
+function isDuplicate(comp: any, existing: any[]): boolean {
   for (const e of existing) {
     const samePrice = e.price && comp.price && Math.abs(e.price - comp.price) / Math.max(e.price, 1) < 0.03;
     const sameArea = e.area && comp.area && Math.abs(e.area - comp.area) / Math.max(e.area, 1) < 0.05;
@@ -256,33 +235,60 @@ function isDuplicate(
   return false;
 }
 
-serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+// ============================================================
+// City pre-filter: discard URLs that clearly belong to wrong city
+// ============================================================
+function isWrongCityUrl(url: string, targetCity: string | undefined): boolean {
+  if (!targetCity) return false;
+  const targetSlug = slugify(targetCity);
+  if (!targetSlug) return false;
+
+  // Known city slugs that appear in portal URLs
+  const cityPatterns = [
+    /vivareal\.com\.br\/imovel\/[^/]*-([a-z-]+)-\w{2}-id/i,
+    /zapimoveis\.com\.br\/imovel\/[^/]*-([a-z-]+)-\w{2}-id/i,
+  ];
+
+  // Simpler: check if URL contains a different major city name
+  const majorCities = [
+    "rio-de-janeiro", "sao-paulo", "belo-horizonte", "curitiba", "porto-alegre",
+    "salvador", "brasilia", "fortaleza", "recife", "manaus", "goiania",
+    "campinas", "santos", "guarulhos", "niteroi",
+  ];
+
+  const urlLower = url.toLowerCase();
+  for (const city of majorCities) {
+    if (city === targetSlug) continue; // same city, OK
+    if (urlLower.includes(`/${city}/`) || urlLower.includes(`-${city}-`)) {
+      return true;
+    }
   }
+  return false;
+}
+
+// ============================================================
+// Main processing logic (runs in background)
+// ============================================================
+async function processMarketAnalysis(
+  property: PropertyData,
+  portals: PortalInfo[],
+  filters: Filters,
+  marketStudyId: string | null,
+  FIRECRAWL_API_KEY: string,
+  LOVABLE_API_KEY: string,
+) {
+  // Create Supabase admin client for status updates
+  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+  const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+  const updateStudyStatus = async (status: string) => {
+    if (!marketStudyId) return;
+    await supabase.from("market_studies").update({ status }).eq("id", marketStudyId).throwOnError();
+  };
 
   try {
-    const { property, portals, filters } = (await req.json()) as {
-      property: PropertyData;
-      portals: PortalInfo[];
-      filters: Filters;
-    };
-
-    const FIRECRAWL_API_KEY = Deno.env.get("FIRECRAWL_API_KEY");
-    if (!FIRECRAWL_API_KEY) {
-      return new Response(
-        JSON.stringify({ success: false, error: "FIRECRAWL_API_KEY not configured" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) {
-      return new Response(
-        JSON.stringify({ success: false, error: "LOVABLE_API_KEY not configured" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
+    if (marketStudyId) await updateStudyStatus("processing");
 
     const searchablePortals = portals.filter((p) => PORTAL_SITE_MAP[p.code] || p.code === "olx");
     const portalResults: PortalResult[] = [];
@@ -291,29 +297,20 @@ serve(async (req) => {
 
     if (searchablePortals.length === 0) {
       limitations.push("Nenhum portal com mapeamento de busca configurado");
-      return new Response(
-        JSON.stringify({
-          success: true,
-          comparables: [],
-          research_metadata: {
-            portals_checked: portalResults,
-            total_listings_found: 0,
-            listings_opened: 0,
-            listings_discarded: 0,
-            discard_reasons: discardReasons,
-            filters_used: filters,
-            collected_at: new Date().toISOString(),
-            limitations,
-          },
-          pricing_analysis: null,
-        }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      if (marketStudyId) await updateStudyStatus("completed");
+      return {
+        success: true, comparables: [],
+        research_metadata: {
+          portals_checked: portalResults, total_listings_found: 0,
+          listings_opened: 0, listings_discarded: 0,
+          discard_reasons: discardReasons, filters_used: filters,
+          collected_at: new Date().toISOString(), limitations,
+        },
+        pricing_analysis: null,
+      };
     }
 
-    // Usar todos os portais configurados — sem limite
     const limitedPortals = searchablePortals;
-
     const maxResults = Math.min(Number(filters.maxComparables) || 15, 20);
     const resultsPerPortal = Math.max(5, Math.min(Math.ceil((maxResults * 2) / limitedPortals.length), 10));
 
@@ -359,7 +356,6 @@ serve(async (req) => {
         const links: string[] = scrapeData.data?.links || scrapeData.links || [];
         const markdown: string = scrapeData.data?.markdown || scrapeData.markdown || "";
 
-        // Filter links that look like individual property listings
         const listingPatterns: Record<string, RegExp> = {
           zap: /zapimoveis\.com\.br\/imovel\//,
           vivareal: /vivareal\.com\.br\/imovel\//,
@@ -381,7 +377,6 @@ serve(async (req) => {
           };
         }
 
-        // Fallback: use AI to extract URLs from markdown
         if (markdown.length > 200) {
           console.log(`[FASE 1A] ${portal.name}: usando markdown (${markdown.length} chars) para extrair URLs via IA...`);
           try {
@@ -426,6 +421,8 @@ serve(async (req) => {
                   limitation: null,
                 };
               }
+            } else {
+              await extractRes.text();
             }
           } catch (aiErr) {
             console.warn(`[FASE 1A] ${portal.name}: AI extraction failed`, aiErr);
@@ -450,7 +447,7 @@ serve(async (req) => {
     console.log(`[FASE 1A] Total: ${nativeUrls.length} URLs de scrape nativo`);
 
     // ==========================================
-    // FASE 1B: Busca via Google (Firecrawl Search) — em paralelo
+    // FASE 1B: Busca via Google (Firecrawl Search)
     // ==========================================
     console.log(`[FASE 1B] Buscando em ${limitedPortals.length} portais via Google...`);
     
@@ -519,48 +516,57 @@ serve(async (req) => {
       }
     }
 
-    // Merge native + Google URLs, deduplicating by URL
+    // Merge native + Google URLs, dedup, and CITY PRE-FILTER
     const seenUrls = new Set<string>();
     const mergedUrls: Array<{ url: string; title: string; portal: PortalInfo; snippet: string }> = [];
+    let cityFilteredCount = 0;
     for (const item of [...nativeUrls, ...googleUrls]) {
       const normalized = item.url.replace(/\/$/, "").toLowerCase();
-      if (!seenUrls.has(normalized)) {
-        seenUrls.add(normalized);
-        mergedUrls.push(item);
+      if (seenUrls.has(normalized)) continue;
+      seenUrls.add(normalized);
+
+      // City pre-filter: discard URLs from obviously wrong cities
+      if (isWrongCityUrl(item.url, property.city)) {
+        cityFilteredCount++;
+        discardReasons.push({
+          url: item.url,
+          portal: item.portal.name,
+          reason: "URL pertence a outra cidade (pré-filtro)",
+        });
+        continue;
       }
+
+      mergedUrls.push(item);
+    }
+
+    if (cityFilteredCount > 0) {
+      console.log(`[FASE 1] Pré-filtro de cidade removeu ${cityFilteredCount} URLs de cidades erradas`);
     }
 
     console.log(`[FASE 1] Total merged: ${mergedUrls.length} URLs únicas (${nativeUrls.length} nativo + ${googleUrls.length} Google)`);
 
-    // Update portal results with native counts
     for (const pr of portalResults) {
       const nativeCount = nativeUrls.filter(u => u.portal.code === pr.portal_code).length;
       pr.urls_found += nativeCount;
     }
 
     if (mergedUrls.length === 0) {
-      return new Response(
-        JSON.stringify({
-          success: true,
-          comparables: [],
-          research_metadata: {
-            portals_checked: portalResults,
-            total_listings_found: 0,
-            listings_opened: 0,
-            listings_discarded: 0,
-            discard_reasons: discardReasons,
-            filters_used: filters,
-            collected_at: new Date().toISOString(),
-            limitations: [...limitations, "Nenhum resultado encontrado nos portais"],
-          },
-          pricing_analysis: null,
-        }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      if (marketStudyId) await updateStudyStatus("completed");
+      return {
+        success: true, comparables: [],
+        research_metadata: {
+          portals_checked: portalResults, total_listings_found: 0,
+          listings_opened: 0, listings_discarded: discardReasons.length,
+          discard_reasons: discardReasons, filters_used: filters,
+          collected_at: new Date().toISOString(),
+          limitations: [...limitations, "Nenhum resultado encontrado nos portais"],
+        },
+        pricing_analysis: null,
+      };
     }
 
     // ==========================================
-    // FASE 2: Validação individual (Firecrawl Scrape + AI extraction)
+    // FASE 2: Validação individual
     // ==========================================
     console.log(`[FASE 2] Abrindo ${mergedUrls.length} URLs individualmente...`);
 
@@ -575,11 +581,11 @@ serve(async (req) => {
       portal: PortalInfo;
       markdown: string;
       status: "ok" | "failed";
+      isMultiListing?: boolean;
+      isCondoTarget?: boolean;
     }> = [];
 
     let listingsOpened = 0;
-
-    // Track URLs already seen to avoid re-scraping expanded URLs
     const scrapedUrlSet = new Set<string>();
 
     for (const item of urlsToProcess) {
@@ -588,11 +594,9 @@ serve(async (req) => {
         console.log(`[FASE 2] Scraping${isMultiListing ? " (multi-listing)" : ""}: ${item.url.substring(0, 80)}...`);
         listingsOpened++;
 
-        // Update portal stats
         const pr = portalResults.find(p => p.portal_code === item.portal.code);
         if (pr) pr.urls_opened++;
 
-        // For multi-listing pages, also request links to extract individual URLs
         const formats = isMultiListing ? ["markdown", "links"] : ["markdown"];
 
         const scrapeRes = await fetch("https://api.firecrawl.dev/v1/scrape", {
@@ -634,7 +638,6 @@ serve(async (req) => {
           continue;
         }
 
-        // Check for expired/unavailable markers
         const lowerMd = markdown.toLowerCase();
         if (
           lowerMd.includes("anúncio indisponível") ||
@@ -651,12 +654,10 @@ serve(async (req) => {
           continue;
         }
 
-        // Multi-listing handling: try to expand into individual URLs
+        // Multi-listing handling
         if (!isIndividualListingUrl(item.url) && (isMultiListing || looksLikeMultiListing(markdown))) {
-          // Collect individual URLs from this page
           let allIndividualUrls = extractIndividualListingUrls(links, item.portal.code);
           
-          // Auto-pagination: scrape adjacent pages to find more listings
           const paginationUrls = generatePaginationUrls(item.url, 4);
           if (paginationUrls.length > 0) {
             console.log(`[FASE 2] Paginação automática: ${paginationUrls.length} páginas adjacentes para ${item.url.substring(0, 60)}...`);
@@ -694,7 +695,6 @@ serve(async (req) => {
                 const pageListingUrls = extractIndividualListingUrls(pageLinks, item.portal.code);
                 console.log(`[FASE 2] Página ${pageUrl.match(/pagina=(\d+)/)?.[1] || '?'}: ${pageListingUrls.length} anúncios individuais`);
                 
-                // If no individual URLs but has content, save as multi-listing for AI
                 if (pageListingUrls.length === 0 && pageMd.length > 500 && looksLikeMultiListing(pageMd)) {
                   scrapedPages.push({
                     url: pageUrl,
@@ -702,7 +702,7 @@ serve(async (req) => {
                     markdown: pageMd.substring(0, 12000),
                     status: "ok",
                     isMultiListing: true,
-                  } as any);
+                  });
                 }
                 
                 return pageListingUrls;
@@ -721,7 +721,6 @@ serve(async (req) => {
           }
           
           if (allIndividualUrls.length > 0) {
-            // Found individual listing URLs — scrape each one
             const MAX_EXPANDED = 20;
             const newUrls = allIndividualUrls
               .filter(u => !scrapedUrlSet.has(u.replace(/\/$/, "").toLowerCase()))
@@ -729,10 +728,19 @@ serve(async (req) => {
             
             console.log(`[FASE 2] Multi-listing expandido: ${allIndividualUrls.length} URLs totais (com paginação), ${newUrls.length} novas para scrape`);
             
+            // Check if this is a condominium-target URL
+            const isCondoUrl = property.condominium && item.url.toLowerCase().includes(slugify(property.condominium));
+            
             for (const expandedUrl of newUrls) {
               const normalized = expandedUrl.replace(/\/$/, "").toLowerCase();
               if (scrapedUrlSet.has(normalized)) continue;
               scrapedUrlSet.add(normalized);
+              
+              // City pre-filter on expanded URLs too
+              if (isWrongCityUrl(expandedUrl, property.city)) {
+                discardReasons.push({ url: expandedUrl, portal: item.portal.name, reason: "URL pertence a outra cidade" });
+                continue;
+              }
               
               try {
                 listingsOpened++;
@@ -766,6 +774,7 @@ serve(async (req) => {
                     portal: item.portal,
                     markdown: expandedMd.substring(0, 4000),
                     status: "ok",
+                    isCondoTarget: !!isCondoUrl,
                   });
                 }
               } catch (expandErr) {
@@ -776,15 +785,14 @@ serve(async (req) => {
             continue;
           }
           
-          // No individual URLs found — treat the whole page as multi-listing for AI extraction
           console.log(`[FASE 2] Multi-listing sem URLs individuais — enviando para IA como listagem múltipla`);
           scrapedPages.push({
             url: item.url,
             portal: item.portal,
-            markdown: markdown.substring(0, 12000), // More content for multi-listing
+            markdown: markdown.substring(0, 12000),
             status: "ok",
             isMultiListing: true,
-          } as any);
+          });
           continue;
         }
 
@@ -808,42 +816,47 @@ serve(async (req) => {
     console.log(`[FASE 2] ${scrapedPages.length} páginas válidas de ${listingsOpened} abertas`);
 
     if (scrapedPages.length === 0) {
-      return new Response(
-        JSON.stringify({
-          success: true,
-          comparables: [],
-          research_metadata: {
-            portals_checked: portalResults,
-            total_listings_found: mergedUrls.length,
-            listings_opened: listingsOpened,
-            listings_discarded: discardReasons.length,
-            discard_reasons: discardReasons,
-            filters_used: filters,
-            collected_at: new Date().toISOString(),
-            limitations: [...limitations, "Nenhuma página válida após validação individual"],
-          },
-          pricing_analysis: null,
-        }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      if (marketStudyId) await updateStudyStatus("completed");
+      return {
+        success: true, comparables: [],
+        research_metadata: {
+          portals_checked: portalResults, total_listings_found: mergedUrls.length,
+          listings_opened: listingsOpened, listings_discarded: discardReasons.length,
+          discard_reasons: discardReasons, filters_used: filters,
+          collected_at: new Date().toISOString(),
+          limitations: [...limitations, "Nenhuma página válida após validação individual"],
+        },
+        pricing_analysis: null,
+      };
     }
 
     // ==========================================
-    // FASE 3: Scoring e análise (Lovable AI)
+    // FASE 3: AI extraction — CAP at 20 pages, prioritize condo targets
     // ==========================================
-    console.log(`[FASE 3] Extraindo dados de ${scrapedPages.length} páginas com IA...`);
+    const MAX_AI_PAGES = 20;
+    let pagesToAI = scrapedPages;
+    if (scrapedPages.length > MAX_AI_PAGES) {
+      // Prioritize: condo-target pages first, then individual listings, then multi-listing generic
+      pagesToAI = [
+        ...scrapedPages.filter(p => p.isCondoTarget),
+        ...scrapedPages.filter(p => !p.isCondoTarget && !p.isMultiListing),
+        ...scrapedPages.filter(p => !p.isCondoTarget && p.isMultiListing),
+      ].slice(0, MAX_AI_PAGES);
+      limitations.push(`Limitado a ${MAX_AI_PAGES} de ${scrapedPages.length} páginas para extração por IA`);
+      console.log(`[FASE 3] Limitando de ${scrapedPages.length} para ${pagesToAI.length} páginas (prioridade: condomínio > individual > multi-listing)`);
+    }
 
-    const hasMultiListingPages = scrapedPages.some((p: any) => p.isMultiListing);
+    console.log(`[FASE 3] Extraindo dados de ${pagesToAI.length} páginas com IA...`);
 
-    const combinedContent = scrapedPages
-      .map(
-        (p: any, i: number) => {
-          const label = p.isMultiListing
-            ? `--- LISTAGEM MÚLTIPLA ${i + 1} (Portal: ${p.portal.name}, URL: ${p.url}) ---`
-            : `--- Anúncio ${i + 1} (Portal: ${p.portal.name}, URL: ${p.url}) ---`;
-          return `${label}\n${p.markdown}`;
-        }
-      )
+    const hasMultiListingPages = pagesToAI.some((p) => p.isMultiListing);
+
+    const combinedContent = pagesToAI
+      .map((p, i) => {
+        const label = p.isMultiListing
+          ? `--- LISTAGEM MÚLTIPLA ${i + 1} (Portal: ${p.portal.name}, URL: ${p.url}) ---`
+          : `--- Anúncio ${i + 1} (Portal: ${p.portal.name}, URL: ${p.url}) ---`;
+        return `${label}\n${p.markdown}`;
+      })
       .join("\n\n");
 
     const multiListingInstructions = hasMultiListingPages
@@ -864,11 +877,6 @@ REGRAS CRÍTICAS:
 - Áreas "120 m²" → número 120.
 - Inclua o URL EXATO do anúncio no campo source_url.
 - Inclua o nome do portal no campo source_name.
-- Se um dado não está claro, use null/0.
-- Preços no formato "R$ 1.200.000" → converta para número 1200000.
-- Áreas "120 m²" → número 120.
-- Inclua o URL EXATO do anúncio no campo source_url.
-- Inclua o nome do portal no campo source_name.
 
 IMÓVEL DE REFERÊNCIA:
 - Tipo: ${property.property_type || "Não informado"}
@@ -883,13 +891,10 @@ IMÓVEL DE REFERÊNCIA:
 - Preço esperado: ${property.owner_expected_price ? "R$ " + Number(property.owner_expected_price).toLocaleString("pt-BR") : "Não informado"}
 
 IMPORTANTE - DIFERENCIAIS:
-Extraia com atenção TODOS os diferenciais e comodidades do imóvel e do condomínio. Exemplos:
-Piscina, Academia, Churrasqueira, Sauna, Salão de Festas, Playground, Portaria 24h, Elevador, 
-Varanda/Sacada, Área Gourmet, Mobiliado, Planejados, Vista Privilegiada, Energia Solar, Automação,
-Quadra, Brinquedoteca, Jardim, Lavabo, Closet, Ar Condicionado, Lareira, Coworking, Pet Place, Spa.
+Extraia com atenção TODOS os diferenciais e comodidades do imóvel e do condomínio.
 Inclua no campo "differentials" como array de strings. Se não houver diferenciais mencionados, retorne array vazio.
 
-IMPORTANTE: Extraia também a data do anúncio (listing_date) quando disponível. Procure por textos como "Anúncio criado em", "Publicado em", "Atualizado em", "Atualizado há X dias/meses", datas no formato DD/MM/YYYY ou similar. Se encontrar "Atualizado há 3 meses", calcule a data aproximada. Retorne no formato YYYY-MM-DD.
+IMPORTANTE: Extraia também a data do anúncio (listing_date) quando disponível. Retorne no formato YYYY-MM-DD.
 
 Extraia todos os imóveis relevantes. Descarte apenas se claramente incompatível (tipo diferente, cidade diferente).`;
 
@@ -919,32 +924,30 @@ Extraia todos os imóveis relevantes. Descarte apenas se claramente incompatíve
                     items: {
                       type: "object",
                       properties: {
-                        title: { type: "string", description: "Título do anúncio" },
-                        price: { type: "number", description: "Preço em reais (número inteiro)" },
-                        area: { type: "number", description: "Área em m²" },
-                        bedrooms: { type: "number", description: "Quartos" },
-                        suites: { type: "number", description: "Suítes" },
-                        parking_spots: { type: "number", description: "Vagas" },
-                        address: { type: "string", description: "Endereço" },
-                        neighborhood: { type: "string", description: "Bairro" },
-                        city: { type: "string", description: "Cidade" },
-                        condominium: { type: "string", description: "Nome do condomínio" },
-                        construction_standard: { type: "string", description: "Padrão construtivo" },
-                        property_type: { type: "string", description: "Tipo do imóvel" },
-                        source_url: { type: "string", description: "URL exata do anúncio" },
-                        source_name: { type: "string", description: "Nome do portal" },
-                        advertiser: { type: "string", description: "Imobiliária ou anunciante" },
-                        differentials: { type: "array", items: { type: "string" }, description: "Diferenciais do imóvel" },
-                        description_summary: { type: "string", description: "Resumo curto da descrição" },
-                        listing_date: { type: "string", description: "Data do anúncio no formato YYYY-MM-DD, se disponível" },
+                        title: { type: "string" },
+                        price: { type: "number" },
+                        area: { type: "number" },
+                        bedrooms: { type: "number" },
+                        suites: { type: "number" },
+                        parking_spots: { type: "number" },
+                        address: { type: "string" },
+                        neighborhood: { type: "string" },
+                        city: { type: "string" },
+                        condominium: { type: "string" },
+                        construction_standard: { type: "string" },
+                        property_type: { type: "string" },
+                        source_url: { type: "string" },
+                        source_name: { type: "string" },
+                        advertiser: { type: "string" },
+                        differentials: { type: "array", items: { type: "string" } },
+                        description_summary: { type: "string" },
+                        listing_date: { type: "string" },
                       },
                       required: ["title", "price", "area", "source_url", "source_name"],
-                      additionalProperties: false,
                     },
                   },
                 },
                 required: ["comparables"],
-                additionalProperties: false,
               },
             },
           },
@@ -956,38 +959,29 @@ Extraia todos os imóveis relevantes. Descarte apenas se claramente incompatíve
     if (!aiRes.ok) {
       const aiErr = await aiRes.text();
       console.error(`[FASE 3] AI error: ${aiRes.status} ${aiErr}`);
-      const status = aiRes.status;
-      return new Response(
-        JSON.stringify({
-          success: false,
-          error: status === 429 ? "Rate limit exceeded" : status === 402 ? "AI credits exhausted" : "AI extraction failed",
-        }),
-        { status: status === 429 || status === 402 ? status : 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      if (marketStudyId) await updateStudyStatus("failed");
+      return {
+        success: false,
+        error: aiRes.status === 429 ? "Rate limit exceeded" : aiRes.status === 402 ? "AI credits exhausted" : "AI extraction failed",
+      };
     }
 
     const aiData = await aiRes.json();
     const toolCall = aiData.choices?.[0]?.message?.tool_calls?.[0];
     if (!toolCall) {
       console.error("[FASE 3] No tool call in AI response");
-      return new Response(
-        JSON.stringify({
-          success: true,
-          comparables: [],
-          research_metadata: {
-            portals_checked: portalResults,
-            total_listings_found: mergedUrls.length,
-            listings_opened: listingsOpened,
-            listings_discarded: discardReasons.length,
-            discard_reasons: discardReasons,
-            filters_used: filters,
-            collected_at: new Date().toISOString(),
-            limitations: [...limitations, "IA não conseguiu extrair dados estruturados"],
-          },
-          pricing_analysis: null,
-        }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      if (marketStudyId) await updateStudyStatus("completed");
+      return {
+        success: true, comparables: [],
+        research_metadata: {
+          portals_checked: portalResults, total_listings_found: mergedUrls.length,
+          listings_opened: listingsOpened, listings_discarded: discardReasons.length,
+          discard_reasons: discardReasons, filters_used: filters,
+          collected_at: new Date().toISOString(),
+          limitations: [...limitations, "IA não conseguiu extrair dados estruturados"],
+        },
+        pricing_analysis: null,
+      };
     }
 
     let extracted: { comparables: any[] };
@@ -996,23 +990,24 @@ Extraia todos os imóveis relevantes. Descarte apenas se claramente incompatíve
       console.log(`[FASE 3] AI extraiu ${extracted.comparables?.length || 0} comparáveis`);
     } catch {
       console.error("[FASE 3] Failed to parse AI response");
-      return new Response(
-        JSON.stringify({ success: true, comparables: [], research_metadata: {
+      if (marketStudyId) await updateStudyStatus("completed");
+      return {
+        success: true, comparables: [],
+        research_metadata: {
           portals_checked: portalResults, total_listings_found: mergedUrls.length,
           listings_opened: listingsOpened, listings_discarded: discardReasons.length,
           discard_reasons: discardReasons, filters_used: filters,
           collected_at: new Date().toISOString(), limitations: [...limitations, "Erro ao processar resposta da IA"],
-        }, pricing_analysis: null }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+        },
+        pricing_analysis: null,
+      };
     }
 
-    // Filter valid, compute similarity, deduplicate
+    // Filter, score, deduplicate
     const baseArea = Number(property.area_total || property.area_built || property.area_land) || 100;
     const baseBedrooms = Number(property.bedrooms) || 3;
     const baseSuites = Number(property.suites) || 0;
     const baseParking = Number(property.parking_spots) || 0;
-    const basePriceSqm = property.owner_expected_price ? Number(property.owner_expected_price) / baseArea : 0;
 
     const validComparables: any[] = [];
 
@@ -1023,34 +1018,21 @@ Extraia todos os imóveis relevantes. Descarte apenas se claramente incompatíve
 
     for (const c of (extracted.comparables || [])) {
       if (!c.price || c.price <= 0 || !c.area || c.area <= 0) {
-        discardReasons.push({
-          url: c.source_url || "unknown",
-          portal: c.source_name || "unknown",
-          reason: "Preço ou área não disponível",
-        });
+        discardReasons.push({ url: c.source_url || "unknown", portal: c.source_name || "unknown", reason: "Preço ou área não disponível" });
         continue;
       }
 
-      // Filter by listing age
       if (cutoffDate && c.listing_date) {
         const listingDate = new Date(c.listing_date);
         if (!isNaN(listingDate.getTime()) && listingDate < cutoffDate) {
           const ageMonths = Math.round((Date.now() - listingDate.getTime()) / (30 * 24 * 60 * 60 * 1000));
-          discardReasons.push({
-            url: c.source_url || "unknown",
-            portal: c.source_name || "unknown",
-            reason: `Anúncio muito antigo (criado há ${ageMonths} meses)`,
-          });
+          discardReasons.push({ url: c.source_url || "unknown", portal: c.source_name || "unknown", reason: `Anúncio muito antigo (criado há ${ageMonths} meses)` });
           continue;
         }
       }
 
       if (isDuplicate(c, validComparables)) {
-        discardReasons.push({
-          url: c.source_url || "unknown",
-          portal: c.source_name || "unknown",
-          reason: "Duplicata (mesmo imóvel em outro portal)",
-        });
+        discardReasons.push({ url: c.source_url || "unknown", portal: c.source_name || "unknown", reason: "Duplicata (mesmo imóvel em outro portal)" });
         continue;
       }
 
@@ -1058,7 +1040,6 @@ Extraia todos os imóveis relevantes. Descarte apenas se claramente incompatíve
       const isSameCondo = property.condominium && c.condominium &&
         c.condominium.toLowerCase().includes(property.condominium.toLowerCase());
 
-      // Similarity scoring
       let score = 0;
       if (isSameCondo) score += 25;
       if (c.neighborhood && property.neighborhood &&
@@ -1066,14 +1047,12 @@ Extraia todos os imóveis relevantes. Descarte apenas se claramente incompatíve
       if (c.property_type && property.property_type &&
         c.property_type.toLowerCase().includes(property.property_type.toLowerCase())) score += 15;
       
-      // Area score
       const areaDiff = Math.abs(c.area - baseArea) / baseArea;
       if (areaDiff <= 0.05) score += 15;
       else if (areaDiff <= 0.10) score += 12;
       else if (areaDiff <= 0.20) score += 8;
       else if (areaDiff <= 0.30) score += 3;
 
-      // Rooms score
       const bedroomDiff = Math.abs((c.bedrooms || 0) - baseBedrooms);
       const suiteDiff = Math.abs((c.suites || 0) - baseSuites);
       const parkingDiff = Math.abs((c.parking_spots || 0) - baseParking);
@@ -1083,11 +1062,9 @@ Extraia todos os imóveis relevantes. Descarte apenas se claramente incompatíve
       else if (avgDiff <= 1) score += 6;
       else if (avgDiff <= 2) score += 2;
 
-      // Standard
       if (c.construction_standard && property.property_standard &&
         c.construction_standard.toLowerCase().includes(property.property_standard.toLowerCase())) score += 10;
 
-      // Differentials overlap
       const subjectDiffs: string[] = (property as any).differentials || [];
       const compDiffs: string[] = c.differentials || [];
       if (subjectDiffs.length > 0 && compDiffs.length > 0) {
@@ -1099,55 +1076,35 @@ Extraia todos os imóveis relevantes. Descarte apenas se claramente incompatíve
         else if (ratio >= 0.25) score += 3;
       }
 
-      // City match + profile bonus
       if (c.city && property.city &&
         c.city.toLowerCase().includes(property.city.toLowerCase()) && score >= 30) score += 5;
 
       const similarity = Math.min(100, Math.round(score));
 
-      // Minimum similarity filter — lower threshold when focusing on same condominium
       const minSimilarity = (filters?.preferSameCondominium && property.condominium) ? 25 : 40;
       if (similarity < minSimilarity) {
-        discardReasons.push({
-          url: c.source_url || "unknown",
-          portal: c.source_name || "unknown",
-          reason: `Similaridade muito baixa (${similarity}/100)`,
-        });
+        discardReasons.push({ url: c.source_url || "unknown", portal: c.source_name || "unknown", reason: `Similaridade muito baixa (${similarity}/100)` });
         continue;
       }
 
-      // Update portal valid count
-      const pr = portalResults.find(p => p.portal_name === c.source_name || p.portal_code === c.source_name?.toLowerCase());
-      if (pr) pr.urls_valid++;
+      const pr2 = portalResults.find(p => p.portal_name === c.source_name || p.portal_code === c.source_name?.toLowerCase());
+      if (pr2) pr2.urls_valid++;
 
       validComparables.push({
-        title: c.title,
-        price: c.price,
-        area: c.area,
-        price_per_sqm: priceSqm,
-        bedrooms: c.bedrooms || 0,
-        suites: c.suites || 0,
-        parking_spots: c.parking_spots || 0,
-        address: c.address || "",
-        neighborhood: c.neighborhood || "",
-        city: c.city || property.city || "",
-        condominium: c.condominium || "",
-        construction_standard: c.construction_standard || "",
-        property_type: c.property_type || "",
-        source_url: c.source_url || "",
-        source_name: c.source_name || "",
-        similarity_score: similarity,
-        is_approved: true,
+        title: c.title, price: c.price, area: c.area, price_per_sqm: priceSqm,
+        bedrooms: c.bedrooms || 0, suites: c.suites || 0, parking_spots: c.parking_spots || 0,
+        address: c.address || "", neighborhood: c.neighborhood || "",
+        city: c.city || property.city || "", condominium: c.condominium || "",
+        construction_standard: c.construction_standard || "", property_type: c.property_type || "",
+        source_url: c.source_url || "", source_name: c.source_name || "",
+        similarity_score: similarity, is_approved: true,
         raw_data: {
-          advertiser: c.advertiser || null,
-          differentials: c.differentials || [],
-          description_summary: c.description_summary || "",
-          validated_individually: true,
+          advertiser: c.advertiser || null, differentials: c.differentials || [],
+          description_summary: c.description_summary || "", validated_individually: true,
         },
       });
     }
 
-    // Sort by similarity and limit
     validComparables.sort((a, b) => b.similarity_score - a.similarity_score);
     const finalComparables = validComparables.slice(0, maxResults);
 
@@ -1156,32 +1113,24 @@ Extraia todos os imóveis relevantes. Descarte apenas se claramente incompatíve
     // Pricing analysis
     let pricingAnalysis = null;
     if (finalComparables.length > 0) {
-      const prices = finalComparables.map(c => c.price);
-      const pricesSqm = finalComparables.map(c => c.price_per_sqm);
-      const sorted = [...prices].sort((a, b) => a - b);
-      const avg = Math.round(prices.reduce((a, b) => a + b, 0) / prices.length);
+      const prices = finalComparables.map((c: any) => c.price);
+      const pricesSqm = finalComparables.map((c: any) => c.price_per_sqm);
+      const sorted = [...prices].sort((a: number, b: number) => a - b);
+      const avg = Math.round(prices.reduce((a: number, b: number) => a + b, 0) / prices.length);
       const median = sorted.length % 2 === 0
         ? Math.round((sorted[sorted.length / 2 - 1] + sorted[sorted.length / 2]) / 2)
         : sorted[Math.floor(sorted.length / 2)];
-      const avgSqm = Math.round(pricesSqm.reduce((a, b) => a + b, 0) / pricesSqm.length);
+      const avgSqm = Math.round(pricesSqm.reduce((a: number, b: number) => a + b, 0) / pricesSqm.length);
       
-      const suggestedMarket = Math.round(median * 1.0);
-      const suggestedAd = Math.round(median * 1.10);
-      const suggestedFast = Math.round(median * 0.90);
-
       pricingAnalysis = {
-        avg_price: avg,
-        median_price: median,
-        avg_price_per_sqm: avgSqm,
-        price_range_min: sorted[0],
-        price_range_max: sorted[sorted.length - 1],
-        suggested_ad_price: suggestedAd,
-        suggested_market_price: suggestedMarket,
-        suggested_fast_sale_price: suggestedFast,
+        avg_price: avg, median_price: median, avg_price_per_sqm: avgSqm,
+        price_range_min: sorted[0], price_range_max: sorted[sorted.length - 1],
+        suggested_ad_price: Math.round(median * 1.10),
+        suggested_market_price: Math.round(median * 1.0),
+        suggested_fast_sale_price: Math.round(median * 0.90),
       };
     }
 
-    // Build research metadata
     const researchMetadata = {
       portals_checked: portalResults,
       total_listings_found: mergedUrls.length,
@@ -1195,14 +1144,98 @@ Extraia todos os imóveis relevantes. Descarte apenas se claramente incompatíve
 
     console.log(`[RESULTADO] ${finalComparables.length} comparáveis, ${listingsOpened} links abertos, ${discardReasons.length} descartados`);
 
+    if (marketStudyId) await updateStudyStatus("completed");
+
+    return {
+      success: true,
+      comparables: finalComparables,
+      research_metadata: researchMetadata,
+      pricing_analysis: pricingAnalysis,
+    };
+  } catch (err) {
+    console.error("processMarketAnalysis error:", err);
+    // Always update status to failed so it doesn't stay stuck in "processing"
+    try {
+      if (marketStudyId) {
+        const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+        const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+        const sb = createClient(supabaseUrl, supabaseServiceKey);
+        await sb.from("market_studies").update({ status: "failed" }).eq("id", marketStudyId);
+      }
+    } catch (statusErr) {
+      console.error("Failed to update study status to failed:", statusErr);
+    }
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : "Unknown error",
+    };
+  }
+}
+
+// ============================================================
+// HTTP Handler — returns 202 immediately, processes in background
+// ============================================================
+serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const { property, portals, filters, market_study_id } = (await req.json()) as {
+      property: PropertyData;
+      portals: PortalInfo[];
+      filters: Filters;
+      market_study_id?: string;
+    };
+
+    const FIRECRAWL_API_KEY = Deno.env.get("FIRECRAWL_API_KEY");
+    if (!FIRECRAWL_API_KEY) {
+      return new Response(
+        JSON.stringify({ success: false, error: "FIRECRAWL_API_KEY not configured" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    if (!LOVABLE_API_KEY) {
+      return new Response(
+        JSON.stringify({ success: false, error: "LOVABLE_API_KEY not configured" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const studyId = market_study_id || null;
+
+    // If market_study_id is provided, run in background and return 202 immediately
+    if (studyId) {
+      // Use EdgeRuntime.waitUntil for background processing
+      const backgroundPromise = processMarketAnalysis(
+        property, portals, filters, studyId, FIRECRAWL_API_KEY, LOVABLE_API_KEY
+      );
+
+      // Try EdgeRuntime.waitUntil if available (Supabase Edge Runtime)
+      try {
+        (EdgeRuntime as any).waitUntil(backgroundPromise);
+      } catch {
+        // Fallback: just fire and forget (the promise runs in background anyway in Deno)
+        backgroundPromise.catch(err => console.error("Background processing failed:", err));
+      }
+
+      return new Response(
+        JSON.stringify({ success: true, message: "Processing started in background", market_study_id: studyId }),
+        { status: 202, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // No market_study_id — run synchronously (legacy mode)
+    const result = await processMarketAnalysis(
+      property, portals, filters, null, FIRECRAWL_API_KEY, LOVABLE_API_KEY
+    );
+
+    const statusCode = result.success === false ? 500 : 200;
     return new Response(
-      JSON.stringify({
-        success: true,
-        comparables: finalComparables,
-        research_metadata: researchMetadata,
-        pricing_analysis: pricingAnalysis,
-      }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      JSON.stringify(result),
+      { status: statusCode, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (err) {
     console.error("analyze-market-deep error:", err);
