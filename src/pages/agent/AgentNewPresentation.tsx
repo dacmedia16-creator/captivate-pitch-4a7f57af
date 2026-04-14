@@ -195,6 +195,7 @@ export default function AgentNewPresentation() {
         minComparables: mktData.minComparables, maxComparables: mktData.maxComparables,
         preferSameCondominium: mktData.preferSameCondominium, maxListingAgeMonths: mktData.maxListingAgeMonths,
       },
+      market_study_id: study.id,
     };
 
     let scrapedComparables: any[] = [];
