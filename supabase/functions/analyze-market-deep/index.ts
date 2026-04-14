@@ -624,11 +624,45 @@ async function processMarketAnalysis(
     // ==========================================
     console.log(`[FASE 2] Abrindo ${mergedUrls.length} URLs individualmente...`);
 
-    const maxUrlsToScrape = Math.min(mergedUrls.length, 25);
-    if (mergedUrls.length > maxUrlsToScrape) {
-      limitations.push(`Limitado a ${maxUrlsToScrape} de ${mergedUrls.length} URLs para respeitar timeout`);
+    // Round-robin: garantir diversidade de portais
+    const MAX_URLS = 25;
+    const MIN_PER_PORTAL = 3;
+    const byPortal = new Map<string, typeof mergedUrls>();
+    for (const item of mergedUrls) {
+      const key = item.portal.code;
+      if (!byPortal.has(key)) byPortal.set(key, []);
+      byPortal.get(key)!.push(item);
     }
-    const urlsToProcess = mergedUrls.slice(0, maxUrlsToScrape);
+
+    const selectedUrls = new Set<string>();
+    const urlsToProcess: typeof mergedUrls = [];
+
+    // Round 1: até MIN_PER_PORTAL por portal
+    for (const [_code, items] of byPortal) {
+      for (const item of items.slice(0, MIN_PER_PORTAL)) {
+        if (urlsToProcess.length >= MAX_URLS) break;
+        urlsToProcess.push(item);
+        selectedUrls.add(item.url);
+      }
+    }
+
+    // Round 2: preencher com restantes por relevância (mergedUrls já está ordenado)
+    for (const item of mergedUrls) {
+      if (urlsToProcess.length >= MAX_URLS) break;
+      if (!selectedUrls.has(item.url)) {
+        urlsToProcess.push(item);
+      }
+    }
+
+    if (mergedUrls.length > MAX_URLS) {
+      limitations.push(`Limitado a ${MAX_URLS} de ${mergedUrls.length} URLs para respeitar timeout`);
+    }
+
+    // Log distribuição por portal
+    const distLog = [...byPortal.entries()].map(([c, items]) =>
+      `${c}: ${urlsToProcess.filter(u => u.portal.code === c).length}/${items.length}`
+    ).join(", ");
+    console.log(`[FASE 2] Distribuição por portal: ${distLog}`);
 
     const scrapedPages: Array<{
       url: string;
