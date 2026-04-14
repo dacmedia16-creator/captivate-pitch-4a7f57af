@@ -653,18 +653,29 @@ async function processMarketAnalysis(
 
         const formats = isMultiListing ? ["markdown", "links"] : ["markdown"];
 
+        // Kenlo is a SPA — needs longer wait + scroll actions for JS rendering
+        const isKenlo = /kenlo\.com\.br/i.test(item.url);
+        const scrapeBody: any = {
+          url: item.url,
+          formats,
+          onlyMainContent: true,
+          waitFor: isKenlo ? 10000 : (isMultiListing ? 5000 : 2000),
+        };
+        if (isKenlo) {
+          scrapeBody.actions = [
+            { type: "wait", milliseconds: 8000 },
+            { type: "scroll", direction: "down", amount: 3 },
+            { type: "wait", milliseconds: 2000 },
+          ];
+        }
+
         const scrapeRes = await fetch("https://api.firecrawl.dev/v1/scrape", {
           method: "POST",
           headers: {
             Authorization: `Bearer ${FIRECRAWL_API_KEY}`,
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({
-            url: item.url,
-            formats,
-            onlyMainContent: true,
-            waitFor: isMultiListing ? 5000 : 2000,
-          }),
+          body: JSON.stringify(scrapeBody),
         });
 
         if (!scrapeRes.ok) {
@@ -680,14 +691,40 @@ async function processMarketAnalysis(
         }
 
         const scrapeData = await scrapeRes.json();
-        const markdown = scrapeData.data?.markdown || scrapeData.markdown || "";
+        let markdown = scrapeData.data?.markdown || scrapeData.markdown || "";
         const links: string[] = scrapeData.data?.links || scrapeData.links || [];
+
+        // Diagnostic: log markdown size per portal
+        console.log(`[FASE 2] ${item.portal.name} markdown: ${markdown.length} chars for ${item.url.substring(0, 60)}...`);
+
+        // Google Cache fallback for Kenlo SPA pages with insufficient content
+        if (isKenlo && markdown.length < 500) {
+          console.log(`[FASE 2] Kenlo page too short (${markdown.length} chars), trying Google Cache fallback...`);
+          try {
+            const cacheUrl = `https://webcache.googleusercontent.com/search?q=cache:${encodeURIComponent(item.url)}`;
+            const cacheRes = await fetch("https://api.firecrawl.dev/v1/scrape", {
+              method: "POST",
+              headers: { Authorization: `Bearer ${FIRECRAWL_API_KEY}`, "Content-Type": "application/json" },
+              body: JSON.stringify({ url: cacheUrl, formats: ["markdown"], onlyMainContent: true, waitFor: 3000 }),
+            });
+            if (cacheRes.ok) {
+              const cacheData = await cacheRes.json();
+              const cacheMd = cacheData.data?.markdown || cacheData.markdown || "";
+              if (cacheMd.length > markdown.length) {
+                console.log(`[FASE 2] Google Cache returned ${cacheMd.length} chars (better than ${markdown.length})`);
+                markdown = cacheMd;
+              }
+            }
+          } catch (cacheErr) {
+            console.warn(`[FASE 2] Google Cache fallback failed for ${item.url}`, cacheErr);
+          }
+        }
 
         if (!markdown || markdown.length < 100) {
           discardReasons.push({
             url: item.url,
             portal: item.portal.name,
-            reason: "Conteúdo insuficiente ou página vazia",
+            reason: `Conteúdo insuficiente (${markdown.length} chars)${isKenlo ? ' — SPA não renderizou' : ''}`,
           });
           continue;
         }
@@ -1096,6 +1133,17 @@ Extraia todos os imóveis relevantes. Descarte apenas se claramente incompatíve
         }
         console.log(`[URL FIX] ${url.substring(0, 60)}... → ${c.source_url}`);
       }
+    }
+
+    // === Forced portal attribution by URL domain ===
+    for (const c of (extracted.comparables || [])) {
+      const srcUrl = (c.source_url || "").toLowerCase();
+      if (/kenlo\.com\.br/i.test(srcUrl)) c.source_name = "Kenlo";
+      else if (/vivareal\.com\.br/i.test(srcUrl)) c.source_name = "Viva Real";
+      else if (/zapimoveis\.com\.br/i.test(srcUrl)) c.source_name = "ZAP Imóveis";
+      else if (/imovelweb\.com\.br/i.test(srcUrl)) c.source_name = "Imóvel Web";
+      else if (/olx\.com\.br/i.test(srcUrl)) c.source_name = "OLX";
+      else if (/chavesnamao\.com\.br/i.test(srcUrl)) c.source_name = "Chaves na Mão";
     }
 
     // Filter, score, deduplicate
