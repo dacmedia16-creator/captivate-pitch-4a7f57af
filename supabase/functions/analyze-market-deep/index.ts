@@ -161,6 +161,39 @@ function buildPortalNativeUrl(property: PropertyData, portal: PortalInfo): strin
   }
 }
 
+// Detect multi-listing pages (condominium, search results, etc.)
+function isMultiListingUrl(url: string): boolean {
+  const patterns = [
+    /\/condominio\//i,
+    /\/busca\//i,
+    /\/resultado\//i,
+    /[?&]pagina=/i,
+    /[?&]page=/i,
+  ];
+  return patterns.some(p => p.test(url));
+}
+
+// Check if markdown content looks like multiple listings
+function looksLikeMultiListing(markdown: string): boolean {
+  const priceMatches = markdown.match(/R\$\s*[\d.,]+/g) || [];
+  const areaMatches = markdown.match(/\d+\s*m²/g) || [];
+  return priceMatches.length >= 3 && areaMatches.length >= 3 && markdown.length > 2000;
+}
+
+// Extract individual listing URLs from a list of links for a given portal
+function extractIndividualListingUrls(links: string[], portalCode: string): string[] {
+  const listingPatterns: Record<string, RegExp> = {
+    zap: /zapimoveis\.com\.br\/imovel\//,
+    vivareal: /vivareal\.com\.br\/imovel\//,
+    kenlo: /portal\.kenlo\.com\.br\/imovel\//,
+    olx: /olx\.com\.br\/.*\/imoveis\//,
+    imovelweb: /imovelweb\.com\.br\/propriedades\//,
+  };
+  const pattern = listingPatterns[portalCode];
+  if (!pattern) return [];
+  return [...new Set(links.filter(l => pattern.test(l)))];
+}
+
 // Deduplicate by address+area+price similarity
 function isDuplicate(
   comp: any,
@@ -497,14 +530,21 @@ serve(async (req) => {
 
     let listingsOpened = 0;
 
+    // Track URLs already seen to avoid re-scraping expanded URLs
+    const scrapedUrlSet = new Set<string>();
+
     for (const item of urlsToProcess) {
       try {
-        console.log(`[FASE 2] Scraping: ${item.url.substring(0, 80)}...`);
+        const isMultiListing = isMultiListingUrl(item.url);
+        console.log(`[FASE 2] Scraping${isMultiListing ? " (multi-listing)" : ""}: ${item.url.substring(0, 80)}...`);
         listingsOpened++;
 
         // Update portal stats
         const pr = portalResults.find(p => p.portal_code === item.portal.code);
         if (pr) pr.urls_opened++;
+
+        // For multi-listing pages, also request links to extract individual URLs
+        const formats = isMultiListing ? ["markdown", "links"] : ["markdown"];
 
         const scrapeRes = await fetch("https://api.firecrawl.dev/v1/scrape", {
           method: "POST",
@@ -514,15 +554,15 @@ serve(async (req) => {
           },
           body: JSON.stringify({
             url: item.url,
-            formats: ["markdown"],
+            formats,
             onlyMainContent: true,
-            waitFor: 2000,
+            waitFor: isMultiListing ? 5000 : 2000,
           }),
         });
 
         if (!scrapeRes.ok) {
           const status = scrapeRes.status;
-          await scrapeRes.text(); // consume body
+          await scrapeRes.text();
           console.warn(`[FASE 2] Scrape failed: ${status} for ${item.url}`);
           discardReasons.push({
             url: item.url,
@@ -534,6 +574,7 @@ serve(async (req) => {
 
         const scrapeData = await scrapeRes.json();
         const markdown = scrapeData.data?.markdown || scrapeData.markdown || "";
+        const links: string[] = scrapeData.data?.links || scrapeData.links || [];
 
         if (!markdown || markdown.length < 100) {
           discardReasons.push({
@@ -561,6 +602,82 @@ serve(async (req) => {
           continue;
         }
 
+        // Multi-listing handling: try to expand into individual URLs
+        if (isMultiListing || looksLikeMultiListing(markdown)) {
+          const individualUrls = extractIndividualListingUrls(links, item.portal.code);
+          
+          if (individualUrls.length > 0) {
+            // Found individual listing URLs — add them to the queue for individual scraping
+            const MAX_EXPANDED = 15;
+            const newUrls = individualUrls
+              .filter(u => !scrapedUrlSet.has(u.replace(/\/$/, "").toLowerCase()))
+              .slice(0, MAX_EXPANDED);
+            
+            console.log(`[FASE 2] Multi-listing expandido: ${individualUrls.length} URLs encontradas, ${newUrls.length} novas adicionadas à fila`);
+            
+            // Add expanded URLs to the processing queue
+            for (const expandedUrl of newUrls) {
+              const normalized = expandedUrl.replace(/\/$/, "").toLowerCase();
+              if (scrapedUrlSet.has(normalized)) continue;
+              scrapedUrlSet.add(normalized);
+              
+              // Scrape each expanded URL individually
+              try {
+                listingsOpened++;
+                if (pr) pr.urls_opened++;
+                
+                const expandedRes = await fetch("https://api.firecrawl.dev/v1/scrape", {
+                  method: "POST",
+                  headers: {
+                    Authorization: `Bearer ${FIRECRAWL_API_KEY}`,
+                    "Content-Type": "application/json",
+                  },
+                  body: JSON.stringify({
+                    url: expandedUrl,
+                    formats: ["markdown"],
+                    onlyMainContent: true,
+                    waitFor: 2000,
+                  }),
+                });
+
+                if (!expandedRes.ok) {
+                  await expandedRes.text();
+                  continue;
+                }
+
+                const expandedData = await expandedRes.json();
+                const expandedMd = expandedData.data?.markdown || expandedData.markdown || "";
+                
+                if (expandedMd && expandedMd.length >= 100) {
+                  scrapedPages.push({
+                    url: expandedUrl,
+                    portal: item.portal,
+                    markdown: expandedMd.substring(0, 4000),
+                    status: "ok",
+                  });
+                }
+              } catch (expandErr) {
+                console.warn(`[FASE 2] Expanded scrape failed: ${expandedUrl}`, expandErr);
+              }
+            }
+            
+            // Don't add the multi-listing page itself as a single listing
+            continue;
+          }
+          
+          // No individual URLs found — treat the whole page as multi-listing for AI extraction
+          console.log(`[FASE 2] Multi-listing sem URLs individuais — enviando para IA como listagem múltipla`);
+          scrapedPages.push({
+            url: item.url,
+            portal: item.portal,
+            markdown: markdown.substring(0, 12000), // More content for multi-listing
+            status: "ok",
+            isMultiListing: true,
+          } as any);
+          continue;
+        }
+
+        scrapedUrlSet.add(item.url.replace(/\/$/, "").toLowerCase());
         scrapedPages.push({
           url: item.url,
           portal: item.portal,
@@ -605,18 +722,37 @@ serve(async (req) => {
     // ==========================================
     console.log(`[FASE 3] Extraindo dados de ${scrapedPages.length} páginas com IA...`);
 
+    const hasMultiListingPages = scrapedPages.some((p: any) => p.isMultiListing);
+
     const combinedContent = scrapedPages
       .map(
-        (p, i) =>
-          `--- Anúncio ${i + 1} (Portal: ${p.portal.name}, URL: ${p.url}) ---\n${p.markdown}`
+        (p: any, i: number) => {
+          const label = p.isMultiListing
+            ? `--- LISTAGEM MÚLTIPLA ${i + 1} (Portal: ${p.portal.name}, URL: ${p.url}) ---`
+            : `--- Anúncio ${i + 1} (Portal: ${p.portal.name}, URL: ${p.url}) ---`;
+          return `${label}\n${p.markdown}`;
+        }
       )
       .join("\n\n");
+
+    const multiListingInstructions = hasMultiListingPages
+      ? `\n\nATENÇÃO - LISTAGENS MÚLTIPLAS:
+- Blocos marcados "--- LISTAGEM MÚLTIPLA ---" contêm VÁRIOS imóveis numa mesma página (ex: página de condomínio).
+- Extraia CADA imóvel individualmente como um comparável separado.
+- Use a URL da página como source_url para todos os imóveis extraídos da mesma listagem.
+- NÃO trate a página inteira como um único imóvel.`
+      : "";
 
     const systemPrompt = `Você é um perito avaliador imobiliário brasileiro. Analise CADA anúncio individualmente e extraia dados estruturados.
 
 REGRAS CRÍTICAS:
-- Cada bloco "--- Anúncio X ---" é UM anúncio individual já validado (página aberta e verificada).
+- Cada bloco "--- Anúncio X ---" é UM anúncio individual já validado (página aberta e verificada).${multiListingInstructions}
 - Extraia EXATAMENTE os dados que estão no anúncio. NÃO invente dados.
+- Se um dado não está claro, use null/0.
+- Preços no formato "R$ 1.200.000" → converta para número 1200000.
+- Áreas "120 m²" → número 120.
+- Inclua o URL EXATO do anúncio no campo source_url.
+- Inclua o nome do portal no campo source_name.
 - Se um dado não está claro, use null/0.
 - Preços no formato "R$ 1.200.000" → converta para número 1200000.
 - Áreas "120 m²" → número 120.
