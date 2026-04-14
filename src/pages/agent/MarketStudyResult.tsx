@@ -19,6 +19,7 @@ import { MarketScatterChart, ComparableChartData } from "@/components/charts/Mar
 import { MetricCard } from "@/components/shared/MetricCard";
 import { scoredComparables } from "@/hooks/useMarketSimilarity";
 import { calculateAllAdjustments, calculateMarketResult } from "@/hooks/useMarketAdjustments";
+import { syncMarketStudySections } from "@/hooks/syncMarketStudySections";
 import { toast } from "sonner";
 import { useState } from "react";
 
@@ -137,6 +138,10 @@ export default function MarketStudyResult() {
       });
       queryClient.invalidateQueries({ queryKey: ["market-study", id] });
       queryClient.invalidateQueries({ queryKey: ["market-study-adjustments", id] });
+
+      // Sync updated data to linked presentations
+      await syncMarketStudySections(id!);
+
       toast.success("Recálculo concluído!");
     } catch (err: any) {
       toast.error("Erro ao recalcular: " + (err.message || "erro"));
