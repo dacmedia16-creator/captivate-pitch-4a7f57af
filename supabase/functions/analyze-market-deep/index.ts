@@ -1154,6 +1154,15 @@ Extraia todos os imóveis relevantes. Descarte apenas se claramente incompatíve
     const finalComparables = validComparables.slice(0, maxResults);
 
     console.log(`[FASE 3] ${finalComparables.length} comparáveis válidos finais`);
+    
+    // Log top 5 discarded by similarity for debugging
+    const discardedBySimilarity = discardReasons
+      .filter(d => d.reason.startsWith("Similaridade"))
+      .slice(0, 5);
+    if (discardedBySimilarity.length > 0) {
+      console.log(`[FASE 3] Top ${discardedBySimilarity.length} descartados por similaridade:`,
+        JSON.stringify(discardedBySimilarity));
+    }
 
     // Pricing analysis
     let pricingAnalysis = null;
