@@ -669,7 +669,9 @@ async function processMarketAnalysis(
           ];
         }
 
-        const scrapeRes = await fetch("https://api.firecrawl.dev/v1/scrape", {
+        // Use Firecrawl v2 for Kenlo (better JS rendering for SPAs)
+        const firecrawlUrl = isKenlo ? "https://api.firecrawl.dev/v2/scrape" : "https://api.firecrawl.dev/v1/scrape";
+        const scrapeRes = await fetch(firecrawlUrl, {
           method: "POST",
           headers: {
             Authorization: `Bearer ${FIRECRAWL_API_KEY}`,
@@ -697,12 +699,12 @@ async function processMarketAnalysis(
         // Diagnostic: log markdown size per portal
         console.log(`[FASE 2] ${item.portal.name} markdown: ${markdown.length} chars for ${item.url.substring(0, 60)}...`);
 
-        // Google Cache fallback for Kenlo SPA pages with insufficient content
-        if (isKenlo && markdown.length < 500) {
+        // Google Cache fallback for Kenlo SPA pages with insufficient content (threshold: 1000 chars)
+        if (isKenlo && markdown.length < 1000) {
           console.log(`[FASE 2] Kenlo page too short (${markdown.length} chars), trying Google Cache fallback...`);
           try {
             const cacheUrl = `https://webcache.googleusercontent.com/search?q=cache:${encodeURIComponent(item.url)}`;
-            const cacheRes = await fetch("https://api.firecrawl.dev/v1/scrape", {
+            const cacheRes = await fetch("https://api.firecrawl.dev/v2/scrape", {
               method: "POST",
               headers: { Authorization: `Bearer ${FIRECRAWL_API_KEY}`, "Content-Type": "application/json" },
               body: JSON.stringify({ url: cacheUrl, formats: ["markdown"], onlyMainContent: true, waitFor: 3000 }),
@@ -717,6 +719,30 @@ async function processMarketAnalysis(
             }
           } catch (cacheErr) {
             console.warn(`[FASE 2] Google Cache fallback failed for ${item.url}`, cacheErr);
+          }
+
+          // Synthetic markdown from Kenlo URL slug as last resort
+          if (markdown.length < 1000 && /\/imovel\//i.test(item.url)) {
+            const slugMatch = item.url.match(/\/imovel\/([^/]+)\/([^/?#]+)/i);
+            if (slugMatch) {
+              const slugParts = slugMatch[1].split("-");
+              const externalId = slugMatch[2];
+              // Extract: type, city, rooms, area from slug like "apartamento-sorocaba-3-quartos-104-m"
+              const typeMatch = slugParts[0] || "";
+              const cityMatch = slugParts.find((_, i) => i === 1) || "";
+              const roomsMatch = slugMatch[1].match(/(\d+)-quartos/);
+              const areaMatch = slugMatch[1].match(/(\d+)-m/);
+              const syntheticMd = [
+                `# ${typeMatch} em ${cityMatch}`,
+                roomsMatch ? `- Quartos: ${roomsMatch[1]}` : "",
+                areaMatch ? `- Área: ${areaMatch[1]}m²` : "",
+                `- Código: ${externalId}`,
+                `- Fonte: Kenlo`,
+                `- URL: ${item.url}`,
+              ].filter(Boolean).join("\n");
+              console.log(`[FASE 2] Kenlo synthetic markdown from slug: ${syntheticMd.length} chars for ${externalId}`);
+              markdown = markdown + "\n\n" + syntheticMd;
+            }
           }
         }
 
