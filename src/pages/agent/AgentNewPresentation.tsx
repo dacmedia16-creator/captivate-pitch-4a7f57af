@@ -196,8 +196,6 @@ export default function AgentNewPresentation() {
     };
 
     let scrapedComparables: any[] = [];
-    let researchMetadata: any = null;
-    let scrapingOrigin = "auto_firecrawl";
 
     // Cascade: Manus → Firecrawl Deep → Firecrawl Basic
     try {
