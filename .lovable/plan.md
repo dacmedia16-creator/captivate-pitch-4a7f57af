@@ -1,63 +1,73 @@
 
 
-# Plano: Corrigir filtro de cidade e priorização de URLs
+# Plano: Corrigir scoring de similaridade (19 → 3 válidos)
 
-## Diagnóstico confirmado (Cannes 23 logs)
+## Problemas encontrados
 
-Os logs mostram que:
-- 103 URLs merged, **0 filtradas por cidade** (o filtro não disparou)
-- Primeiro 25 URLs abertas são TODAS de Rio de Janeiro
-- IA extraiu 25 comparáveis mas **todos 25 descartados** por similaridade 0
+### Bug 1 — Direção do `includes` no bairro está invertida
+**Linha 1082**: `c.neighborhood.toLowerCase().includes(property.neighborhood.toLowerCase())`  
+Se IA retorna "Campolim" e o subject é "Parque Campolim", `"campolim".includes("parque campolim")` = FALSE.  
+Deveria ser bidirecional: qualquer um contendo o outro.
 
-O filtro `isWrongCityUrl` tem o pattern `-rio-de-janeiro-` que DEVERIA casar com as URLs do log. Causa provável: o deploy anterior não incluiu o código do filtro, OU as URLs reais (truncadas no log) não contêm o pattern exatamente.
+### Bug 2 — Campo `property_standard` não existe no subject
+**Linha 1101**: `property.property_standard` — o subject vem de `market_study_subject_properties` que tem o campo `construction_standard`, não `property_standard`. Resultado: matching de padrão construtivo NUNCA funciona (perde 10 pontos).
 
-## Correções (todas em `supabase/functions/analyze-market-deep/index.ts`)
+### Bug 3 — Bônus de cidade exige score >= 30 primeiro
+**Linha 1116**: `score >= 30` para dar +5 de cidade. Mas se bairro e padrão já falharam (bugs 1 e 2), o score pode estar abaixo de 30 mesmo para imóveis na mesma cidade.
 
-### 1. Trocar filtro negativo por filtro POSITIVO de cidade
-Em vez de listar cidades erradas para bloquear, verificar se a URL contém a cidade-alvo (positivo). Se a URL contém OUTRA cidade conhecida E NÃO contém a cidade-alvo, descartar.
+### Bug 4 — Sem log de scores individuais
+Impossível debugar sem ver o score de cada comparável descartado.
 
+### Impacto estimado
+Com os bugs corrigidos, um imóvel típico do mesmo condomínio + bairro + cidade ganharia:
+- Condomínio: +25
+- Bairro (corrigido): +20
+- Tipo: +15
+- Padrão (corrigido): +10
+- Cidade (bônus): +5
+- **Total base: 75** (vs ~25-35 com bugs)
+
+## Correções (todas em `analyze-market-deep/index.ts`)
+
+### 1. Tornar matching de bairro bidirecional
 ```typescript
-function isWrongCityUrl(url: string, targetCity: string | undefined): boolean {
-  if (!targetCity) return false;
-  const targetSlug = slugify(targetCity);
-  if (!targetSlug) return false;
-  const urlLower = url.toLowerCase();
-  
-  // Se a URL contém a cidade-alvo, é OK
-  if (urlLower.includes(targetSlug)) return false;
-  
-  // Se contém qualquer outra cidade conhecida, é errada
-  const knownCities = [
-    "rio-de-janeiro", "sao-paulo", "belo-horizonte", "curitiba", 
-    "porto-alegre", "salvador", "brasilia", "fortaleza", "recife", 
-    "manaus", "goiania", "campinas", "santos", "guarulhos", "niteroi",
-    "sorocaba", "jundiai", "piracicaba", "bauru", "ribeirao-preto",
-    "uberlandia", "joinville", "florianopolis", "londrina", "maringa",
-  ];
-  
-  for (const city of knownCities) {
-    if (city === targetSlug) continue;
-    if (urlLower.includes(city)) return true;
-  }
-  return false;
-}
+// De:
+if (c.neighborhood.toLowerCase().includes(property.neighborhood.toLowerCase()))
+// Para:
+const compNeigh = c.neighborhood.toLowerCase();
+const subjNeigh = property.neighborhood.toLowerCase();
+if (compNeigh.includes(subjNeigh) || subjNeigh.includes(compNeigh))
 ```
 
-### 2. Priorizar URLs por relevância antes do slice(0, 25)
-Ordenar `mergedUrls` antes de pegar os primeiros 25:
-1. URLs que contêm o nome do condomínio (highest priority)
-2. URLs que contêm a cidade-alvo
-3. Resto
+### 2. Corrigir campo de padrão construtivo
+```typescript
+// De:
+property.property_standard
+// Para:
+property.construction_standard || property.property_standard
+```
 
-### 3. Adicionar log detalhado do filtro
-Logar as primeiras 5 URLs descartadas pelo filtro de cidade para debug.
+### 3. Remover pré-requisito de score >= 30 no bônus de cidade
+```typescript
+// De:
+if (c.city... && score >= 30) score += 5;
+// Para:
+if (c.city...) score += 5;
+```
 
-### 4. Forçar re-deploy e testar
-Deploy explícito + teste via `curl_edge_functions` com payload do Cannes.
+### 4. Adicionar log de scores individuais (top 5 descartados)
+Logar os 5 comparáveis com maior score que foram descartados, mostrando: URL, score, razão.
+
+### 5. Aplicar mesma lógica bidirecional ao condomínio
+Para pegar "Residencial Cannes" vs "Cannes".
 
 ## Etapas
-1. Atualizar `isWrongCityUrl` para filtro positivo + lista expandida de cidades
-2. Adicionar sort de prioridade em `mergedUrls` antes do cap de 25
-3. Adicionar logs de debug no filtro
-4. Deploy + teste com payload Cannes Sorocaba
+1. Corrigir matching bidirecional (bairro + condomínio)
+2. Corrigir campo `construction_standard`
+3. Remover requisito `score >= 30` do bônus cidade
+4. Adicionar logs de score dos descartados
+5. Deploy + teste
+
+## Arquivo modificado
+`supabase/functions/analyze-market-deep/index.ts` — ~15 linhas alteradas
 
