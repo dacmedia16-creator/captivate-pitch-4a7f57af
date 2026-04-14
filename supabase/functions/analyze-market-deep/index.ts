@@ -653,18 +653,29 @@ async function processMarketAnalysis(
 
         const formats = isMultiListing ? ["markdown", "links"] : ["markdown"];
 
+        // Kenlo is a SPA — needs longer wait + scroll actions for JS rendering
+        const isKenlo = /kenlo\.com\.br/i.test(item.url);
+        const scrapeBody: any = {
+          url: item.url,
+          formats,
+          onlyMainContent: true,
+          waitFor: isKenlo ? 10000 : (isMultiListing ? 5000 : 2000),
+        };
+        if (isKenlo) {
+          scrapeBody.actions = [
+            { type: "wait", milliseconds: 8000 },
+            { type: "scroll", direction: "down", amount: 3 },
+            { type: "wait", milliseconds: 2000 },
+          ];
+        }
+
         const scrapeRes = await fetch("https://api.firecrawl.dev/v1/scrape", {
           method: "POST",
           headers: {
             Authorization: `Bearer ${FIRECRAWL_API_KEY}`,
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({
-            url: item.url,
-            formats,
-            onlyMainContent: true,
-            waitFor: isMultiListing ? 5000 : 2000,
-          }),
+          body: JSON.stringify(scrapeBody),
         });
 
         if (!scrapeRes.ok) {
