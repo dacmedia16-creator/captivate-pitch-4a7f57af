@@ -1,36 +1,55 @@
 
 
-# Plano: Corrigir URLs individuais dos comparáveis
+# Diagnóstico: Por que o Kenlo nunca aparece nos resultados
 
-## Problema
-A IA extrai múltiplos imóveis de uma página de resultados de busca e usa a URL da página de busca como `source_url` para todos. Resultado: 8 de 10 comparáveis apontam para a mesma URL genérica de busca, não para o anúncio individual.
+## Evidências dos logs
+
+1. **FASE 1A** (scrape nativo): Kenlo URL construída corretamente (`portal.kenlo.com.br/imoveis/a-venda/apartamento/sorocaba/parque-campolim?quartos=3+`), mas retornou apenas 13 links genéricos e **0 links de anúncio individual**. O markdown extraído tem apenas 914 chars — Kenlo é um SPA (React/Angular) que carrega conteúdo via JavaScript, e o Firecrawl não consegue renderizar o conteúdo dinâmico mesmo com `waitFor: 5000`.
+
+2. **FASE 1B** (Google): Encontrou 8 URLs do Kenlo via Google, incluindo URLs individuais válidas como `/imovel/apartamento-sorocaba-3-quartos-97-m/AP2160-F1`.
+
+3. **FASE 2** (scrape individual): As URLs Kenlo foram abertas, mas o conteúdo provavelmente é mínimo (SPA sem server-side rendering).
+
+4. **FASE 3** (extração AI): A IA processa todas as páginas juntas e atribui `source_name` livremente. Os resultados finais mostram **100% Viva Real, 0% Kenlo** — a IA ignora as páginas Kenlo porque o markdown delas é vazio ou irrelevante.
 
 ## Causa raiz
-No prompt de extração (`analyze-market-deep/index.ts`, linha 920):
-> "Use a URL da página como source_url para todos os imóveis extraídos da mesma listagem."
 
-Essa instrução contradiz a linha 932:
-> "Inclua o URL EXATO do anúncio no campo source_url."
+**Kenlo é um SPA que não faz Server-Side Rendering.** O Firecrawl retorna páginas quase vazias. A IA então não consegue extrair dados das páginas Kenlo, resultando em 0 comparáveis atribuídos a esse portal.
 
-## Correção em `supabase/functions/analyze-market-deep/index.ts`
+## Solução proposta
 
-### 1. Atualizar o prompt de extração
-Substituir a instrução conflitante por:
-- "Para cada imóvel, extraia o URL individual do anúncio (link que leva direto à ficha do imóvel). Se a página é de resultados de busca, cada card deve ter um link individual — use esse link."
-- "Se não for possível extrair o URL individual, use a URL da página e adicione o external_id do imóvel."
-- Adicionar campo `individual_url` como alternativa no schema.
+### 1. Forçar renderização JavaScript no Firecrawl para Kenlo
+Na FASE 2, quando o portal é Kenlo, usar as opções `actions` do Firecrawl para esperar a renderização do conteúdo:
+```typescript
+if (portal.code === "kenlo") {
+  body.actions = [
+    { type: "wait", milliseconds: 8000 },
+    { type: "scroll", direction: "down", amount: 3 }
+  ];
+  body.waitFor = 10000;
+}
+```
 
-### 2. Fallback: construir URL individual quando possível
-Após extração, se o `source_url` parece ser uma URL de busca (não contém `/imovel/` ou `id-`), e o `external_id` está presente, tentar montar a URL individual do portal. Para VivaReal/ZAP: `https://www.vivareal.com.br/imovel/{external_id}`.
+### 2. Fallback: scraping via Google Cache
+Se o Firecrawl retornar markdown < 500 chars para Kenlo, tentar buscar a versão cacheada do Google (`webcache.googleusercontent.com/search?q=cache:URL`).
 
-### 3. Instrução no prompt para extrair external_id
-Reforçar no prompt que o `external_id` é o código do anúncio no portal (ex: "id-2446277614") e deve ser extraído de cada card de resultado.
+### 3. Atribuição forçada de portal na FASE 3
+Após a extração AI, cruzar o `source_url` de cada comparável com a URL original da página scrapeada para atribuir o `source_name` correto:
+```typescript
+// Se a URL contém "kenlo.com.br", forçar source_name = "Kenlo"
+if (/kenlo\.com\.br/i.test(c.source_url)) c.source_name = "Kenlo";
+```
+Isso corrige o caso onde a IA atribui erroneamente ao Viva Real.
 
-## Etapas
-1. Corrigir prompt conflitante (remover linha 920, reforçar extração de URL individual)
-2. Adicionar lógica de fallback para montar URL individual a partir do external_id
-3. Deploy + teste
+### 4. Log de diagnóstico: tamanho do markdown por portal
+Adicionar log do tamanho do markdown retornado por portal na FASE 2 para monitorar quais portais estão retornando conteúdo vazio.
 
 ## Arquivo modificado
-`supabase/functions/analyze-market-deep/index.ts` — ~10 linhas alteradas no prompt + ~15 linhas de fallback
+`supabase/functions/analyze-market-deep/index.ts`
+
+## Prioridade
+1. Atribuição forçada de portal (fix imediato, 5 linhas)
+2. `waitFor` maior + actions para Kenlo (fix de renderização)
+3. Log de diagnóstico
+4. Fallback via Google Cache (opcional, mais complexo)
 
