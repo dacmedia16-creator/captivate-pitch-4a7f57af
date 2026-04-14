@@ -1135,6 +1135,17 @@ Extraia todos os imóveis relevantes. Descarte apenas se claramente incompatíve
       }
     }
 
+    // === Forced portal attribution by URL domain ===
+    for (const c of (extracted.comparables || [])) {
+      const srcUrl = (c.source_url || "").toLowerCase();
+      if (/kenlo\.com\.br/i.test(srcUrl)) c.source_name = "Kenlo";
+      else if (/vivareal\.com\.br/i.test(srcUrl)) c.source_name = "Viva Real";
+      else if (/zapimoveis\.com\.br/i.test(srcUrl)) c.source_name = "ZAP Imóveis";
+      else if (/imovelweb\.com\.br/i.test(srcUrl)) c.source_name = "Imóvel Web";
+      else if (/olx\.com\.br/i.test(srcUrl)) c.source_name = "OLX";
+      else if (/chavesnamao\.com\.br/i.test(srcUrl)) c.source_name = "Chaves na Mão";
+    }
+
     // Filter, score, deduplicate
     const baseArea = Number(property.area_total || property.area_built || property.area_land) || 100;
     const baseBedrooms = Number(property.bedrooms) || 3;
