@@ -203,7 +203,6 @@ export default function AgentNewPresentation() {
       const { data: manusResult, error: manusError } = await supabase.functions.invoke("analyze-market-manus", { body: analyzeBody });
       if (!manusError && manusResult?.success && manusResult?.comparables?.length) {
         scrapedComparables = manusResult.comparables;
-        scrapingOrigin = "auto_manus";
         toast.success(`Manus encontrou ${manusResult.comparables.length} comparáveis`);
       } else {
         throw new Error(manusError?.message || manusResult?.message || "No results");
