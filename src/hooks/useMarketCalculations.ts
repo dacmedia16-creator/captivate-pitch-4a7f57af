@@ -1,10 +1,6 @@
-/** 
- * @deprecated useSaveMarketReport writes to legacy market_reports table.
- * calculateMarketPrices is still used by the official flow.
+/**
+ * calculateMarketPrices — used by the official market_studies flow.
  */
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-
 interface Comparable {
   price: number | null;
   price_per_sqm: number | null;
@@ -44,30 +40,4 @@ export function calculateMarketPrices(comparables: Comparable[]): MarketCalcResu
     suggested_aspirational_price: Math.round(medianPrice * 1.15),
     suggested_fast_sale_price: Math.round(medianPrice * 0.85),
   };
-}
-
-export function useSaveMarketReport(jobId: string) {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (calc: MarketCalcResult) => {
-      // Upsert: delete existing then insert
-      await supabase.from("market_reports").delete().eq("market_analysis_job_id", jobId);
-      const { error } = await supabase.from("market_reports").insert({
-        market_analysis_job_id: jobId,
-        avg_price: calc.avg_price,
-        median_price: calc.median_price,
-        avg_price_per_sqm: calc.avg_price_per_sqm,
-        suggested_market_price: calc.suggested_market_price,
-        suggested_aspirational_price: calc.suggested_aspirational_price,
-        suggested_fast_sale_price: calc.suggested_fast_sale_price,
-        confidence_level: "medium",
-        summary: `Análise baseada em ${calc.avg_price > 0 ? "comparáveis aprovados" : "dados insuficientes"}.`,
-      });
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["market-report", jobId] });
-    },
-  });
 }
