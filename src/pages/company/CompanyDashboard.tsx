@@ -34,7 +34,7 @@ export default function CompanyDashboard() {
     queryKey: ["company-studies", tenantId],
     enabled: !!tenantId,
     queryFn: async () => {
-      const { count } = await supabase.from("market_analysis_jobs").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId!);
+      const { count } = await supabase.from("market_studies").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId!);
       return count || 0;
     },
   });

@@ -16,7 +16,7 @@ export default function AdminDashboard() {
   const { data: userCount = 0 } = useQuery({ queryKey: ["admin-count-users"], queryFn: async () => { const { count } = await supabase.from("profiles").select("id", { count: "exact", head: true }); return count || 0; } });
   const { data: brokerCount = 0 } = useQuery({ queryKey: ["admin-count-brokers"], queryFn: async () => { const { count } = await supabase.from("user_roles").select("id", { count: "exact", head: true }).eq("role", "broker"); return count || 0; } });
   const { data: presentationCount = 0 } = useQuery({ queryKey: ["admin-count-presentations"], queryFn: async () => { const { count } = await supabase.from("presentations").select("id", { count: "exact", head: true }); return count || 0; } });
-  const { data: studyCount = 0 } = useQuery({ queryKey: ["admin-count-studies"], queryFn: async () => { const { count } = await supabase.from("market_analysis_jobs").select("id", { count: "exact", head: true }); return count || 0; } });
+  const { data: studyCount = 0 } = useQuery({ queryKey: ["admin-count-studies"], queryFn: async () => { const { count } = await supabase.from("market_studies").select("id", { count: "exact", head: true }); return count || 0; } });
   const { data: exportCount = 0 } = useQuery({ queryKey: ["admin-count-exports"], queryFn: async () => { const { count } = await supabase.from("export_history").select("id", { count: "exact", head: true }); return count || 0; } });
 
   const { data: tenants = [], isLoading } = useQuery({
