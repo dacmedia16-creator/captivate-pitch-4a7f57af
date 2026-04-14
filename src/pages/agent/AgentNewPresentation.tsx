@@ -3,9 +3,6 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { generatePresentationSections } from "@/hooks/useGeneratePresentation";
-import { calculateMarketPrices } from "@/hooks/useMarketCalculations";
-import { scoredComparables } from "@/hooks/useMarketSimilarity";
-import { calculateAllAdjustments, calculateMarketResult } from "@/hooks/useMarketAdjustments";
 import { WizardStepper } from "@/components/wizard/WizardStepper";
 import { StepPropertyData, PropertyData } from "@/components/wizard/StepPropertyData";
 import { StepLayoutStyle, LayoutStyleData } from "@/components/wizard/StepLayoutStyle";
@@ -199,8 +196,6 @@ export default function AgentNewPresentation() {
     };
 
     let scrapedComparables: any[] = [];
-    let researchMetadata: any = null;
-    let scrapingOrigin = "auto_firecrawl";
 
     // Cascade: Manus → Firecrawl Deep → Firecrawl Basic
     try {
@@ -208,7 +203,6 @@ export default function AgentNewPresentation() {
       const { data: manusResult, error: manusError } = await supabase.functions.invoke("analyze-market-manus", { body: analyzeBody });
       if (!manusError && manusResult?.success && manusResult?.comparables?.length) {
         scrapedComparables = manusResult.comparables;
-        scrapingOrigin = "auto_manus";
         toast.success(`Manus encontrou ${manusResult.comparables.length} comparáveis`);
       } else {
         throw new Error(manusError?.message || manusResult?.message || "No results");
@@ -217,20 +211,18 @@ export default function AgentNewPresentation() {
       console.warn("Manus failed, trying Firecrawl deep...", manusErr);
       try {
         const { data: deepResult, error: deepError } = await supabase.functions.invoke("analyze-market-deep", { body: analyzeBody });
-        // 202 = background processing started — study will update itself via DB
+        // 202 = background processing — edge function saves comparables directly to DB
         if (!deepError && deepResult?.message === "Processing started in background") {
           console.log("Market analysis running in background for study:", study.id);
           toast.info("Estudo de mercado sendo processado em background...");
-          // Don't wait for comparables — they'll be saved directly by the edge function
-          // The study status will be updated to "completed" or "failed" automatically
+          // Poll for completion
+          pollStudyStatus(study.id, presId, propData);
           return;
         }
+        // Sync mode — edge function already saved to DB if market_study_id was provided
         if (!deepError && deepResult?.success && deepResult?.comparables?.length) {
           scrapedComparables = deepResult.comparables;
-          researchMetadata = deepResult.research_metadata || null;
-          if (deepResult.research_metadata) {
-            toast.success(`${deepResult.research_metadata.total_listings_found} anúncios encontrados, ${deepResult.comparables.length} selecionados`);
-          }
+          toast.success(`${deepResult.research_metadata?.total_listings_found || 0} anúncios encontrados, ${deepResult.comparables.length} selecionados`);
         } else {
           throw new Error(deepError?.message || deepResult?.message || "No results");
         }
@@ -251,125 +243,86 @@ export default function AgentNewPresentation() {
       }
     }
 
-    // === 3. Score, insert comparables, adjustments, results ===
-    const subjectForScoring = {
-      condominium: propData.condominium || null, neighborhood: propData.neighborhood || null,
-      city: propData.city || null, property_type: propData.property_type || null,
-      area_useful: propData.area_useful ? Number(propData.area_useful) : (propData.area_total ? Number(propData.area_total) : null),
-      area_built: propData.area_built ? Number(propData.area_built) : null,
-      area_land: propData.area_land ? Number(propData.area_land) : null,
-      bedrooms: propData.bedrooms ? Number(propData.bedrooms) : null,
-      suites: propData.suites ? Number(propData.suites) : null,
-      parking_spots: propData.parking_spots ? Number(propData.parking_spots) : null,
-      construction_standard: propData.construction_standard || propData.property_standard || null,
-      conservation_state: propData.conservation_state || null,
-      owner_expected_price: propData.owner_expected_price ? Number(propData.owner_expected_price) : null,
-    };
-
-    let marketCalcResult: any = null;
-
+    // === 3. Edge function already saved comparables/adjustments/results to DB ===
+    // Just update presentation sections with results from DB
     if (scrapedComparables.length > 0) {
-      const scored = scoredComparables(subjectForScoring, scrapedComparables.map((c: any, i: number) => ({ id: `temp-${i}`, ...c })), undefined, 0);
-      const studyComparables = scored.map((c: any) => ({
-        market_study_id: study.id, title: c.title || null, address: c.address || null,
-        neighborhood: c.neighborhood || null, city: c.city || null, condominium: c.condominium || null,
-        property_type: c.property_type || null, price: c.price || null, area: c.area || null,
-        price_per_sqm: c.price_per_sqm || null, bedrooms: c.bedrooms || null, suites: c.suites || null,
-        parking_spots: c.parking_spots || null, similarity_score: c.similarity_score || 0,
-        source_name: c.source_name || null, source_url: c.source_url || null,
-        is_approved: true, origin: scrapingOrigin,
-      }));
-
-      const { data: insertedComps } = await supabase.from("market_study_comparables").insert(studyComparables).select();
-
-      if (insertedComps && insertedComps.length > 0) {
-        const adjustedComps = calculateAllAdjustments(subjectForScoring, insertedComps.map((c: any) => ({
-          id: c.id, price: c.price, suites: c.suites, parking_spots: c.parking_spots,
-          conservation_state: c.conservation_state, construction_standard: c.construction_standard,
-          area: c.area, differentials: c.differentials,
-        })));
-
-        const allAdjustments = adjustedComps.flatMap(ac =>
-          ac.adjustments.map(a => ({
-            comparable_id: ac.comparable_id, adjustment_type: a.adjustment_type,
-            label: a.label, percentage: a.percentage, value: a.value, direction: a.direction,
-          }))
-        );
-
-        if (allAdjustments.length > 0) {
-          await supabase.from("market_study_adjustments").insert(allAdjustments);
-        }
-
-        await Promise.all(adjustedComps.map(ac =>
-          supabase.from("market_study_comparables").update({ adjusted_price: ac.adjusted_price }).eq("id", ac.comparable_id)
-        ));
-
-        const result = calculateMarketResult(adjustedComps);
-        const avgPriceSqm = insertedComps
-          .filter((c: any) => c.price_per_sqm && c.price_per_sqm > 0)
-          .reduce((sum: number, c: any, _: number, arr: any[]) => sum + (c.price_per_sqm / arr.length), 0);
-
-        marketCalcResult = { ...result, avg_price_per_sqm: Math.round(avgPriceSqm) };
-
-        await supabase.from("market_study_results").insert({
-          market_study_id: study.id, avg_price: result.avg_price, median_price: result.median_price,
-          avg_price_per_sqm: Math.round(avgPriceSqm), suggested_ad_price: result.suggested_ad_price,
-          suggested_market_price: result.suggested_market_price, suggested_fast_sale_price: result.suggested_fast_sale_price,
-          price_range_min: result.price_range_min, price_range_max: result.price_range_max,
-          confidence_level: "medium", executive_summary: `Análise baseada em ${insertedComps.length} comparáveis reais.`,
-          research_metadata: researchMetadata as any,
-        });
-
-        // AI summary (non-fatal)
-        try {
-          const { data: aiSummary } = await supabase.functions.invoke("generate-market-summary", {
-            body: { subject: subjectForScoring, comparables: studyComparables, result: marketCalcResult },
-          });
-          if (aiSummary?.executive_summary) {
-            await supabase.from("market_study_results").update({
-              executive_summary: aiSummary.executive_summary, justification: aiSummary.justification,
-              market_insights: aiSummary.market_insights,
-            }).eq("market_study_id", study.id);
-          }
-        } catch (aiErr) {
-          console.warn("AI summary failed (non-fatal):", aiErr);
-        }
-      }
-
-      await supabase.from("market_studies").update({ status: "completed" }).eq("id", study.id);
+      await updatePresentationSectionsFromStudy(study.id, presId, propData);
+      toast.success("Estudo de mercado concluído!");
     } else {
-      await supabase.from("market_studies").update({ status: "completed" }).eq("id", study.id);
+      // No comparables from sync response — edge function may have saved to DB
+      console.log("No comparables returned from sync call, checking DB...");
     }
+  };
 
-    // === 4. Update presentation sections with market data ===
-    if (marketCalcResult && scrapedComparables.length > 0) {
-      const chartComparables = scrapedComparables.map((c: any) => ({
-        title: c.title, price: c.price, area: c.area, price_per_sqm: c.price_per_sqm,
-      }));
+  /** Polls study status every 5s until completed/failed, then updates presentation sections */
+  const pollStudyStatus = async (studyId: string, presId: string, propData: PropertyData) => {
+    const MAX_POLLS = 60; // 5 min max
+    let polls = 0;
+    const interval = setInterval(async () => {
+      polls++;
+      try {
+        const { data: study } = await supabase
+          .from("market_studies")
+          .select("status")
+          .eq("id", studyId)
+          .single();
 
-      await Promise.all([
-        supabase.from("presentation_sections").update({
-          content: {
-            owner_expected_price: propData.owner_expected_price ? Number(propData.owner_expected_price) : null,
-            scenarios: [
-              { label: "Preço aspiracional", value: marketCalcResult.suggested_ad_price },
-              { label: "Preço de mercado", value: marketCalcResult.suggested_market_price },
-              { label: "Preço de venda rápida", value: marketCalcResult.suggested_fast_sale_price },
-            ],
-          } as any,
-        }).eq("presentation_id", presId).eq("section_key", "pricing_scenarios"),
-        supabase.from("presentation_sections").update({
-          content: {
-            comparables: chartComparables,
-            owner_expected_price: propData.owner_expected_price ? Number(propData.owner_expected_price) : null,
-            avg_price: marketCalcResult.avg_price, median_price: marketCalcResult.median_price,
-            avg_price_per_sqm: marketCalcResult.avg_price_per_sqm, status: "completed",
-          } as any,
-        }).eq("presentation_id", presId).eq("section_key", "market_study_placeholder"),
-      ]);
+        if (!study || polls >= MAX_POLLS) {
+          clearInterval(interval);
+          if (polls >= MAX_POLLS) {
+            toast.warning("Estudo de mercado está demorando mais que o esperado. Verifique depois.");
+          }
+          return;
+        }
 
-      toast.success("Estudo de mercado concluído em background!");
-    }
+        if (study.status === "completed") {
+          clearInterval(interval);
+          await updatePresentationSectionsFromStudy(studyId, presId, propData);
+          toast.success("Estudo de mercado concluído!");
+        } else if (study.status === "failed") {
+          clearInterval(interval);
+          toast.error("Estudo de mercado falhou. Tente novamente.");
+        }
+      } catch (err) {
+        console.error("Poll error:", err);
+      }
+    }, 5000);
+  };
+
+  /** Reads market_study_results + comparables from DB and updates presentation sections */
+  const updatePresentationSectionsFromStudy = async (studyId: string, presId: string, propData: PropertyData) => {
+    const [{ data: results }, { data: comps }] = await Promise.all([
+      supabase.from("market_study_results").select("*").eq("market_study_id", studyId).limit(1),
+      supabase.from("market_study_comparables").select("title, price, area, price_per_sqm").eq("market_study_id", studyId).eq("is_approved", true),
+    ]);
+
+    const result = results?.[0];
+    if (!result || !comps?.length) return;
+
+    const chartComparables = comps.map((c: any) => ({
+      title: c.title, price: c.price, area: c.area, price_per_sqm: c.price_per_sqm,
+    }));
+
+    await Promise.all([
+      supabase.from("presentation_sections").update({
+        content: {
+          owner_expected_price: propData.owner_expected_price ? Number(propData.owner_expected_price) : null,
+          scenarios: [
+            { label: "Preço aspiracional", value: result.suggested_ad_price },
+            { label: "Preço de mercado", value: result.suggested_market_price },
+            { label: "Preço de venda rápida", value: result.suggested_fast_sale_price },
+          ],
+        } as any,
+      }).eq("presentation_id", presId).eq("section_key", "pricing_scenarios"),
+      supabase.from("presentation_sections").update({
+        content: {
+          comparables: chartComparables,
+          owner_expected_price: propData.owner_expected_price ? Number(propData.owner_expected_price) : null,
+          avg_price: result.avg_price, median_price: result.median_price,
+          avg_price_per_sqm: result.avg_price_per_sqm, status: "completed",
+        } as any,
+      }).eq("presentation_id", presId).eq("section_key", "market_study_placeholder"),
+    ]);
   };
 
   const handleAnimationDone = useCallback(() => {

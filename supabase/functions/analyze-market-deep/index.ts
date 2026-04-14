@@ -1198,6 +1198,213 @@ Extraia todos os imóveis relevantes. Descarte apenas se claramente incompatíve
 
     console.log(`[RESULTADO] ${finalComparables.length} comparáveis, ${listingsOpened} links abertos, ${discardReasons.length} descartados`);
 
+    // === Save comparables, adjustments and results directly to DB ===
+    if (marketStudyId && finalComparables.length > 0) {
+      console.log(`[DB] Inserindo ${finalComparables.length} comparáveis no banco...`);
+
+      // Fetch subject property for adjustments
+      const { data: subjectProps } = await supabase
+        .from("market_study_subject_properties")
+        .select("*")
+        .eq("market_study_id", marketStudyId)
+        .limit(1);
+      const subjectProp = subjectProps?.[0] || null;
+
+      const studyComparables = finalComparables.map((c: any) => ({
+        market_study_id: marketStudyId,
+        title: c.title || null,
+        address: c.address || null,
+        neighborhood: c.neighborhood || null,
+        city: c.city || null,
+        condominium: c.condominium || null,
+        property_type: c.property_type || null,
+        price: c.price || null,
+        area: c.area || null,
+        price_per_sqm: c.price_per_sqm || null,
+        bedrooms: c.bedrooms || null,
+        suites: c.suites || null,
+        parking_spots: c.parking_spots || null,
+        construction_standard: c.construction_standard || null,
+        similarity_score: c.similarity_score || 0,
+        source_name: c.source_name || null,
+        source_url: c.source_url || null,
+        is_approved: true,
+        origin: "auto_firecrawl",
+        raw_data: c.raw_data || null,
+      }));
+
+      const { data: insertedComps, error: insertErr } = await supabase
+        .from("market_study_comparables")
+        .insert(studyComparables)
+        .select();
+
+      if (insertErr) {
+        console.error("[DB] Erro ao inserir comparáveis:", insertErr.message);
+      } else {
+        console.log(`[DB] ${insertedComps?.length || 0} comparáveis inseridos`);
+      }
+
+      // Calculate and insert adjustments if we have subject data
+      if (insertedComps && insertedComps.length > 0 && subjectProp) {
+        const allAdjustments: any[] = [];
+        const adjustedPrices: { id: string; adjusted_price: number }[] = [];
+
+        for (const comp of insertedComps) {
+          const price = comp.price ?? 0;
+          if (price <= 0) continue;
+
+          const adjustments: any[] = [];
+
+          // Suites difference
+          const subSuites = subjectProp.suites ?? 0;
+          const compSuites = comp.suites ?? 0;
+          if (subSuites !== compSuites) {
+            const diff = compSuites - subSuites;
+            const pct = 2 * Math.abs(diff);
+            adjustments.push({
+              comparable_id: comp.id, adjustment_type: "suites",
+              label: `Suítes (${diff > 0 ? "+" : ""}${diff})`,
+              percentage: diff > 0 ? pct : -pct,
+              value: Math.round(price * (pct / 100) * (diff > 0 ? 1 : -1)),
+              direction: diff > 0 ? "positive" : "negative",
+            });
+          }
+
+          // Parking difference
+          const subParking = subjectProp.parking_spots ?? 0;
+          const compParking = comp.parking_spots ?? 0;
+          if (subParking !== compParking) {
+            const diff = compParking - subParking;
+            const pct = 1.5 * Math.abs(diff);
+            adjustments.push({
+              comparable_id: comp.id, adjustment_type: "parking",
+              label: `Vagas (${diff > 0 ? "+" : ""}${diff})`,
+              percentage: diff > 0 ? pct : -pct,
+              value: Math.round(price * (pct / 100) * (diff > 0 ? 1 : -1)),
+              direction: diff > 0 ? "positive" : "negative",
+            });
+          }
+
+          // Area difference
+          const subArea = subjectProp.area_land ?? subjectProp.area_built ?? subjectProp.area_useful ?? 0;
+          const compArea = comp.area ?? 0;
+          if (subArea > 0 && compArea > 0 && subArea !== compArea) {
+            const diffPct = ((compArea - subArea) / subArea) * 100;
+            if (Math.abs(diffPct) > 5) {
+              const adjPct = Math.min(Math.abs(diffPct) * 0.15, 9);
+              adjustments.push({
+                comparable_id: comp.id, adjustment_type: "area",
+                label: `Área (${diffPct > 0 ? "+" : ""}${diffPct.toFixed(0)}%)`,
+                percentage: diffPct > 0 ? adjPct : -adjPct,
+                value: Math.round(price * (adjPct / 100) * (diffPct > 0 ? 1 : -1)),
+                direction: diffPct > 0 ? "positive" : "negative",
+              });
+            }
+          }
+
+          const totalAdj = adjustments.reduce((sum, a) => sum + a.value, 0);
+          adjustedPrices.push({ id: comp.id, adjusted_price: Math.round(price + totalAdj) });
+          allAdjustments.push(...adjustments);
+        }
+
+        if (allAdjustments.length > 0) {
+          await supabase.from("market_study_adjustments").insert(allAdjustments);
+        }
+
+        // Update adjusted prices
+        await Promise.all(
+          adjustedPrices.map(ap =>
+            supabase.from("market_study_comparables").update({ adjusted_price: ap.adjusted_price }).eq("id", ap.id)
+          )
+        );
+
+        // Calculate and insert results
+        const adjPrices = adjustedPrices.map(ap => ap.adjusted_price).filter(p => p > 0);
+        const sortedPrices = [...adjPrices].sort((a, b) => a - b);
+        const mid = Math.floor(sortedPrices.length / 2);
+        const medianPrice = sortedPrices.length % 2 !== 0
+          ? sortedPrices[mid]
+          : Math.round((sortedPrices[mid - 1] + sortedPrices[mid]) / 2);
+        const avgPrice = Math.round(adjPrices.reduce((a, b) => a + b, 0) / adjPrices.length);
+
+        await supabase.from("market_study_results").insert({
+          market_study_id: marketStudyId,
+          avg_price: pricingAnalysis?.avg_price ?? avgPrice,
+          median_price: pricingAnalysis?.median_price ?? medianPrice,
+          avg_price_per_sqm: pricingAnalysis?.avg_price_per_sqm ?? 0,
+          suggested_ad_price: pricingAnalysis?.suggested_ad_price ?? Math.round(medianPrice * 1.10),
+          suggested_market_price: pricingAnalysis?.suggested_market_price ?? medianPrice,
+          suggested_fast_sale_price: pricingAnalysis?.suggested_fast_sale_price ?? Math.round(medianPrice * 0.90),
+          price_range_min: pricingAnalysis?.price_range_min ?? sortedPrices[0],
+          price_range_max: pricingAnalysis?.price_range_max ?? sortedPrices[sortedPrices.length - 1],
+          confidence_level: finalComparables.length >= 5 ? "high" : "medium",
+          executive_summary: `Análise baseada em ${finalComparables.length} comparáveis reais coletados automaticamente.`,
+          research_metadata: researchMetadata as any,
+        });
+
+        console.log(`[DB] Results e ${allAdjustments.length} adjustments salvos`);
+      } else if (insertedComps && insertedComps.length > 0) {
+        // No subject prop but we have comparables - save basic results
+        await supabase.from("market_study_results").insert({
+          market_study_id: marketStudyId,
+          avg_price: pricingAnalysis?.avg_price ?? 0,
+          median_price: pricingAnalysis?.median_price ?? 0,
+          avg_price_per_sqm: pricingAnalysis?.avg_price_per_sqm ?? 0,
+          suggested_ad_price: pricingAnalysis?.suggested_ad_price ?? 0,
+          suggested_market_price: pricingAnalysis?.suggested_market_price ?? 0,
+          suggested_fast_sale_price: pricingAnalysis?.suggested_fast_sale_price ?? 0,
+          price_range_min: pricingAnalysis?.price_range_min ?? 0,
+          price_range_max: pricingAnalysis?.price_range_max ?? 0,
+          confidence_level: "medium",
+          executive_summary: `Análise baseada em ${finalComparables.length} comparáveis reais.`,
+          research_metadata: researchMetadata as any,
+        });
+      }
+
+      // Try AI summary (non-fatal)
+      try {
+        const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") || Deno.env.get("SUPABASE_PUBLISHABLE_KEY") || "";
+        const summaryResp = await fetch(
+          `${supabaseUrl}/functions/v1/generate-market-summary`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
+              "apikey": SUPABASE_ANON_KEY,
+            },
+            body: JSON.stringify({
+              subject: subjectProp || property,
+              comparables: finalComparables.slice(0, 10),
+              result: pricingAnalysis,
+            }),
+          }
+        );
+        if (summaryResp.ok) {
+          const aiSummary = await summaryResp.json();
+          if (aiSummary?.executive_summary) {
+            await supabase.from("market_study_results").update({
+              executive_summary: aiSummary.executive_summary,
+              justification: aiSummary.justification,
+              market_insights: aiSummary.market_insights,
+            }).eq("market_study_id", marketStudyId);
+          }
+        }
+      } catch (aiErr) {
+        console.warn("[DB] AI summary failed (non-fatal):", aiErr);
+      }
+    } else if (marketStudyId && finalComparables.length === 0) {
+      // No comparables found - still save empty results
+      await supabase.from("market_study_results").insert({
+        market_study_id: marketStudyId,
+        avg_price: 0, median_price: 0, avg_price_per_sqm: 0,
+        suggested_ad_price: 0, suggested_market_price: 0, suggested_fast_sale_price: 0,
+        confidence_level: "low",
+        executive_summary: `Nenhum comparável válido encontrado. ${discardReasons.length} anúncios foram descartados.`,
+        research_metadata: researchMetadata as any,
+      });
+    }
+
     if (marketStudyId) await updateStudyStatus("completed");
 
     return {
