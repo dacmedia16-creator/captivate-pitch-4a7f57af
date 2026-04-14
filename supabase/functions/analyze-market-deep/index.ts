@@ -79,6 +79,8 @@ function buildSearchQuery(property: PropertyData, portal: PortalInfo, filters?: 
   const parts: string[] = [];
   if (property.property_type) parts.push(property.property_type);
   if (property.bedrooms) parts.push(`${property.bedrooms} quartos`);
+  // Include condominium name in search query when available (Bug 3 fix)
+  if (property.condominium) parts.push(property.condominium);
   if (property.neighborhood) parts.push(property.neighborhood);
   if (property.city) parts.push(property.city);
   const purpose = property.property_purpose?.toLowerCase();
@@ -86,6 +88,11 @@ function buildSearchQuery(property: PropertyData, portal: PortalInfo, filters?: 
   const siteFilter = getPortalSiteFilter(portal.code, purpose);
   if (siteFilter) parts.push(siteFilter);
   return parts.join(" ");
+}
+
+// Check if URL is an individual listing (not a search/listing page)
+function isIndividualListingUrl(url: string): boolean {
+  return /\/imovel\//i.test(url) || /\/propriedades\//i.test(url);
 }
 
 // Remove accents and normalize for URL slugs
@@ -137,9 +144,16 @@ function buildPortalNativeUrl(property: PropertyData, portal: PortalInfo): strin
       // zapimoveis.com.br/venda/apartamentos/sp+sorocaba+parque-campolim/
       return `https://www.zapimoveis.com.br/${purposeSlug}/${typeSlug}/${state}+${city}+${neighborhood}/`;
 
-    case "vivareal":
+    case "vivareal": {
       // vivareal.com.br/venda/sp/sorocaba/parque-campolim/apartamento_residencial/
-      return `https://www.vivareal.com.br/${purposeSlug}/${state}/${city}/${neighborhood}/apartamento_residencial/`;
+      const baseVivaUrl = `https://www.vivareal.com.br/${purposeSlug}/${state}/${city}/${neighborhood}/apartamento_residencial/`;
+      // When condominium is specified, add it as a filter parameter
+      if (property.condominium) {
+        const condoSlug = slugify(property.condominium);
+        return `${baseVivaUrl}?filtro=condominium:${condoSlug}`;
+      }
+      return baseVivaUrl;
+    }
 
     case "kenlo":
       // portal.kenlo.com.br/imoveis/a-venda/apartamento/sorocaba/parque-campolim?quartos=3+
@@ -638,7 +652,7 @@ serve(async (req) => {
         }
 
         // Multi-listing handling: try to expand into individual URLs
-        if (isMultiListing || looksLikeMultiListing(markdown)) {
+        if (!isIndividualListingUrl(item.url) && (isMultiListing || looksLikeMultiListing(markdown))) {
           // Collect individual URLs from this page
           let allIndividualUrls = extractIndividualListingUrls(links, item.portal.code);
           
@@ -1091,8 +1105,8 @@ Extraia todos os imóveis relevantes. Descarte apenas se claramente incompatíve
 
       const similarity = Math.min(100, Math.round(score));
 
-      // Minimum similarity filter
-      const minSimilarity = 40;
+      // Minimum similarity filter — lower threshold when focusing on same condominium
+      const minSimilarity = (filters?.preferSameCondominium && property.condominium) ? 25 : 40;
       if (similarity < minSimilarity) {
         discardReasons.push({
           url: c.source_url || "unknown",
