@@ -1,89 +1,48 @@
 
 
-# Plano: Garantir diversidade de portais na seleção de URLs (Kenlo aparecendo)
+# Diagnóstico: Dados do estudo de mercado não sincronizam com a apresentação
 
 ## Problema
 
-O Kenlo contribui 8 URLs via Google (0 nativas, pois é SPA), mas os outros 4 portais contribuem 70+ URLs nativas. Na seleção das 25 URLs para scraping, a priorização por relevância (condomínio > cidade) não garante representação de todos os portais. Resultado: **0 URLs do Kenlo são scrapeadas**.
+O estudo de mercado "teste 7" mostra valores atualizados (avg_price: R$ 1.028.587, median: R$ 992.100), mas a apresentação vinculada mostra valores antigos (avg_price: R$ 877.345, median: R$ 784.950).
 
 ## Causa raiz
 
-Linha 627-631: `mergedUrls.slice(0, 25)` — simples truncamento após sort. URLs de Viva Real, ZAP e OLX dominam pelo volume.
+Os dados do estudo de mercado são **copiados** para `presentation_sections` no momento da geração da apresentação (`useGeneratePresentation.ts`, linhas 193-203). Quando o estudo é recalculado posteriormente (ex: comparáveis aprovados/removidos, recálculo manual), os novos valores ficam apenas em `market_study_results` — as sections da apresentação **nunca são atualizadas**.
 
-## Solução: Round-robin por portal
+O mesmo acontece com `pricing_scenarios` (linha 205-212): os cenários de preço ficam congelados com os valores do momento da geração.
 
-Em vez de `slice(0, 25)`, implementar seleção round-robin que garante pelo menos N URLs por portal ativo (quando disponíveis), depois preenche o restante por relevância.
+## Solução
 
-### Lógica
+Criar uma função `syncMarketDataToPresentation` que, sempre que o estudo de mercado for recalculado, atualize automaticamente as sections `market_study_placeholder` e `pricing_scenarios` da apresentação vinculada.
 
-```text
-1. Agrupar URLs por portal
-2. Para cada portal com URLs, selecionar até 3 URLs (round-robin)
-3. Preencher slots restantes (até 25) com URLs não selecionadas, ordenadas por relevância
-```
+### Onde chamar a sincronização
 
-Com 5 portais: 5 × 3 = 15 slots garantidos, + 10 por relevância = 25 total.
+1. **Na página `MarketStudyResult.tsx`** — após o recálculo (botão "Recalcular")
+2. **Na edge function `analyze-market-deep`** — ao final, quando grava os resultados
+3. **Em `AgentNewPresentation.tsx`** — já existe lógica parcial (linha 322-324), mas usa dados do resultado local, não do `market_study_results`
 
-## Mudanças em `supabase/functions/analyze-market-deep/index.ts`
+### Implementação
 
-### Substituir linhas 627-631
+**Novo hook/função `syncMarketStudySections.ts`:**
 
-De:
 ```typescript
-const maxUrlsToScrape = Math.min(mergedUrls.length, 25);
-const urlsToProcess = mergedUrls.slice(0, maxUrlsToScrape);
+export async function syncMarketStudySections(marketStudyId: string) {
+  // 1. Buscar market_study_results atualizado
+  // 2. Buscar comparáveis aprovados
+  // 3. Buscar apresentações vinculadas (presentations.market_study_id = X)
+  // 4. Para cada apresentação: UPDATE presentation_sections 
+  //    SET content = novos dados WHERE section_key IN 
+  //    ('market_study_placeholder', 'pricing_scenarios')
+}
 ```
 
-Para:
-```typescript
-// Round-robin: garantir diversidade de portais
-const MAX_URLS = 25;
-const MIN_PER_PORTAL = 3;
-const byPortal = new Map<string, typeof mergedUrls>();
-for (const item of mergedUrls) {
-  const key = item.portal.code;
-  if (!byPortal.has(key)) byPortal.set(key, []);
-  byPortal.get(key)!.push(item);
-}
+**Chamadas:**
+- Após recálculo em `MarketStudyResult.tsx`
+- Após `analyze-market-deep` finalizar (na edge function)
 
-const selected = new Set<string>();
-const urlsToProcess: typeof mergedUrls = [];
-
-// Round 1: até MIN_PER_PORTAL por portal
-for (const [code, items] of byPortal) {
-  for (const item of items.slice(0, MIN_PER_PORTAL)) {
-    if (urlsToProcess.length >= MAX_URLS) break;
-    urlsToProcess.push(item);
-    selected.add(item.url);
-  }
-}
-
-// Round 2: preencher com restantes por relevância
-for (const item of mergedUrls) {
-  if (urlsToProcess.length >= MAX_URLS) break;
-  if (!selected.has(item.url)) {
-    urlsToProcess.push(item);
-  }
-}
-
-// Log distribuição
-const distLog = [...byPortal.entries()].map(([c, items]) => 
-  `${c}: ${urlsToProcess.filter(u => u.portal.code === c).length}/${items.length}`
-).join(", ");
-console.log(`[FASE 2] Distribuição por portal: ${distLog}`);
-```
-
-## Resultado esperado
-
-- Kenlo: 3 URLs scrapeadas (das 8 do Google)
-- Outros portais: pelo menos 3 cada, restante por relevância
-- Total: 25 URLs com representação de todos os portais ativos
-
-## Etapas
-1. Implementar round-robin na seleção de URLs
-2. Adicionar log de distribuição por portal
-3. Deploy + re-testar
-
-## Arquivo modificado
-`supabase/functions/analyze-market-deep/index.ts` — ~25 linhas alteradas
+### Arquivos modificados
+1. `src/hooks/syncMarketStudySections.ts` — nova função (criar)
+2. `src/pages/agent/MarketStudyResult.tsx` — chamar sync após recálculo
+3. `supabase/functions/analyze-market-deep/index.ts` — chamar sync ao final da execução
 
