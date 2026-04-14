@@ -46,6 +46,36 @@ const SECTION_DEFINITIONS = [
   { key: "closing", title: "Fechamento", order: 14 },
 ];
 
+/** Fetch market data from the official market_studies flow, with legacy fallback */
+async function fetchMarketData(presentation: any) {
+  let comparables: any[] = [];
+  let report: any = null;
+
+  if (presentation.market_study_id) {
+    // Official flow
+    const [compsRes, resultRes] = await Promise.all([
+      supabase.from("market_study_comparables").select("*").eq("market_study_id", presentation.market_study_id).eq("is_approved", true),
+      supabase.from("market_study_results").select("*").eq("market_study_id", presentation.market_study_id).single(),
+    ]);
+    comparables = compsRes.data || [];
+    report = resultRes.data;
+  } else {
+    // Legacy fallback
+    const { data: jobs } = await supabase.from("market_analysis_jobs").select("id").eq("presentation_id", presentation.id);
+    if (jobs && jobs.length > 0) {
+      const jobId = jobs[0].id;
+      const [compsRes, repRes] = await Promise.all([
+        supabase.from("market_comparables").select("*").eq("market_analysis_job_id", jobId).eq("is_approved", true),
+        supabase.from("market_reports").select("*").eq("market_analysis_job_id", jobId).single(),
+      ]);
+      comparables = compsRes.data || [];
+      report = repRes.data;
+    }
+  }
+
+  return { comparables, report };
+}
+
 export async function generatePresentationSections({ presentationId, tenantId, brokerId }: GenerateParams) {
   const [
     { data: presentation },
@@ -68,6 +98,9 @@ export async function generatePresentationSections({ presentationId, tenantId, b
     supabase.from("testimonials").select("*").eq("tenant_id", tenantId).order("sort_order"),
     supabase.from("presentation_images").select("*").eq("presentation_id", presentationId).order("sort_order"),
   ]);
+
+  // Fetch market data from official or legacy flow
+  const { comparables, report } = presentation ? await fetchMarketData(presentation) : { comparables: [], report: null };
 
   const agencyAny = agency as any;
 
@@ -157,15 +190,27 @@ export async function generatePresentationSections({ presentationId, tenantId, b
         content = { items: salesResults || [], testimonials: testimonials || [] };
         break;
       case "market_study_placeholder":
-        content = { status: "pending", message: "O estudo de mercado será inserido aqui após processamento." };
+        if (report) {
+          content = {
+            status: "completed",
+            avg_price: report.avg_price,
+            median_price: report.median_price,
+            avg_price_per_sqm: report.avg_price_per_sqm,
+            confidence_level: report.confidence_level,
+            executive_summary: report.executive_summary || report.summary,
+            comparables_count: comparables.length,
+          };
+        } else {
+          content = { status: "pending", message: "O estudo de mercado será inserido aqui após processamento." };
+        }
         break;
       case "pricing_scenarios":
         content = {
           owner_expected_price: presentation?.owner_expected_price,
           scenarios: [
-            { label: "Preço aspiracional", value: null },
-            { label: "Preço de mercado", value: null },
-            { label: "Preço de venda rápida", value: null },
+            { label: "Preço aspiracional", value: report?.suggested_ad_price || report?.suggested_aspirational_price || null },
+            { label: "Preço de mercado", value: report?.suggested_market_price || null },
+            { label: "Preço de venda rápida", value: report?.suggested_fast_sale_price || null },
           ],
         };
         break;

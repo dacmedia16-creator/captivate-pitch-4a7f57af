@@ -1,3 +1,7 @@
+/** 
+ * @deprecated useSaveMarketReport writes to legacy market_reports table.
+ * calculateMarketPrices is still used by the official flow.
+ */
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 

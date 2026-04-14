@@ -1,3 +1,4 @@
+/** @deprecated Legacy page — uses market_analysis_jobs/market_comparables. Routes redirect to /market-studies/:id. Will be removed. */
 import { useState } from "react";
 import { useParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
