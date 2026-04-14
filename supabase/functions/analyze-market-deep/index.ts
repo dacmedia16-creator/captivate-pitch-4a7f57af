@@ -531,8 +531,9 @@ async function processMarketAnalysis(
 
     // Merge native + Google URLs, dedup, and CITY PRE-FILTER
     const seenUrls = new Set<string>();
-    const mergedUrls: Array<{ url: string; title: string; portal: PortalInfo; snippet: string }> = [];
+    const mergedUrlsRaw: Array<{ url: string; title: string; portal: PortalInfo; snippet: string }> = [];
     let cityFilteredCount = 0;
+    const cityFilteredExamples: string[] = [];
     for (const item of [...nativeUrls, ...googleUrls]) {
       const normalized = item.url.replace(/\/$/, "").toLowerCase();
       if (seenUrls.has(normalized)) continue;
@@ -541,6 +542,9 @@ async function processMarketAnalysis(
       // City pre-filter: discard URLs from obviously wrong cities
       if (isWrongCityUrl(item.url, property.city)) {
         cityFilteredCount++;
+        if (cityFilteredExamples.length < 5) {
+          cityFilteredExamples.push(item.url.substring(0, 100));
+        }
         discardReasons.push({
           url: item.url,
           portal: item.portal.name,
@@ -549,14 +553,33 @@ async function processMarketAnalysis(
         continue;
       }
 
-      mergedUrls.push(item);
+      mergedUrlsRaw.push(item);
     }
 
     if (cityFilteredCount > 0) {
       console.log(`[FASE 1] Pré-filtro de cidade removeu ${cityFilteredCount} URLs de cidades erradas`);
+      console.log(`[FASE 1] Exemplos filtrados: ${cityFilteredExamples.join(" | ")}`);
     }
 
+    // Sort by relevance: condo-target > city-match > rest
+    const condoSlug = property.condominium ? slugify(property.condominium) : null;
+    const citySlug = property.city ? slugify(property.city) : null;
+
+    const mergedUrls = mergedUrlsRaw.sort((a, b) => {
+      const aLower = a.url.toLowerCase();
+      const bLower = b.url.toLowerCase();
+      const aCondoMatch = condoSlug && aLower.includes(condoSlug) ? 1 : 0;
+      const bCondoMatch = condoSlug && bLower.includes(condoSlug) ? 1 : 0;
+      if (aCondoMatch !== bCondoMatch) return bCondoMatch - aCondoMatch; // condo first
+      const aCityMatch = citySlug && aLower.includes(citySlug) ? 1 : 0;
+      const bCityMatch = citySlug && bLower.includes(citySlug) ? 1 : 0;
+      return bCityMatch - aCityMatch; // city match second
+    });
+
     console.log(`[FASE 1] Total merged: ${mergedUrls.length} URLs únicas (${nativeUrls.length} nativo + ${googleUrls.length} Google)`);
+    if (mergedUrls.length > 0) {
+      console.log(`[FASE 1] Top 3 URLs após priorização: ${mergedUrls.slice(0, 3).map(u => u.url.substring(0, 80)).join(" | ")}`);
+    }
 
     for (const pr of portalResults) {
       const nativeCount = nativeUrls.filter(u => u.portal.code === pr.portal_code).length;
