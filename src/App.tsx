@@ -35,10 +35,14 @@ const AgentDashboard = lazy(() => import("@/pages/agent/AgentDashboard"));
 const AgentPresentations = lazy(() => import("@/pages/agent/AgentPresentations"));
 const AgentNewPresentation = lazy(() => import("@/pages/agent/AgentNewPresentation"));
 const AgentProfile = lazy(() => import("@/pages/agent/AgentProfile"));
-const AgentMarketStudy = lazy(() => import("@/pages/agent/AgentMarketStudy"));
 const MarketStudies = lazy(() => import("@/pages/agent/MarketStudies"));
 const MarketStudyResult = lazy(() => import("@/pages/agent/MarketStudyResult"));
-const MarketStudyDetail = lazy(() => import("@/pages/agent/MarketStudyDetail"));
+
+// Legacy redirect helper
+const LegacyStudyRedirect = () => {
+  const params = window.location.pathname.match(/\/market-study\/(.+)/);
+  return <Navigate to={params ? `/market-studies/${params[1]}` : "/market-studies"} replace />;
+};
 const PresentationEditor = lazy(() => import("@/pages/agent/PresentationEditor"));
 const PresentationMode = lazy(() => import("@/pages/agent/PresentationMode"));
 const SharedPresentation = lazy(() => import("@/pages/shared/SharedPresentation"));
@@ -78,8 +82,9 @@ const App = () => (
                 <Route path="/presentations/:id/edit" element={<AppLayout><RoleGuard allowedRoles={["agent"]}><PresentationEditor /></RoleGuard></AppLayout>} />
                 <Route path="/presentations/:id/present" element={<RoleGuard allowedRoles={["agent"]}><PresentationMode /></RoleGuard>} />
                 <Route path="/profile" element={<AppLayout><RoleGuard allowedRoles={["agent"]}><AgentProfile /></RoleGuard></AppLayout>} />
-                <Route path="/market-study" element={<AppLayout><RoleGuard allowedRoles={["agent"]}><AgentMarketStudy /></RoleGuard></AppLayout>} />
-                <Route path="/market-study/:id" element={<AppLayout><RoleGuard allowedRoles={["agent"]}><MarketStudyDetail /></RoleGuard></AppLayout>} />
+                {/* Legacy redirects → official routes */}
+                <Route path="/market-study" element={<Navigate to="/market-studies" replace />} />
+                <Route path="/market-study/:id" element={<LegacyStudyRedirect />} />
                 <Route path="/market-studies" element={<AppLayout><RoleGuard allowedRoles={["agent"]}><MarketStudies /></RoleGuard></AppLayout>} />
                 <Route path="/market-studies/:id" element={<AppLayout><RoleGuard allowedRoles={["agent"]}><MarketStudyResult /></RoleGuard></AppLayout>} />
 

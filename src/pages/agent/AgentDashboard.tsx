@@ -32,7 +32,7 @@ export default function AgentDashboard() {
         supabase.from("presentations").select("id", { count: "exact", head: true }).eq("broker_id", uid!),
         supabase.from("presentations").select("id", { count: "exact", head: true }).eq("broker_id", uid!).gte("created_at", monthStart),
         supabase.from("export_history").select("id", { count: "exact", head: true }).eq("created_by", uid!),
-        supabase.from("market_analysis_jobs").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId!),
+        supabase.from("market_studies").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId!),
         supabase.from("presentation_templates").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId!),
       ]);
       return { total: total.count || 0, monthly: monthly.count || 0, exports: exports.count || 0, studies: studies.count || 0, templates: templates.count || 0 };
