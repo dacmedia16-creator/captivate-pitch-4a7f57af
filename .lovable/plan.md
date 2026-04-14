@@ -1,48 +1,31 @@
 
 
-# Diagnóstico: Dados do estudo de mercado não sincronizam com a apresentação
+# Corrigir: Usuário sem tenant_id não vê portais
 
 ## Problema
-
-O estudo de mercado "teste 7" mostra valores atualizados (avg_price: R$ 1.028.587, median: R$ 992.100), mas a apresentação vinculada mostra valores antigos (avg_price: R$ 877.345, median: R$ 784.950).
+O perfil do usuário logado (`c5043c88-ce5f-4e52-8081-b57d7262b300`) tem `tenant_id = NULL`. A query de portais filtra por `tenant_id`, então retorna vazio → "Nenhum portal configurado pela imobiliária."
 
 ## Causa raiz
-
-Os dados do estudo de mercado são **copiados** para `presentation_sections` no momento da geração da apresentação (`useGeneratePresentation.ts`, linhas 193-203). Quando o estudo é recalculado posteriormente (ex: comparáveis aprovados/removidos, recálculo manual), os novos valores ficam apenas em `market_study_results` — as sections da apresentação **nunca são atualizadas**.
-
-O mesmo acontece com `pricing_scenarios` (linha 205-212): os cenários de preço ficam congelados com os valores do momento da geração.
+Esse usuário foi criado sem ser associado a um tenant. Os 3 usuários demo (Ana, Carlos, Marina) estão corretamente no tenant `fa4322ce-...`, mas este 4º usuário não.
 
 ## Solução
 
-Criar uma função `syncMarketDataToPresentation` que, sempre que o estudo de mercado for recalculado, atualize automaticamente as sections `market_study_placeholder` e `pricing_scenarios` da apresentação vinculada.
-
-### Onde chamar a sincronização
-
-1. **Na página `MarketStudyResult.tsx`** — após o recálculo (botão "Recalcular")
-2. **Na edge function `analyze-market-deep`** — ao final, quando grava os resultados
-3. **Em `AgentNewPresentation.tsx`** — já existe lógica parcial (linha 322-324), mas usa dados do resultado local, não do `market_study_results`
-
-### Implementação
-
-**Novo hook/função `syncMarketStudySections.ts`:**
-
-```typescript
-export async function syncMarketStudySections(marketStudyId: string) {
-  // 1. Buscar market_study_results atualizado
-  // 2. Buscar comparáveis aprovados
-  // 3. Buscar apresentações vinculadas (presentations.market_study_id = X)
-  // 4. Para cada apresentação: UPDATE presentation_sections 
-  //    SET content = novos dados WHERE section_key IN 
-  //    ('market_study_placeholder', 'pricing_scenarios')
-}
+### Opção A — Vincular o usuário ao tenant existente (rápido)
+Executar uma migration para atualizar o perfil:
+```sql
+UPDATE profiles 
+SET tenant_id = 'fa4322ce-bdbe-4221-b1f7-2bd38c4dd79c' 
+WHERE id = 'c5043c88-ce5f-4e52-8081-b57d7262b300';
 ```
 
-**Chamadas:**
-- Após recálculo em `MarketStudyResult.tsx`
-- Após `analyze-market-deep` finalizar (na edge function)
+### Opção B — Auto-associar no signup (preventivo)
+Modificar o trigger de criação de perfil ou o fluxo de signup para garantir que novos usuários sejam associados a um tenant automaticamente. Isso evita o problema no futuro.
 
-### Arquivos modificados
-1. `src/hooks/syncMarketStudySections.ts` — nova função (criar)
-2. `src/pages/agent/MarketStudyResult.tsx` — chamar sync após recálculo
-3. `supabase/functions/analyze-market-deep/index.ts` — chamar sync ao final da execução
+## Recomendação
+Fazer **ambos**: a migration resolve o caso atual, e ajustar o signup previne recorrência.
+
+### Arquivos
+1. **Migration SQL** — vincular o usuário ao tenant
+2. `src/pages/auth/Signup.tsx` — garantir que o signup associe o `tenant_id` (verificar se já faz isso)
+3. `src/contexts/AuthContext.tsx` — verificar se o trigger `handle_new_user` define `tenant_id`
 
