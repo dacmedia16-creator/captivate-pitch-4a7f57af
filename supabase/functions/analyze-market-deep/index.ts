@@ -691,14 +691,40 @@ async function processMarketAnalysis(
         }
 
         const scrapeData = await scrapeRes.json();
-        const markdown = scrapeData.data?.markdown || scrapeData.markdown || "";
+        let markdown = scrapeData.data?.markdown || scrapeData.markdown || "";
         const links: string[] = scrapeData.data?.links || scrapeData.links || [];
+
+        // Diagnostic: log markdown size per portal
+        console.log(`[FASE 2] ${item.portal.name} markdown: ${markdown.length} chars for ${item.url.substring(0, 60)}...`);
+
+        // Google Cache fallback for Kenlo SPA pages with insufficient content
+        if (isKenlo && markdown.length < 500) {
+          console.log(`[FASE 2] Kenlo page too short (${markdown.length} chars), trying Google Cache fallback...`);
+          try {
+            const cacheUrl = `https://webcache.googleusercontent.com/search?q=cache:${encodeURIComponent(item.url)}`;
+            const cacheRes = await fetch("https://api.firecrawl.dev/v1/scrape", {
+              method: "POST",
+              headers: { Authorization: `Bearer ${FIRECRAWL_API_KEY}`, "Content-Type": "application/json" },
+              body: JSON.stringify({ url: cacheUrl, formats: ["markdown"], onlyMainContent: true, waitFor: 3000 }),
+            });
+            if (cacheRes.ok) {
+              const cacheData = await cacheRes.json();
+              const cacheMd = cacheData.data?.markdown || cacheData.markdown || "";
+              if (cacheMd.length > markdown.length) {
+                console.log(`[FASE 2] Google Cache returned ${cacheMd.length} chars (better than ${markdown.length})`);
+                markdown = cacheMd;
+              }
+            }
+          } catch (cacheErr) {
+            console.warn(`[FASE 2] Google Cache fallback failed for ${item.url}`, cacheErr);
+          }
+        }
 
         if (!markdown || markdown.length < 100) {
           discardReasons.push({
             url: item.url,
             portal: item.portal.name,
-            reason: "Conteúdo insuficiente ou página vazia",
+            reason: `Conteúdo insuficiente (${markdown.length} chars)${isKenlo ? ' — SPA não renderizou' : ''}`,
           });
           continue;
         }
