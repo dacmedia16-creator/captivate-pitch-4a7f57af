@@ -539,6 +539,24 @@ async function processMarketAnalysis(
       if (seenUrls.has(normalized)) continue;
       seenUrls.add(normalized);
 
+      // Purpose pre-filter: discard rental URLs when purpose is sale (and vice-versa)
+      const studyPurpose = (property.property_purpose || "venda").toLowerCase();
+      const urlLower = item.url.toLowerCase();
+      const isRentalUrl = /\/(aluguel|alugar|para-alugar)\//i.test(urlLower);
+      const isSaleUrl = /\/(venda|comprar|a-venda)\//i.test(urlLower);
+      if (studyPurpose !== "aluguel" && studyPurpose !== "rent" && isRentalUrl && !isSaleUrl) {
+        cityFilteredCount++;
+        if (cityFilteredExamples.length < 5) cityFilteredExamples.push(item.url.substring(0, 100));
+        discardReasons.push({ url: item.url, portal: item.portal.name, reason: "URL de aluguel descartada (estudo é venda)" });
+        continue;
+      }
+      if ((studyPurpose === "aluguel" || studyPurpose === "rent") && isSaleUrl && !isRentalUrl) {
+        cityFilteredCount++;
+        if (cityFilteredExamples.length < 5) cityFilteredExamples.push(item.url.substring(0, 100));
+        discardReasons.push({ url: item.url, portal: item.portal.name, reason: "URL de venda descartada (estudo é aluguel)" });
+        continue;
+      }
+
       // City pre-filter: discard URLs from obviously wrong cities
       if (isWrongCityUrl(item.url, property.city)) {
         cityFilteredCount++;
@@ -1052,9 +1070,35 @@ Extraia todos os imóveis relevantes. Descarte apenas se claramente incompatíve
       ? new Date(Date.now() - maxAgeMonths * 30 * 24 * 60 * 60 * 1000)
       : null;
 
+    const studyPurposeFinal = (property.property_purpose || "venda").toLowerCase();
+    const isStudySale = studyPurposeFinal !== "aluguel" && studyPurposeFinal !== "rent";
+
     for (const c of (extracted.comparables || [])) {
       if (!c.price || c.price <= 0 || !c.area || c.area <= 0) {
         discardReasons.push({ url: c.source_url || "unknown", portal: c.source_name || "unknown", reason: "Preço ou área não disponível" });
+        continue;
+      }
+
+      // Purpose filter by title keywords
+      const titleLower = (c.title || "").toLowerCase();
+      const isRentalTitle = /alugu[e]?[lr]|para alugar|locação/i.test(titleLower);
+      const isSaleTitle = /venda|comprar|à venda|a venda/i.test(titleLower);
+      if (isStudySale && isRentalTitle && !isSaleTitle) {
+        discardReasons.push({ url: c.source_url || "unknown", portal: c.source_name || "unknown", reason: "Comparável é aluguel (título), estudo é venda" });
+        continue;
+      }
+      if (!isStudySale && isSaleTitle && !isRentalTitle) {
+        discardReasons.push({ url: c.source_url || "unknown", portal: c.source_name || "unknown", reason: "Comparável é venda (título), estudo é aluguel" });
+        continue;
+      }
+
+      // Price heuristic: sales < R$10k are likely rentals, rentals > R$100k are likely sales
+      if (isStudySale && c.price < 10000) {
+        discardReasons.push({ url: c.source_url || "unknown", portal: c.source_name || "unknown", reason: `Preço R$ ${c.price.toLocaleString("pt-BR")} muito baixo para venda (provável aluguel)` });
+        continue;
+      }
+      if (!isStudySale && c.price > 100000) {
+        discardReasons.push({ url: c.source_url || "unknown", portal: c.source_name || "unknown", reason: `Preço R$ ${c.price.toLocaleString("pt-BR")} muito alto para aluguel (provável venda)` });
         continue;
       }
 
