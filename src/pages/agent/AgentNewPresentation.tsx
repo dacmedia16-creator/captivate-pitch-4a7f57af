@@ -222,7 +222,6 @@ export default function AgentNewPresentation() {
         // Sync mode — edge function already saved to DB if market_study_id was provided
         if (!deepError && deepResult?.success && deepResult?.comparables?.length) {
           scrapedComparables = deepResult.comparables;
-          researchMetadata = deepResult.research_metadata || null;
           toast.success(`${deepResult.research_metadata?.total_listings_found || 0} anúncios encontrados, ${deepResult.comparables.length} selecionados`);
         } else {
           throw new Error(deepError?.message || deepResult?.message || "No results");
