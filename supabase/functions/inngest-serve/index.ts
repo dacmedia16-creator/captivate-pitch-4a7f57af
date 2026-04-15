@@ -667,7 +667,7 @@ IMÓVEL DE REFERÊNCIA: Tipo: ${property.property_type || "?"}, Bairro: ${proper
 const inngest = new Inngest({ id: "listing-studio-ai" });
 
 const marketStudyAnalyze = inngest.createFunction(
-  { id: "market-study-analyze", retries: 2, trigger: { event: "market-study/analyze.requested" } },
+  { id: "market-study-analyze", retries: 2, triggers: [{ event: "market-study/analyze.requested" }] },
   async ({ event }) => {
     const { property, portals, filters, market_study_id } = event.data;
     const FIRECRAWL_API_KEY = Deno.env.get("FIRECRAWL_API_KEY");
