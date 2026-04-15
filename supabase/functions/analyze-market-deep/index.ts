@@ -7,6 +7,40 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+// Retry with exponential backoff for Firecrawl calls
+async function fetchWithRetry(
+  url: string,
+  options: RequestInit,
+  maxRetries = 3,
+  baseDelayMs = 2000,
+): Promise<Response> {
+  let lastError: Error | null = null;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const res = await fetch(url, options);
+      // Don't retry on 4xx (client errors) except 429 (rate limit)
+      if (res.ok || (res.status >= 400 && res.status < 500 && res.status !== 429)) {
+        return res;
+      }
+      // 429 or 5xx → retry
+      if (attempt < maxRetries) {
+        const delay = baseDelayMs * Math.pow(2, attempt);
+        console.log(`[RETRY] Attempt ${attempt + 1}/${maxRetries}, waiting ${delay}ms (status: ${res.status})`);
+        await new Promise(r => setTimeout(r, delay));
+      } else {
+        return res; // Return last failed response
+      }
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error(String(err));
+      if (attempt < maxRetries) {
+        const delay = baseDelayMs * Math.pow(2, attempt);
+        console.log(`[RETRY] Attempt ${attempt + 1}/${maxRetries}, waiting ${delay}ms (error: ${lastError.message})`);
+        await new Promise(r => setTimeout(r, delay));
+      }
+    }
+  }
+  throw lastError || new Error("fetchWithRetry: all attempts failed");
+
 const PORTAL_SITE_MAP: Record<string, string> = {
   zap: "site:zapimoveis.com.br",
   vivareal: "site:vivareal.com.br",
