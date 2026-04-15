@@ -1,39 +1,18 @@
 
 
-# Corrigir extração de anúncios do VIP Seven
+# Ocultar seção "Portais de pesquisa" do wizard
 
 ## Problema
-O Firecrawl retorna 21 links no array `links` para o VIP Seven, mas nenhum é `/imovel/XXXX`. O site é um SPA e os links dos imóveis ficam apenas no **markdown** (formato `](https://vipsevenimoveis.com.br/imovel/1051)`).
+O usuário quer esconder a seção "Portais de pesquisa" (o card com os toggles dos portais) no step de Market Study do wizard.
 
 ## Solução
 
-### `supabase/functions/inngest-serve/index.ts`
+### `src/components/wizard/StepMarketStudy.tsx`
+Remover (ou comentar) o primeiro `<Card>` que contém "Portais de pesquisa" — o bloco com o `portalList.map()` e os switches. Manter os cards de "Filtros de pesquisa" e "Preferências avançadas".
 
-**1. Alterar `extractIndividualListingUrls`** (linha 218) para aceitar `markdown` opcional e extrair URLs dele:
-
-```typescript
-function extractIndividualListingUrls(
-  links: string[], portalCode: string, markdown?: string
-): string[] {
-  const listingPatterns: Record<string, RegExp> = { /* existente */ };
-  const pattern = listingPatterns[portalCode];
-  if (!pattern) return [];
-  let allLinks = [...links];
-  if (markdown) {
-    const mdRegex = /\]\((https?:\/\/[^\s)]+)\)/g;
-    let m;
-    while ((m = mdRegex.exec(markdown)) !== null) allLinks.push(m[1]);
-  }
-  return [...new Set(allLinks.filter(l => pattern.test(l)))];
-}
-```
-
-**2. Passar `markdown`** nas 2 chamadas existentes:
-- Linha 431: `extractIndividualListingUrls(links, item.portal.code, markdown)`
-- Linha 438 (paginação): `extractIndividualListingUrls(..., item.portal.code, pagMd)` — extrair markdown da resposta da paginação também
+Os portais selecionados continuarão funcionando via o valor default de `selectedPortals` (que já vem preenchido no state do wizard).
 
 ## Escopo
-- 1 função alterada (~6 linhas adicionais)
-- 2 call sites atualizados
-- Redeploy da edge function
+- 1 arquivo editado
+- Remoção de ~30 linhas (o card de portais)
 
