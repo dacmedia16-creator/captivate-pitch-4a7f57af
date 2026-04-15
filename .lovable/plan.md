@@ -1,35 +1,32 @@
 
 
-# Excluir Kenlo do sistema
+# Adicionar QuintoAndar como portal de pesquisa
 
 ## O que será feito
 
-Remover todas as referências ao portal Kenlo dos edge functions e desativar o registro no banco de dados.
+Adicionar o QuintoAndar como opção de portal nos 3 edge functions de pesquisa de mercado e inserir o registro na tabela `portal_sources`.
 
 ## Mudanças
 
-### 1. Migration — desativar Kenlo no banco
+### 1. Inserir registro no banco (via insert tool)
 ```sql
-UPDATE public.portal_sources SET is_global = false WHERE code = 'kenlo';
-DELETE FROM public.tenant_portal_settings WHERE portal_source_id = (SELECT id FROM public.portal_sources WHERE code = 'kenlo');
+INSERT INTO public.portal_sources (name, code, base_url, is_global)
+VALUES ('QuintoAndar', 'quintoandar', 'https://www.quintoandar.com.br', true);
 ```
 
 ### 2. `supabase/functions/inngest-serve/index.ts`
-- Remover `kenlo` do map `PORTAL_SITE_FILTERS` (linha 128)
-- Remover case `"kenlo"` da função `portalTypeSlug` (linhas 169-172)
-- Remover case `"kenlo"` da função `buildPortalUrl` (linhas 198-203)
-- Remover `kenlo` dos `listingPatterns` (linhas 226 e 323)
-- Remover todo o bloco de Kenlo extract schema e lógica especial (linhas 412-478)
-- Remover referências `isKenlo` no scraping padrão (linhas 481-483)
+- Adicionar `quintoandar: "site:quintoandar.com.br"` ao `PORTAL_SITE_MAP` (linha 128)
+- Adicionar case `"quintoandar"` em `buildPortalNativeUrl` para gerar URL nativa de busca
+- Adicionar pattern `quintoandar: /quintoandar\.com\.br\/imovel\//` em `extractIndividualListingUrls` (linha 215)
 
 ### 3. `supabase/functions/analyze-market/index.ts`
-- Remover `kenlo` do map de portais (linha 16)
+- Adicionar `quintoandar: "site:quintoandar.com.br"` ao `PORTAL_SITE_MAP` (linha 15)
 
 ### 4. `supabase/functions/analyze-market-manus/index.ts`
-- Remover `kenlo` do map de portais (linha 44)
+- Já tem `quintoandar` no `PORTAL_URLS` (linha 43) — nenhuma mudança necessária
 
 ## Escopo
-- 1 migration (desativar + limpar settings)
-- 3 edge functions editadas
-- ~80 linhas removidas
+- 1 insert no banco (portal_sources)
+- 2 edge functions editadas (~10 linhas adicionadas)
+- QuintoAndar aparecerá automaticamente na tela de configuração de portais da imobiliária
 
