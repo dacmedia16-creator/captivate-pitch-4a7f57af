@@ -125,7 +125,6 @@ const PORTAL_SITE_MAP: Record<string, string> = {
   olx_aluguel: "site:olx.com.br/imoveis/aluguel",
   imovelweb: "site:imovelweb.com.br",
   chavesnamao: "site:chavesnamao.com.br",
-  kenlo: "site:portal.kenlo.com.br",
 };
 
 function getPortalSiteFilter(portalCode: string, purpose?: string): string | undefined {
@@ -166,12 +165,6 @@ function getPropertyTypeSlug(type: string | undefined, portal: string): string {
     if (t.includes("terreno")) return "terrenos";
     return "apartamentos";
   }
-  if (portal === "kenlo") {
-    if (t.includes("casa")) return "casa";
-    if (t.includes("cobertura")) return "cobertura";
-    if (t.includes("terreno")) return "terreno";
-    return "apartamento";
-  }
   if (t.includes("casa")) return "casas";
   return "apartamentos";
 }
@@ -195,12 +188,6 @@ function buildPortalNativeUrl(property: PropertyData, portal: PortalInfo): strin
       if (property.condominium) return `${baseVivaUrl}?filtro=condominium:${slugify(property.condominium)}`;
       return baseVivaUrl;
     }
-    case "kenlo": {
-      const kenloAction = isRental ? "para-alugar" : "a-venda";
-      let kenloUrl = `https://portal.kenlo.com.br/imoveis/${kenloAction}/${typeSlug}/${city}/${neighborhood}`;
-      if (bedrooms) kenloUrl += `?quartos=${bedrooms}+`;
-      return kenloUrl;
-    }
     case "olx":
       return `https://www.olx.com.br/imoveis/${purposeSlug}/${typeSlug}/estado-${state}/${city}-e-regiao/${neighborhood}`;
     case "imovelweb":
@@ -223,7 +210,7 @@ function looksLikeMultiListing(markdown: string): boolean {
 function extractIndividualListingUrls(links: string[], portalCode: string): string[] {
   const listingPatterns: Record<string, RegExp> = {
     zap: /zapimoveis\.com\.br\/imovel\//, vivareal: /vivareal\.com\.br\/imovel\//,
-    kenlo: /portal\.kenlo\.com\.br\/imovel\//, olx: /olx\.com\.br\/.*\/imoveis\//,
+    olx: /olx\.com\.br\/.*\/imoveis\//,
     imovelweb: /imovelweb\.com\.br\/propriedades\//,
   };
   const pattern = listingPatterns[portalCode];
@@ -320,7 +307,7 @@ async function collectUrls(
       const scrapeData = await scrapeRes.json();
       const links: string[] = scrapeData.data?.links || scrapeData.links || [];
       const markdown: string = scrapeData.data?.markdown || scrapeData.markdown || "";
-      const listingPatterns: Record<string, RegExp> = { zap: /zapimoveis\.com\.br\/imovel\//, vivareal: /vivareal\.com\.br\/imovel\//, kenlo: /portal\.kenlo\.com\.br\/imovel\//, olx: /olx\.com\.br\/.*\/imoveis\//, imovelweb: /imovelweb\.com\.br\/propriedades\// };
+      const listingPatterns: Record<string, RegExp> = { zap: /zapimoveis\.com\.br\/imovel\//, vivareal: /vivareal\.com\.br\/imovel\//, olx: /olx\.com\.br\/.*\/imoveis\//, imovelweb: /imovelweb\.com\.br\/propriedades\// };
       const pattern = listingPatterns[portal.code];
       const listingUrls = pattern ? links.filter(l => pattern.test(l)) : [];
       console.log(`[INNGEST][FASE 1A] ${portal.name}: ${links.length} links, ${listingUrls.length} anúncios`);
@@ -409,94 +396,22 @@ async function scrapeUrlBatch(
   const discardReasons: DiscardReason[] = [];
   let listingsOpened = 0;
 
-  // Kenlo extract schema for Firecrawl v2 JSON extraction
-  const KENLO_EXTRACT_SCHEMA = {
-    type: "object",
-    properties: {
-      title: { type: "string", description: "Título do anúncio" },
-      price: { type: "number", description: "Preço em reais, sem pontos ou separadores. Ex: 1200000" },
-      area: { type: "number", description: "Área total em m²" },
-      bedrooms: { type: "number", description: "Número de quartos/dormitórios" },
-      suites: { type: "number", description: "Número de suítes" },
-      parking_spots: { type: "number", description: "Número de vagas de garagem" },
-      bathrooms: { type: "number", description: "Número de banheiros" },
-      address: { type: "string", description: "Endereço completo" },
-      neighborhood: { type: "string", description: "Bairro" },
-      city: { type: "string", description: "Cidade" },
-      condominium: { type: "string", description: "Nome do condomínio" },
-      external_id: { type: "string", description: "Código do imóvel no portal" },
-      description: { type: "string", description: "Descrição resumida do imóvel" },
-    },
-    required: ["title", "price", "area"],
-  };
-
   for (const item of batch) {
     try {
       const isML = isMultiListingUrl(item.url);
       listingsOpened++;
-      const isKenlo = /kenlo\.com\.br/i.test(item.url);
-      const isKenloIndividual = isKenlo && /\/imovel\//i.test(item.url) && !isML;
 
-      // For Kenlo individual listings: use Firecrawl v2 extract (JSON) instead of markdown
-      if (isKenloIndividual) {
-        try {
-          const extractBody = {
-            url: item.url,
-            formats: ["extract"],
-            extract: {
-              schema: KENLO_EXTRACT_SCHEMA,
-              prompt: "Extraia os dados deste anúncio imobiliário brasileiro. Retorne o preço como número inteiro sem separadores.",
-            },
-            waitFor: 10000,
-            actions: [{ type: "wait", milliseconds: 8000 }, { type: "scroll", direction: "down", amount: 3 }, { type: "wait", milliseconds: 2000 }],
-          };
-          const extractRes = await fetchWithRetry("https://api.firecrawl.dev/v2/scrape", {
-            method: "POST", headers: { Authorization: `Bearer ${FIRECRAWL_API_KEY}`, "Content-Type": "application/json" },
-            body: JSON.stringify(extractBody),
-          });
-          if (extractRes.ok) {
-            const extractData = await extractRes.json();
-            const extracted = extractData.data?.extract || extractData.extract;
-            if (extracted && extracted.price > 0 && extracted.area > 0) {
-              console.log(`[INNGEST][KENLO-EXTRACT] OK: ${extracted.title || item.url} - R$${extracted.price} - ${extracted.area}m²`);
-              scrapedPages.push({
-                url: item.url, portal: item.portal, markdown: "", status: "ok",
-                isMultiListing: false,
-                isCondoTarget: condoSlug ? item.url.toLowerCase().includes(condoSlug) : false,
-                extractedData: extracted,
-              });
-              continue; // Skip to next URL — no need for markdown fallback
-            }
-            console.log(`[INNGEST][KENLO-EXTRACT] Incomplete data for ${item.url}, falling back to markdown`);
-          } else {
-            console.log(`[INNGEST][KENLO-EXTRACT] HTTP ${extractRes.status} for ${item.url}, falling back to markdown`);
-            await extractRes.text();
-          }
-        } catch (extractErr) {
-          console.warn(`[INNGEST][KENLO-EXTRACT] Error for ${item.url}, falling back to markdown:`, extractErr);
-        }
-      }
-
-      // Standard markdown scraping (also serves as Kenlo fallback)
-      const scrapeBody: any = { url: item.url, formats: isML ? ["markdown", "links"] : ["markdown"], onlyMainContent: true, waitFor: isKenlo ? 10000 : (isML ? 5000 : 2000) };
-      if (isKenlo) scrapeBody.actions = [{ type: "wait", milliseconds: 8000 }, { type: "scroll", direction: "down", amount: 3 }, { type: "wait", milliseconds: 2000 }];
-      const firecrawlUrl = isKenlo ? "https://api.firecrawl.dev/v2/scrape" : "https://api.firecrawl.dev/v1/scrape";
+      // Standard markdown scraping
+      const scrapeBody: any = { url: item.url, formats: isML ? ["markdown", "links"] : ["markdown"], onlyMainContent: true, waitFor: isML ? 5000 : 2000 };
+      const firecrawlUrl = "https://api.firecrawl.dev/v1/scrape";
       const scrapeRes = await fetchWithRetry(firecrawlUrl, { method: "POST", headers: { Authorization: `Bearer ${FIRECRAWL_API_KEY}`, "Content-Type": "application/json" }, body: JSON.stringify(scrapeBody) });
       if (!scrapeRes.ok) { await scrapeRes.text(); discardReasons.push({ url: item.url, portal: item.portal.name, reason: `Erro HTTP ${scrapeRes.status}` }); continue; }
       const scrapeData = await scrapeRes.json();
       let markdown = scrapeData.data?.markdown || scrapeData.markdown || "";
       const links: string[] = scrapeData.data?.links || scrapeData.links || [];
 
-      if (isKenlo && markdown.length < 1000) {
-        try {
-          const cacheRes = await fetchWithRetry("https://api.firecrawl.dev/v2/scrape", { method: "POST", headers: { Authorization: `Bearer ${FIRECRAWL_API_KEY}`, "Content-Type": "application/json" }, body: JSON.stringify({ url: `https://webcache.googleusercontent.com/search?q=cache:${encodeURIComponent(item.url)}`, formats: ["markdown"], onlyMainContent: true, waitFor: 3000 }) });
-          if (cacheRes.ok) { const cacheMd = ((await cacheRes.json()).data?.markdown || ""); if (cacheMd.length > markdown.length) markdown = cacheMd; }
-        } catch {}
-        if (markdown.length < 1000 && /\/imovel\//i.test(item.url)) {
-          const sm = item.url.match(/\/imovel\/([^/]+)\/([^/?#]+)/i);
-          if (sm) { const sp = sm[1].split("-"); markdown += `\n\n# ${sp[0]} em ${sp[1] || ""}\n- Código: ${sm[2]}\n- Fonte: Kenlo\n- URL: ${item.url}`; }
-        }
-      }
+
+
 
       if (!markdown || markdown.length < 100) { discardReasons.push({ url: item.url, portal: item.portal.name, reason: `Conteúdo insuficiente (${markdown.length} chars)` }); continue; }
       const lMd = markdown.toLowerCase();
@@ -516,19 +431,10 @@ async function scrapeUrlBatch(
         }
         allIndUrls = [...new Set(allIndUrls)];
         if (allIndUrls.length > 0) {
-          // For Kenlo individual URLs found in multi-listing, also try extract
           for (const iUrl of allIndUrls.slice(0, 8)) {
             if (scrapedUrlSet.has(iUrl.toLowerCase())) continue;
             scrapedUrlSet.add(iUrl.toLowerCase());
             listingsOpened++;
-            const isKenloChild = /kenlo\.com\.br\/imovel\//i.test(iUrl);
-            if (isKenloChild) {
-              try {
-                const eRes = await fetchWithRetry("https://api.firecrawl.dev/v2/scrape", { method: "POST", headers: { Authorization: `Bearer ${FIRECRAWL_API_KEY}`, "Content-Type": "application/json" }, body: JSON.stringify({ url: iUrl, formats: ["extract"], extract: { schema: KENLO_EXTRACT_SCHEMA, prompt: "Extraia os dados deste anúncio imobiliário brasileiro." }, waitFor: 10000, actions: [{ type: "wait", milliseconds: 8000 }] }) });
-                if (eRes.ok) { const eData = (await eRes.json()).data?.extract; if (eData?.price > 0 && eData?.area > 0) { scrapedPages.push({ url: iUrl, portal: item.portal, markdown: "", status: "ok", isMultiListing: false, isCondoTarget: condoSlug ? iUrl.toLowerCase().includes(condoSlug) : false, extractedData: eData }); continue; } }
-                else { await eRes.text(); }
-              } catch {}
-            }
             try { const iRes = await fetchWithRetry("https://api.firecrawl.dev/v1/scrape", { method: "POST", headers: { Authorization: `Bearer ${FIRECRAWL_API_KEY}`, "Content-Type": "application/json" }, body: JSON.stringify({ url: iUrl, formats: ["markdown"], onlyMainContent: true, waitFor: 2000 }) }); if (!iRes.ok) { await iRes.text(); continue; } const iMd = (await iRes.json()).data?.markdown || ""; if (iMd.length >= 100) scrapedPages.push({ url: iUrl, portal: item.portal, markdown: iMd, status: "ok", isMultiListing: false, isCondoTarget: condoSlug ? iUrl.toLowerCase().includes(condoSlug) : false }); } catch {}
           }
         }
@@ -548,32 +454,23 @@ async function scrapeUrlBatch(
 async function extractWithAI(
   scrapedPages: ScrapedPage[], property: PropertyData, LOVABLE_API_KEY: string,
 ): Promise<any[]> {
-  // Separate pages with pre-extracted data (Kenlo extract) from those needing AI
+  // Separate pages with pre-extracted data from those needing AI
   const preExtracted: any[] = [];
   const needsAI: ScrapedPage[] = [];
 
   for (const page of scrapedPages) {
     if (page.extractedData && page.extractedData.price && page.extractedData.area) {
-      // Convert pre-extracted data directly to comparable format
       const ed = page.extractedData;
       preExtracted.push({
-        title: ed.title || "Imóvel Kenlo",
-        price: ed.price,
-        area: ed.area,
-        bedrooms: ed.bedrooms || null,
-        suites: ed.suites || null,
-        parking_spots: ed.parking_spots || null,
-        bathrooms: ed.bathrooms || null,
-        address: ed.address || null,
-        neighborhood: ed.neighborhood || null,
-        city: ed.city || null,
-        condominium: ed.condominium || null,
-        external_id: ed.external_id || null,
-        source_url: page.url,
-        source_name: "Kenlo",
-        property_type: null,
-        construction_standard: null,
-        differentials: [],
+        title: ed.title || "Imóvel",
+        price: ed.price, area: ed.area,
+        bedrooms: ed.bedrooms || null, suites: ed.suites || null,
+        parking_spots: ed.parking_spots || null, bathrooms: ed.bathrooms || null,
+        address: ed.address || null, neighborhood: ed.neighborhood || null,
+        city: ed.city || null, condominium: ed.condominium || null,
+        external_id: ed.external_id || null, source_url: page.url,
+        source_name: page.portal?.name || "", property_type: null,
+        construction_standard: null, differentials: [],
         description_summary: ed.description || null,
       });
     } else {
@@ -582,7 +479,7 @@ async function extractWithAI(
   }
 
   if (preExtracted.length > 0) {
-    console.log(`[INNGEST][FASE 3] ${preExtracted.length} comparáveis pré-extraídos (Kenlo JSON)`);
+    console.log(`[INNGEST][FASE 3] ${preExtracted.length} comparáveis pré-extraídos (JSON)`);
   }
 
   // If no pages need AI extraction, return pre-extracted only
@@ -629,7 +526,7 @@ IMÓVEL DE REFERÊNCIA: Tipo: ${property.property_type || "?"}, Bairro: ${proper
 
     // URL fix + portal attribution
     const searchPats = [/vivareal\.com\.br\/venda\//, /vivareal\.com\.br\/aluguel\//, /vivareal\.com\.br\/condominio\//, /zapimoveis\.com\.br\/venda\//, /zapimoveis\.com\.br\/aluguel\//, /zapimoveis\.com\.br\/condominio\//, /imovelweb\.com\.br\/(apartamentos|casas|imoveis)-/, /olx\.com\.br\/imoveis\//];
-    const indPats = [/vivareal\.com\.br\/imovel\//, /zapimoveis\.com\.br\/imovel\//, /imovelweb\.com\.br\/propriedades\//, /olx\.com\.br\/d\/anuncio\//, /kenlo\.com\.br\/imovel\//];
+    const indPats = [/vivareal\.com\.br\/imovel\//, /zapimoveis\.com\.br\/imovel\//, /imovelweb\.com\.br\/propriedades\//, /olx\.com\.br\/d\/anuncio\//];
     for (const c of (extracted.comparables || [])) {
       const u = c.source_url || "";
       if (searchPats.some(p => p.test(u)) && !indPats.some(p => p.test(u)) && c.external_id) {
@@ -640,8 +537,7 @@ IMÓVEL DE REFERÊNCIA: Tipo: ${property.property_type || "?"}, Bairro: ${proper
         else if (pn.includes("imóvel web") || pn.includes("imovelweb")) c.source_url = `https://www.imovelweb.com.br/propriedades/${eid}`;
       }
       const su = (c.source_url || "").toLowerCase();
-      if (/kenlo\.com\.br/i.test(su)) c.source_name = "Kenlo";
-      else if (/vivareal\.com\.br/i.test(su)) c.source_name = "Viva Real";
+      if (/vivareal\.com\.br/i.test(su)) c.source_name = "Viva Real";
       else if (/zapimoveis\.com\.br/i.test(su)) c.source_name = "ZAP Imóveis";
       else if (/imovelweb\.com\.br/i.test(su)) c.source_name = "Imóvel Web";
       else if (/olx\.com\.br/i.test(su)) c.source_name = "OLX";

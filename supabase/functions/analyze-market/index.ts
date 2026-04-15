@@ -13,7 +13,6 @@ const PORTAL_SITE_MAP: Record<string, string> = {
   olx: "site:olx.com.br/imoveis",
   imovelweb: "site:imovelweb.com.br",
   chavesnamao: "site:chavesnamao.com.br",
-  kenlo: "site:portal.kenlo.com.br",
 };
 
 interface PropertyData {
