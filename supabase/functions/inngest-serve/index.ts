@@ -215,7 +215,7 @@ function looksLikeMultiListing(markdown: string): boolean {
   return priceMatches.length >= 3 && areaMatches.length >= 3 && markdown.length > 2000;
 }
 
-function extractIndividualListingUrls(links: string[], portalCode: string): string[] {
+function extractIndividualListingUrls(links: string[], portalCode: string, markdown?: string): string[] {
   const listingPatterns: Record<string, RegExp> = {
     zap: /zapimoveis\.com\.br\/imovel\//, vivareal: /vivareal\.com\.br\/imovel\//,
     olx: /olx\.com\.br\/.*\/imoveis\//,
@@ -225,7 +225,13 @@ function extractIndividualListingUrls(links: string[], portalCode: string): stri
   };
   const pattern = listingPatterns[portalCode];
   if (!pattern) return [];
-  return [...new Set(links.filter(l => pattern.test(l)))];
+  let allLinks = [...links];
+  if (markdown) {
+    const mdRegex = /\]\((https?:\/\/[^\s)]+)\)/g;
+    let m;
+    while ((m = mdRegex.exec(markdown)) !== null) allLinks.push(m[1]);
+  }
+  return [...new Set(allLinks.filter(l => pattern.test(l)))];
 }
 
 function generatePaginationUrls(url: string, maxPages = 5): string[] {
@@ -428,14 +434,14 @@ async function scrapeUrlBatch(
       if (lMd.includes("anúncio indisponível") || lMd.includes("anúncio expirado") || lMd.includes("imóvel vendido") || lMd.includes("este anúncio não está mais") || lMd.includes("página não encontrada")) { discardReasons.push({ url: item.url, portal: item.portal.name, reason: "Indisponível/expirado" }); continue; }
 
       if (!isIndividualListingUrl(item.url) && (isML || looksLikeMultiListing(markdown))) {
-        let allIndUrls = extractIndividualListingUrls(links, item.portal.code);
+        let allIndUrls = extractIndividualListingUrls(links, item.portal.code, markdown);
         const pagUrls = generatePaginationUrls(item.url, 4);
         if (pagUrls.length > 0) {
           const pagResults = await Promise.allSettled(pagUrls.map(async (pu) => {
             if (scrapedUrlSet.has(pu.replace(/\/$/, "").toLowerCase())) return [];
             scrapedUrlSet.add(pu.replace(/\/$/, "").toLowerCase());
             listingsOpened++;
-            try { const r = await fetchWithRetry("https://api.firecrawl.dev/v1/scrape", { method: "POST", headers: { Authorization: `Bearer ${FIRECRAWL_API_KEY}`, "Content-Type": "application/json" }, body: JSON.stringify({ url: pu, formats: ["markdown", "links"], onlyMainContent: true, waitFor: 5000 }) }); if (!r.ok) { await r.text(); return []; } return extractIndividualListingUrls((await r.json()).data?.links || [], item.portal.code); } catch { return []; }
+            try { const r = await fetchWithRetry("https://api.firecrawl.dev/v1/scrape", { method: "POST", headers: { Authorization: `Bearer ${FIRECRAWL_API_KEY}`, "Content-Type": "application/json" }, body: JSON.stringify({ url: pu, formats: ["markdown", "links"], onlyMainContent: true, waitFor: 5000 }) }); if (!r.ok) { await r.text(); return []; } const pagData = (await r.json()).data; return extractIndividualListingUrls(pagData?.links || [], item.portal.code, pagData?.markdown); } catch { return []; }
           }));
           for (const r of pagResults) { if (r.status === "fulfilled") allIndUrls.push(...r.value); }
         }
