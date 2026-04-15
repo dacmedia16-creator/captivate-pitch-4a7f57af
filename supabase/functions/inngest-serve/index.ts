@@ -1,5 +1,5 @@
 import { Inngest } from "https://esm.sh/inngest@4.2.2";
-import { serve } from "https://esm.sh/inngest@4.2.2/deno";
+import { serve } from "https://esm.sh/inngest@4.2.2/edge";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
 
 // ============================================================
