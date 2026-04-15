@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from "react";
-import { Check, Loader2, Sparkles } from "lucide-react";
+import { Check, Loader2, Sparkles, Globe, FileSearch, Brain, BarChart3 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const stages = [
@@ -7,7 +7,14 @@ const stages = [
   { label: "Organizando branding da imobiliária", duration: 1200 },
   { label: "Gerando narrativa da apresentação", duration: 2000 },
   { label: "Montando apresentação final", duration: 1500 },
-  { label: "Finalizando...", duration: 0 }, // waiting stage
+  { label: "Finalizando...", duration: 0 },
+];
+
+const marketPhases = [
+  { key: "collecting_urls", label: "Coletando URLs dos portais", icon: Globe },
+  { key: "scraping", label: "Abrindo páginas dos anúncios", icon: FileSearch },
+  { key: "extracting", label: "Extraindo dados com IA", icon: Brain },
+  { key: "scoring", label: "Analisando e salvando resultados", icon: BarChart3 },
 ];
 
 interface StepGenerationProps {
@@ -15,20 +22,19 @@ interface StepGenerationProps {
   isComplete: boolean;
   generationDone: boolean;
   onAnimationDone: () => void;
+  marketPhase?: string | null;
 }
 
-export function StepGeneration({ isGenerating, isComplete, generationDone, onAnimationDone }: StepGenerationProps) {
+export function StepGeneration({ isGenerating, isComplete, generationDone, onAnimationDone, marketPhase }: StepGenerationProps) {
   const [currentStage, setCurrentStage] = useState(-1);
   const [progress, setProgress] = useState(0);
   const animationDone = useRef(false);
   const generationDoneRef = useRef(false);
 
-  // Keep ref in sync with prop
   useEffect(() => {
     generationDoneRef.current = generationDone;
   }, [generationDone]);
 
-  // Animate through first 4 stages on fixed timers
   useEffect(() => {
     if (!isGenerating) return;
     let stageIndex = 0;
@@ -41,14 +47,13 @@ export function StepGeneration({ isGenerating, isComplete, generationDone, onAni
         setProgress(Math.round((stageIndex / 4) * 90));
         setTimeout(advance, stages[stageIndex].duration);
       } else {
-        // Animation done, check ref for latest generation status
         setProgress(90);
         animationDone.current = true;
         if (generationDoneRef.current) {
           setProgress(100);
           onAnimationDone();
         } else {
-          setCurrentStage(4); // "Finalizando..."
+          setCurrentStage(4);
         }
       }
     };
@@ -56,7 +61,6 @@ export function StepGeneration({ isGenerating, isComplete, generationDone, onAni
     setTimeout(advance, stages[0].duration);
   }, [isGenerating]);
 
-  // Watch generationDone — complete when both animation and generation are done
   useEffect(() => {
     if (generationDone && animationDone.current && !isComplete) {
       setCurrentStage(4);
@@ -67,6 +71,11 @@ export function StepGeneration({ isGenerating, isComplete, generationDone, onAni
   }, [generationDone]);
 
   const visibleStages = currentStage < 4 && !generationDone ? stages.slice(0, 4) : stages;
+
+  const currentPhaseIndex = marketPhase
+    ? marketPhases.findIndex(p => p.key === marketPhase)
+    : -1;
+  const isMarketCompleted = marketPhase === "completed";
 
   return (
     <div className="max-w-lg mx-auto py-12 space-y-8">
@@ -118,6 +127,48 @@ export function StepGeneration({ isGenerating, isComplete, generationDone, onAni
           </div>
         ))}
       </div>
+
+      {/* Market study progress stepper */}
+      {marketPhase && (
+        <div className="space-y-3 pt-4 border-t border-border">
+          <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Estudo de Mercado</h3>
+          <div className="space-y-2">
+            {marketPhases.map((phase, i) => {
+              const Icon = phase.icon;
+              const isDone = isMarketCompleted || i < currentPhaseIndex;
+              const isCurrent = !isMarketCompleted && i === currentPhaseIndex;
+              const isPending = !isDone && !isCurrent;
+
+              return (
+                <div
+                  key={phase.key}
+                  className={cn(
+                    "flex items-center gap-3 p-3 rounded-xl transition-all duration-300",
+                    isDone || isCurrent ? "bg-card shadow-sm" : "opacity-30"
+                  )}
+                >
+                  {isDone ? (
+                    <div className="h-8 w-8 rounded-full gold-gradient flex items-center justify-center shadow-sm">
+                      <Check className="h-4 w-4 text-primary-foreground" />
+                    </div>
+                  ) : isCurrent ? (
+                    <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center shadow-sm">
+                      <Loader2 className="h-4 w-4 text-primary-foreground animate-spin" />
+                    </div>
+                  ) : (
+                    <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center">
+                      <Icon className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                  )}
+                  <span className={cn("text-sm", isDone || isCurrent ? "font-medium" : "text-muted-foreground")}>
+                    {phase.label}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
