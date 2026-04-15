@@ -33,8 +33,6 @@ export default function MarketStudyResult() {
   const [creatingPresentation, setCreatingPresentation] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
 
-  const isProcessing = study?.status === "processing";
-
   const { data: study, isLoading } = useQuery({
     queryKey: ["market-study", id],
     queryFn: async () => {
@@ -47,8 +45,14 @@ export default function MarketStudyResult() {
       return data;
     },
     enabled: !!id,
-    refetchInterval: study?.status === "processing" ? 5000 : false,
+    refetchInterval: (query) => {
+      const d = query.state.data as any;
+      return d?.status === "processing" ? 5000 : false;
+    },
   });
+
+  const isProcessing = study?.status === "processing";
+  const currentPhase = (study as any)?.current_phase as string | null;
 
   const { data: adjustmentsMap } = useQuery({
     queryKey: ["market-study-adjustments", id],
