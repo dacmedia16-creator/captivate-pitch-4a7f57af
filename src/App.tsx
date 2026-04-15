@@ -88,6 +88,7 @@ const App = () => (
                 <Route path="/market-study/:id" element={<LegacyStudyRedirect />} />
                 <Route path="/market-studies" element={<AppLayout><RoleGuard allowedRoles={["agent"]}><MarketStudies /></RoleGuard></AppLayout>} />
                 <Route path="/market-studies/:id" element={<AppLayout><RoleGuard allowedRoles={["agent"]}><MarketStudyResult /></RoleGuard></AppLayout>} />
+                <Route path="/market-studies/:id/executions" element={<AppLayout><RoleGuard allowedRoles={["agent"]}><MarketStudyExecutions /></RoleGuard></AppLayout>} />
 
                 {/* Public shared route */}
                 <Route path="/share/:token" element={<SharedPresentation />} />
