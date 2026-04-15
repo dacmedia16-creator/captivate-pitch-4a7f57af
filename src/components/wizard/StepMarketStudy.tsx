@@ -72,39 +72,6 @@ export function StepMarketStudy({ data, onChange }: StepMarketStudyProps) {
   return (
     <div className="space-y-6 max-w-3xl mx-auto">
       <Card className="glass-card">
-        <CardHeader><CardTitle className="text-lg">Portais de pesquisa</CardTitle></CardHeader>
-        <CardContent className="space-y-3">
-          {isLoading ? (
-            Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-10" />)
-          ) : portalList && portalList.length > 0 ? (
-            portalList.map((portal: any) => (
-              <div key={portal.id} className="flex items-center justify-between p-3 rounded-lg border border-border">
-                <div className="flex flex-col gap-0.5">
-                  <span className="font-medium">{portal.portal_name}</span>
-                  {portal.base_url && (
-                    <a
-                      href={portal.base_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-xs text-primary hover:underline truncate max-w-[250px]"
-                    >
-                      {portal.base_url}
-                    </a>
-                  )}
-                </div>
-                <Switch
-                  checked={data.selectedPortals.includes(portal.portal_source_id)}
-                  onCheckedChange={() => togglePortal(portal.portal_source_id)}
-                />
-              </div>
-            ))
-          ) : (
-            <p className="text-sm text-muted-foreground">Nenhum portal disponível.</p>
-          )}
-        </CardContent>
-      </Card>
-
-      <Card className="glass-card">
         <CardHeader><CardTitle className="text-lg">Filtros de pesquisa</CardTitle></CardHeader>
         <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-2">
