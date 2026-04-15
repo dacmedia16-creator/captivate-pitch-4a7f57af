@@ -1,1 +1,4 @@
 project_id = "joqkvcyeypknbrlhizxb"
+
+[functions.inngest-serve]
+verify_jwt = false
