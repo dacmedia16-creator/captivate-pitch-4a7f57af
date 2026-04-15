@@ -1,26 +1,39 @@
 
 
-# Corrigir URL de busca do VIP Seven Imóveis
+# Corrigir extração de anúncios do VIP Seven
 
 ## Problema
-A URL configurada `https://vipsevenimoveis.com.br/imoveis/venda` retorna 404. O site usa query parameters: `https://vipsevenimoveis.com.br/imoveis?finalidade=venda`.
+O Firecrawl retorna 21 links no array `links` para o VIP Seven, mas nenhum é `/imovel/XXXX`. O site é um SPA e os links dos imóveis ficam apenas no **markdown** (formato `](https://vipsevenimoveis.com.br/imovel/1051)`).
 
-## Correção
+## Solução
 
-### `supabase/functions/inngest-serve/index.ts` (linha ~200)
-Alterar o case `"vipseven"` em `buildPortalNativeUrl`:
+### `supabase/functions/inngest-serve/index.ts`
+
+**1. Alterar `extractIndividualListingUrls`** (linha 218) para aceitar `markdown` opcional e extrair URLs dele:
+
+```typescript
+function extractIndividualListingUrls(
+  links: string[], portalCode: string, markdown?: string
+): string[] {
+  const listingPatterns: Record<string, RegExp> = { /* existente */ };
+  const pattern = listingPatterns[portalCode];
+  if (!pattern) return [];
+  let allLinks = [...links];
+  if (markdown) {
+    const mdRegex = /\]\((https?:\/\/[^\s)]+)\)/g;
+    let m;
+    while ((m = mdRegex.exec(markdown)) !== null) allLinks.push(m[1]);
+  }
+  return [...new Set(allLinks.filter(l => pattern.test(l)))];
+}
 ```
-// DE:
-return `https://vipsevenimoveis.com.br/imoveis/${purposeSlug}`;
 
-// PARA:
-const fin = purposeSlug === "venda" ? "venda" : "aluguel";
-return `https://vipsevenimoveis.com.br/imoveis?finalidade=${fin}`;
-```
-
-O regex de anúncio individual (`/vipsevenimoveis\.com\.br\/imovel\//`) está correto — os links individuais são `/imovel/1051`.
+**2. Passar `markdown`** nas 2 chamadas existentes:
+- Linha 431: `extractIndividualListingUrls(links, item.portal.code, markdown)`
+- Linha 438 (paginação): `extractIndividualListingUrls(..., item.portal.code, pagMd)` — extrair markdown da resposta da paginação também
 
 ## Escopo
-- 1 linha alterada no `inngest-serve`
+- 1 função alterada (~6 linhas adicionais)
+- 2 call sites atualizados
 - Redeploy da edge function
 
