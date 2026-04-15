@@ -682,7 +682,7 @@ async function scoreAndSave(
   }
 
   if (marketStudyId) {
-    await supabase.from("market_studies").update({ status: "completed" }).eq("id", marketStudyId);
+    await supabase.from("market_studies").update({ status: "completed", current_phase: "completed" }).eq("id", marketStudyId);
   }
 
   return { success: true, comparables: finalComparables, research_metadata: resMeta, pricing_analysis: pricingAnalysis };
@@ -707,7 +707,7 @@ const marketStudyAnalyze = inngest.createFunction(
     await step.run("set-processing", async () => {
       if (!market_study_id) return;
       const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-      await sb.from("market_studies").update({ status: "processing" }).eq("id", market_study_id);
+      await sb.from("market_studies").update({ status: "processing", current_phase: "collecting_urls" }).eq("id", market_study_id);
     });
 
     // Step 1: Collect URLs (Fase 1A + 1B) — ~3-5s
@@ -745,6 +745,13 @@ const marketStudyAnalyze = inngest.createFunction(
 
     for (let i = 0; i < urlsToProcess.length; i += BATCH_SIZE) {
       const batch = urlsToProcess.slice(i, i + BATCH_SIZE);
+      // Update phase to scraping on first batch
+      if (i === 0 && market_study_id) {
+        await step.run("phase-scraping", async () => {
+          const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+          await sb.from("market_studies").update({ current_phase: "scraping" }).eq("id", market_study_id);
+        });
+      }
       const batchResult = await step.run(`scrape-batch-${i}`, async () => {
         return await scrapeUrlBatch(batch, property, FIRECRAWL_API_KEY!, scrapedUrlSet, condoSlug);
       });
@@ -772,11 +779,23 @@ const marketStudyAnalyze = inngest.createFunction(
     }
 
     // Step 3: AI extraction — ~5-8s
+    if (market_study_id) {
+      await step.run("phase-extracting", async () => {
+        const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+        await sb.from("market_studies").update({ current_phase: "extracting" }).eq("id", market_study_id);
+      });
+    }
     const rawComparables = await step.run("ai-extraction", async () => {
       return await extractWithAI(allPages, property, LOVABLE_API_KEY!);
     });
 
     // Step 4: Score, filter, save to DB — ~3-5s
+    if (market_study_id) {
+      await step.run("phase-scoring", async () => {
+        const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+        await sb.from("market_studies").update({ current_phase: "scoring" }).eq("id", market_study_id);
+      });
+    }
     const result = await step.run("score-and-save", async () => {
       const allDiscards = [...urlData.discardReasons, ...allScrapeDiscards];
       return await scoreAndSave(
