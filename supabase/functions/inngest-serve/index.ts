@@ -1,5 +1,5 @@
-import { Inngest } from "https://esm.sh/inngest";
-import { serve } from "https://esm.sh/inngest/edge";
+import { Inngest } from "https://esm.sh/inngest@4.2.2";
+import { serve } from "https://esm.sh/inngest@4.2.2/deno";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
 
 // ============================================================
@@ -667,8 +667,7 @@ IMÓVEL DE REFERÊNCIA: Tipo: ${property.property_type || "?"}, Bairro: ${proper
 const inngest = new Inngest({ id: "listing-studio-ai" });
 
 const marketStudyAnalyze = inngest.createFunction(
-  { id: "market-study-analyze", retries: 2 },
-  { event: "market-study/analyze.requested" },
+  { id: "market-study-analyze", retries: 2, trigger: { event: "market-study/analyze.requested" } },
   async ({ event }) => {
     const { property, portals, filters, market_study_id } = event.data;
     const FIRECRAWL_API_KEY = Deno.env.get("FIRECRAWL_API_KEY");
