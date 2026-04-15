@@ -29,19 +29,37 @@ interface StepMarketStudyProps {
 export function StepMarketStudy({ data, onChange }: StepMarketStudyProps) {
   const { profile } = useAuth();
 
-  const { data: portalSettings, isLoading } = useQuery({
-    queryKey: ["tenant-portals-wizard", profile?.tenant_id],
+  const { data: portalList, isLoading } = useQuery({
+    queryKey: ["portals-wizard", profile?.tenant_id],
     queryFn: async () => {
-      if (!profile?.tenant_id) return [];
-      const { data: settings } = await supabase
-        .from("tenant_portal_settings")
-        .select("*, portal_sources(*)")
-        .eq("tenant_id", profile.tenant_id)
-        .eq("is_enabled", true)
-        .order("priority");
-      return settings || [];
+      const { data: sources } = await supabase
+        .from("portal_sources")
+        .select("*")
+        .eq("is_global", true)
+        .order("name");
+      if (!sources) return [];
+
+      let settingsMap = new Map<string, any>();
+      if (profile?.tenant_id) {
+        const { data: settings } = await supabase
+          .from("tenant_portal_settings")
+          .select("*")
+          .eq("tenant_id", profile.tenant_id);
+        settingsMap = new Map((settings || []).map((s) => [s.portal_source_id, s]));
+      }
+
+      return sources.map((src: any) => {
+        const setting = settingsMap.get(src.id);
+        return {
+          id: src.id,
+          portal_source_id: src.id,
+          portal_name: src.name,
+          base_url: src.base_url,
+          is_enabled: setting ? setting.is_enabled : true,
+        };
+      });
     },
-    enabled: !!profile?.tenant_id,
+    enabled: true,
   });
 
   const togglePortal = (portalId: string) => {
@@ -58,30 +76,30 @@ export function StepMarketStudy({ data, onChange }: StepMarketStudyProps) {
         <CardContent className="space-y-3">
           {isLoading ? (
             Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-10" />)
-          ) : portalSettings && portalSettings.length > 0 ? (
-            portalSettings.map((ps: any) => (
-              <div key={ps.id} className="flex items-center justify-between p-3 rounded-lg border border-border">
+          ) : portalList && portalList.length > 0 ? (
+            portalList.map((portal: any) => (
+              <div key={portal.id} className="flex items-center justify-between p-3 rounded-lg border border-border">
                 <div className="flex flex-col gap-0.5">
-                  <span className="font-medium">{ps.portal_sources?.name || "Portal"}</span>
-                  {ps.portal_sources?.base_url && (
+                  <span className="font-medium">{portal.portal_name}</span>
+                  {portal.base_url && (
                     <a
-                      href={ps.portal_sources.base_url}
+                      href={portal.base_url}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-xs text-primary hover:underline truncate max-w-[250px]"
                     >
-                      {ps.portal_sources.base_url}
+                      {portal.base_url}
                     </a>
                   )}
                 </div>
                 <Switch
-                  checked={data.selectedPortals.includes(ps.portal_source_id)}
-                  onCheckedChange={() => togglePortal(ps.portal_source_id)}
+                  checked={data.selectedPortals.includes(portal.portal_source_id)}
+                  onCheckedChange={() => togglePortal(portal.portal_source_id)}
                 />
               </div>
             ))
           ) : (
-            <p className="text-sm text-muted-foreground">Nenhum portal configurado pela imobiliária.</p>
+            <p className="text-sm text-muted-foreground">Nenhum portal disponível.</p>
           )}
         </CardContent>
       </Card>

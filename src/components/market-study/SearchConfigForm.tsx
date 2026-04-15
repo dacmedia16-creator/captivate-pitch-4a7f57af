@@ -30,19 +30,39 @@ export function SearchConfigForm({ data, onChange }: Props) {
   const set = (field: keyof SearchConfigData, value: any) =>
     onChange({ ...data, [field]: value });
 
-  const { data: portalSettings, isLoading: loadingPortals } = useQuery({
-    queryKey: ["tenant-portals-market-study", profile?.tenant_id],
+  const { data: portalList, isLoading: loadingPortals } = useQuery({
+    queryKey: ["portals-market-study", profile?.tenant_id],
     queryFn: async () => {
-      if (!profile?.tenant_id) return [];
-      const { data: settings } = await supabase
-        .from("tenant_portal_settings")
-        .select("*, portal_sources(*)")
-        .eq("tenant_id", profile.tenant_id)
-        .eq("is_enabled", true)
-        .order("priority");
-      return settings || [];
+      // Fetch all global portals
+      const { data: sources } = await supabase
+        .from("portal_sources")
+        .select("*")
+        .eq("is_global", true)
+        .order("name");
+      if (!sources) return [];
+
+      // Fetch tenant settings if available
+      let settingsMap = new Map<string, any>();
+      if (profile?.tenant_id) {
+        const { data: settings } = await supabase
+          .from("tenant_portal_settings")
+          .select("*")
+          .eq("tenant_id", profile.tenant_id);
+        settingsMap = new Map((settings || []).map((s) => [s.portal_source_id, s]));
+      }
+
+      return sources.map((src: any) => {
+        const setting = settingsMap.get(src.id);
+        return {
+          id: src.id,
+          portal_source_id: src.id,
+          portal_name: src.name,
+          base_url: src.base_url,
+          is_enabled: setting ? setting.is_enabled : true, // global portals enabled by default
+        };
+      });
     },
-    enabled: !!profile?.tenant_id,
+    enabled: true,
   });
 
   const togglePortal = (portalId: string) => {
@@ -64,25 +84,24 @@ export function SearchConfigForm({ data, onChange }: Props) {
             Array.from({ length: 3 }).map((_, i) => (
               <Skeleton key={i} className="h-10" />
             ))
-          ) : portalSettings && portalSettings.length > 0 ? (
-            portalSettings.map((ps: any) => (
+          ) : portalList && portalList.length > 0 ? (
+            portalList.map((portal: any) => (
               <div
-                key={ps.id}
+                key={portal.id}
                 className="flex items-center justify-between p-3 rounded-lg border border-border"
               >
                 <span className="font-medium">
-                  {ps.portal_sources?.name || "Portal"}
+                  {portal.portal_name}
                 </span>
                 <Switch
-                  checked={data.selectedPortals.includes(ps.portal_source_id)}
-                  onCheckedChange={() => togglePortal(ps.portal_source_id)}
+                  checked={data.selectedPortals.includes(portal.portal_source_id)}
+                  onCheckedChange={() => togglePortal(portal.portal_source_id)}
                 />
               </div>
             ))
           ) : (
             <p className="text-sm text-muted-foreground">
-              Nenhum portal configurado pela imobiliária. Serão usados portais
-              padrão (ZAP, Viva Real, OLX).
+              Nenhum portal disponível.
             </p>
           )}
         </CardContent>
