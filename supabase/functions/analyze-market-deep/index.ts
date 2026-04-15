@@ -378,7 +378,7 @@ async function processMarketAnalysis(
       console.log(`[FASE 1A] ${portal.name}: ${nativeUrl}`);
 
       try {
-        const scrapeRes = await fetch("https://api.firecrawl.dev/v1/scrape", {
+        const scrapeRes = await fetchWithRetry("https://api.firecrawl.dev/v1/scrape", {
           method: "POST",
           headers: {
             Authorization: `Bearer ${FIRECRAWL_API_KEY}`,
@@ -513,7 +513,7 @@ async function processMarketAnalysis(
       };
 
       try {
-        const searchRes = await fetch("https://api.firecrawl.dev/v1/search", {
+        const searchRes = await fetchWithRetry("https://api.firecrawl.dev/v1/search", {
           method: "POST",
           headers: {
             Authorization: `Bearer ${FIRECRAWL_API_KEY}`,
@@ -772,7 +772,7 @@ async function processMarketAnalysis(
           console.log(`[FASE 2] Kenlo page too short (${markdown.length} chars), trying Google Cache fallback...`);
           try {
             const cacheUrl = `https://webcache.googleusercontent.com/search?q=cache:${encodeURIComponent(item.url)}`;
-            const cacheRes = await fetch("https://api.firecrawl.dev/v2/scrape", {
+            const cacheRes = await fetchWithRetry("https://api.firecrawl.dev/v2/scrape", {
               method: "POST",
               headers: { Authorization: `Bearer ${FIRECRAWL_API_KEY}`, "Content-Type": "application/json" },
               body: JSON.stringify({ url: cacheUrl, formats: ["markdown"], onlyMainContent: true, waitFor: 3000 }),
@@ -854,7 +854,7 @@ async function processMarketAnalysis(
               
               try {
                 listingsOpened++;
-                const pageRes = await fetch("https://api.firecrawl.dev/v1/scrape", {
+                const pageRes = await fetchWithRetry("https://api.firecrawl.dev/v1/scrape", {
                   method: "POST",
                   headers: {
                     Authorization: `Bearer ${FIRECRAWL_API_KEY}`,
@@ -931,7 +931,7 @@ async function processMarketAnalysis(
                 listingsOpened++;
                 if (pr) pr.urls_opened++;
                 
-                const expandedRes = await fetch("https://api.firecrawl.dev/v1/scrape", {
+                const expandedRes = await fetchWithRetry("https://api.firecrawl.dev/v1/scrape", {
                   method: "POST",
                   headers: {
                     Authorization: `Bearer ${FIRECRAWL_API_KEY}`,
