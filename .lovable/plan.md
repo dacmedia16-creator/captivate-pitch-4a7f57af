@@ -1,41 +1,35 @@
 
 
-# Fix: Indicador de progresso do estudo de mercado não funciona
+# Excluir Kenlo do sistema
 
-## Problema
+## O que será feito
 
-A mensagem retornada pelo edge function `analyze-market-deep` é `"Processing started via Inngest"`, mas o frontend em `AgentNewPresentation.tsx` compara com `"Processing started in background"`. Como as strings não coincidem, o polling nunca inicia e o stepper de fases nunca aparece.
+Remover todas as referências ao portal Kenlo dos edge functions e desativar o registro no banco de dados.
 
-**Linha 217 do frontend:**
-```ts
-if (!deepError && deepResult?.message === "Processing started in background") {
+## Mudanças
+
+### 1. Migration — desativar Kenlo no banco
+```sql
+UPDATE public.portal_sources SET is_global = false WHERE code = 'kenlo';
+DELETE FROM public.tenant_portal_settings WHERE portal_source_id = (SELECT id FROM public.portal_sources WHERE code = 'kenlo');
 ```
 
-**Linha 180 do edge function:**
-```ts
-JSON.stringify({ success: true, message: "Processing started via Inngest", ... })
-```
+### 2. `supabase/functions/inngest-serve/index.ts`
+- Remover `kenlo` do map `PORTAL_SITE_FILTERS` (linha 128)
+- Remover case `"kenlo"` da função `portalTypeSlug` (linhas 169-172)
+- Remover case `"kenlo"` da função `buildPortalUrl` (linhas 198-203)
+- Remover `kenlo` dos `listingPatterns` (linhas 226 e 323)
+- Remover todo o bloco de Kenlo extract schema e lógica especial (linhas 412-478)
+- Remover referências `isKenlo` no scraping padrão (linhas 481-483)
 
-## Solução
+### 3. `supabase/functions/analyze-market/index.ts`
+- Remover `kenlo` do map de portais (linha 16)
 
-Mudar a verificação no frontend para checar o `success: true` + ausência de `comparables` (resposta 202), em vez de depender de uma string exata de mensagem. Isso é mais robusto.
-
-## Mudança
-
-### `src/pages/agent/AgentNewPresentation.tsx` (linha 217)
-
-Trocar:
-```ts
-if (!deepError && deepResult?.message === "Processing started in background") {
-```
-Por:
-```ts
-if (!deepError && deepResult?.success && !deepResult?.comparables?.length && deepResult?.market_study_id) {
-```
-
-Isso cobre tanto a resposta Inngest (`"Processing started via Inngest"`) quanto qualquer outra variante futura de processamento assíncrono.
+### 4. `supabase/functions/analyze-market-manus/index.ts`
+- Remover `kenlo` do map de portais (linha 44)
 
 ## Escopo
-- 1 arquivo, 1 linha editada
-- Sem migrations, sem mudanças no backend
+- 1 migration (desativar + limpar settings)
+- 3 edge functions editadas
+- ~80 linhas removidas
 
