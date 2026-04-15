@@ -1481,11 +1481,50 @@ export type Database = {
           },
         ]
       }
+      tenant_usage: {
+        Row: {
+          created_at: string
+          id: string
+          market_studies_count: number
+          month: string
+          presentations_count: number
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          market_studies_count?: number
+          month: string
+          presentations_count?: number
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          market_studies_count?: number
+          month?: string
+          presentations_count?: number
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tenant_usage_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tenants: {
         Row: {
           created_at: string
           id: string
           name: string
+          plan_id: string | null
           slug: string
           status: string
           updated_at: string
@@ -1494,6 +1533,7 @@ export type Database = {
           created_at?: string
           id?: string
           name: string
+          plan_id?: string | null
           slug: string
           status?: string
           updated_at?: string
@@ -1502,11 +1542,20 @@ export type Database = {
           created_at?: string
           id?: string
           name?: string
+          plan_id?: string | null
           slug?: string
           status?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "tenants_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "subscription_plans"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       testimonials: {
         Row: {
@@ -1572,6 +1621,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      check_tenant_limit: {
+        Args: { _field: string; _tenant_id: string }
+        Returns: boolean
+      }
       get_presentation_by_share_token: {
         Args: { _token: string }
         Returns: {
@@ -1624,6 +1677,10 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      increment_tenant_usage: {
+        Args: { _field: string; _tenant_id: string }
+        Returns: undefined
       }
     }
     Enums: {

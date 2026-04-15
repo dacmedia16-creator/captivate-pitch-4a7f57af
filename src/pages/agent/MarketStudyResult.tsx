@@ -372,6 +372,10 @@ export default function MarketStudyResult() {
             {creatingPresentation ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Presentation className="h-4 w-4 mr-2" />}
             Apresentação
           </Button>
+          <Button variant="ghost" size="sm" onClick={() => navigate(`/market-studies/${id}/executions`)}>
+            <Clock className="h-4 w-4 mr-2" />
+            Execuções
+          </Button>
           <Badge variant={study.status === "completed" ? "default" : "secondary"}>
             {study.status === "completed" ? "Concluído" : study.status === "draft" ? "Rascunho" : study.status}
           </Badge>

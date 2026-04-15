@@ -7,6 +7,41 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+// Retry with exponential backoff for Firecrawl calls
+async function fetchWithRetry(
+  url: string,
+  options: RequestInit,
+  maxRetries = 3,
+  baseDelayMs = 2000,
+): Promise<Response> {
+  let lastError: Error | null = null;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const res = await fetch(url, options);
+      // Don't retry on 4xx (client errors) except 429 (rate limit)
+      if (res.ok || (res.status >= 400 && res.status < 500 && res.status !== 429)) {
+        return res;
+      }
+      // 429 or 5xx → retry
+      if (attempt < maxRetries) {
+        const delay = baseDelayMs * Math.pow(2, attempt);
+        console.log(`[RETRY] Attempt ${attempt + 1}/${maxRetries}, waiting ${delay}ms (status: ${res.status})`);
+        await new Promise(r => setTimeout(r, delay));
+      } else {
+        return res; // Return last failed response
+      }
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error(String(err));
+      if (attempt < maxRetries) {
+        const delay = baseDelayMs * Math.pow(2, attempt);
+        console.log(`[RETRY] Attempt ${attempt + 1}/${maxRetries}, waiting ${delay}ms (error: ${lastError.message})`);
+        await new Promise(r => setTimeout(r, delay));
+      }
+    }
+  }
+  throw lastError || new Error("fetchWithRetry: all attempts failed");
+}
+
 const PORTAL_SITE_MAP: Record<string, string> = {
   zap: "site:zapimoveis.com.br",
   vivareal: "site:vivareal.com.br",
@@ -344,7 +379,7 @@ async function processMarketAnalysis(
       console.log(`[FASE 1A] ${portal.name}: ${nativeUrl}`);
 
       try {
-        const scrapeRes = await fetch("https://api.firecrawl.dev/v1/scrape", {
+        const scrapeRes = await fetchWithRetry("https://api.firecrawl.dev/v1/scrape", {
           method: "POST",
           headers: {
             Authorization: `Bearer ${FIRECRAWL_API_KEY}`,
@@ -479,7 +514,7 @@ async function processMarketAnalysis(
       };
 
       try {
-        const searchRes = await fetch("https://api.firecrawl.dev/v1/search", {
+        const searchRes = await fetchWithRetry("https://api.firecrawl.dev/v1/search", {
           method: "POST",
           headers: {
             Authorization: `Bearer ${FIRECRAWL_API_KEY}`,
@@ -705,7 +740,7 @@ async function processMarketAnalysis(
 
         // Use Firecrawl v2 for Kenlo (better JS rendering for SPAs)
         const firecrawlUrl = isKenlo ? "https://api.firecrawl.dev/v2/scrape" : "https://api.firecrawl.dev/v1/scrape";
-        const scrapeRes = await fetch(firecrawlUrl, {
+        const scrapeRes = await fetchWithRetry(firecrawlUrl, {
           method: "POST",
           headers: {
             Authorization: `Bearer ${FIRECRAWL_API_KEY}`,
@@ -738,7 +773,7 @@ async function processMarketAnalysis(
           console.log(`[FASE 2] Kenlo page too short (${markdown.length} chars), trying Google Cache fallback...`);
           try {
             const cacheUrl = `https://webcache.googleusercontent.com/search?q=cache:${encodeURIComponent(item.url)}`;
-            const cacheRes = await fetch("https://api.firecrawl.dev/v2/scrape", {
+            const cacheRes = await fetchWithRetry("https://api.firecrawl.dev/v2/scrape", {
               method: "POST",
               headers: { Authorization: `Bearer ${FIRECRAWL_API_KEY}`, "Content-Type": "application/json" },
               body: JSON.stringify({ url: cacheUrl, formats: ["markdown"], onlyMainContent: true, waitFor: 3000 }),
@@ -820,7 +855,7 @@ async function processMarketAnalysis(
               
               try {
                 listingsOpened++;
-                const pageRes = await fetch("https://api.firecrawl.dev/v1/scrape", {
+                const pageRes = await fetchWithRetry("https://api.firecrawl.dev/v1/scrape", {
                   method: "POST",
                   headers: {
                     Authorization: `Bearer ${FIRECRAWL_API_KEY}`,
@@ -897,7 +932,7 @@ async function processMarketAnalysis(
                 listingsOpened++;
                 if (pr) pr.urls_opened++;
                 
-                const expandedRes = await fetch("https://api.firecrawl.dev/v1/scrape", {
+                const expandedRes = await fetchWithRetry("https://api.firecrawl.dev/v1/scrape", {
                   method: "POST",
                   headers: {
                     Authorization: `Bearer ${FIRECRAWL_API_KEY}`,
@@ -1690,11 +1725,12 @@ serve(async (req) => {
   }
 
   try {
-    const { property, portals, filters, market_study_id } = (await req.json()) as {
+    const { property, portals, filters, market_study_id, tenant_id } = (await req.json()) as {
       property: PropertyData;
       portals: PortalInfo[];
       filters: Filters;
       market_study_id?: string;
+      tenant_id?: string;
     };
 
     const FIRECRAWL_API_KEY = Deno.env.get("FIRECRAWL_API_KEY");
@@ -1711,6 +1747,44 @@ serve(async (req) => {
         JSON.stringify({ success: false, error: "LOVABLE_API_KEY not configured" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
+    }
+
+    // === RATE LIMITING & PLAN LIMITS ===
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const adminClient = createClient(supabaseUrl, supabaseServiceKey);
+
+    if (tenant_id) {
+      // Check plan limits
+      const { data: limitOk } = await adminClient.rpc("check_tenant_limit", {
+        _tenant_id: tenant_id,
+        _field: "market_studies",
+      });
+      if (limitOk === false) {
+        return new Response(
+          JSON.stringify({ success: false, error: "Limite mensal de estudos de mercado atingido. Faça upgrade do plano." }),
+          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // Check concurrency (max 2 simultaneous processing studies per tenant)
+      const { count } = await adminClient
+        .from("market_studies")
+        .select("id", { count: "exact", head: true })
+        .eq("tenant_id", tenant_id)
+        .eq("status", "processing");
+      if ((count ?? 0) >= 2) {
+        return new Response(
+          JSON.stringify({ success: false, error: "Máximo de 2 estudos simultâneos. Aguarde a conclusão de um estudo." }),
+          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // Increment usage counter
+      await adminClient.rpc("increment_tenant_usage", {
+        _tenant_id: tenant_id,
+        _field: "market_studies_count",
+      });
     }
 
     const studyId = market_study_id || null;

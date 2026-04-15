@@ -193,6 +193,7 @@ export default function AgentNewPresentation() {
         preferSameCondominium: mktData.preferSameCondominium, maxListingAgeMonths: mktData.maxListingAgeMonths,
       },
       market_study_id: study.id,
+      tenant_id: tenantId,
     };
 
     let scrapedComparables: any[] = [];
