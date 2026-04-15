@@ -126,6 +126,7 @@ const PORTAL_SITE_MAP: Record<string, string> = {
   imovelweb: "site:imovelweb.com.br",
   chavesnamao: "site:chavesnamao.com.br",
   quintoandar: "site:quintoandar.com.br",
+  vipseven: "site:vipsevenimoveis.com.br",
 };
 
 function getPortalSiteFilter(portalCode: string, purpose?: string): string | undefined {
@@ -195,6 +196,8 @@ function buildPortalNativeUrl(property: PropertyData, portal: PortalInfo): strin
       return `https://www.imovelweb.com.br/${typeSlug}-${purposeSlug}-${neighborhood}-${city}.html`;
     case "quintoandar":
       return `https://www.quintoandar.com.br/${isRental ? "alugar" : "comprar"}/imovel/${city}/${neighborhood}`;
+    case "vipseven":
+      return `https://vipsevenimoveis.com.br/imoveis/${purposeSlug}`;
     default:
       return null;
   }
@@ -216,6 +219,7 @@ function extractIndividualListingUrls(links: string[], portalCode: string): stri
     olx: /olx\.com\.br\/.*\/imoveis\//,
     imovelweb: /imovelweb\.com\.br\/propriedades\//,
     quintoandar: /quintoandar\.com\.br\/imovel\//,
+    vipseven: /vipsevenimoveis\.com\.br\/imovel\//,
   };
   const pattern = listingPatterns[portalCode];
   if (!pattern) return [];
