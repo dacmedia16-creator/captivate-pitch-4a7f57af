@@ -40,8 +40,6 @@ const PORTAL_URLS: Record<string, string> = {
   olx: "https://www.olx.com.br/imoveis",
   imovelweb: "https://www.imovelweb.com.br",
   chaves_na_mao: "https://www.chavesnamao.com.br",
-  quintoandar: "https://www.quintoandar.com.br",
-  vipseven: "https://vipsevenimoveis.com.br",
 };
 
 function getPortalUrl(portal: PortalInfo): string {

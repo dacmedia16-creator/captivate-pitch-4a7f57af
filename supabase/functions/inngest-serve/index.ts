@@ -125,8 +125,6 @@ const PORTAL_SITE_MAP: Record<string, string> = {
   olx_aluguel: "site:olx.com.br/imoveis/aluguel",
   imovelweb: "site:imovelweb.com.br",
   chavesnamao: "site:chavesnamao.com.br",
-  quintoandar: "site:quintoandar.com.br",
-  vipseven: "site:vipsevenimoveis.com.br",
 };
 
 function getPortalSiteFilter(portalCode: string, purpose?: string): string | undefined {
@@ -194,12 +192,6 @@ function buildPortalNativeUrl(property: PropertyData, portal: PortalInfo): strin
       return `https://www.olx.com.br/imoveis/${purposeSlug}/${typeSlug}/estado-${state}/${city}-e-regiao/${neighborhood}`;
     case "imovelweb":
       return `https://www.imovelweb.com.br/${typeSlug}-${purposeSlug}-${neighborhood}-${city}.html`;
-    case "quintoandar":
-      return `https://www.quintoandar.com.br/${isRental ? "alugar" : "comprar"}/imovel/${city}/${neighborhood}`;
-    case "vipseven": {
-      const fin = purposeSlug === "venda" ? "venda" : "aluguel";
-      return `https://vipsevenimoveis.com.br/imoveis?finalidade=${fin}`;
-    }
     default:
       return null;
   }
@@ -220,8 +212,6 @@ function extractIndividualListingUrls(links: string[], portalCode: string, markd
     zap: /zapimoveis\.com\.br\/imovel\//, vivareal: /vivareal\.com\.br\/imovel\//,
     olx: /olx\.com\.br\/.*\/imoveis\//,
     imovelweb: /imovelweb\.com\.br\/propriedades\//,
-    quintoandar: /quintoandar\.com\.br\/imovel\//,
-    vipseven: /vipsevenimoveis\.com\.br\/imovel\//,
   };
   const pattern = listingPatterns[portalCode];
   if (!pattern) return [];
