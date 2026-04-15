@@ -396,6 +396,11 @@ async function scrapeUrlBatch(
   const discardReasons: DiscardReason[] = [];
   let listingsOpened = 0;
 
+  for (const item of batch) {
+    try {
+      const isML = isMultiListingUrl(item.url);
+      listingsOpened++;
+
       // Standard markdown scraping
       const scrapeBody: any = { url: item.url, formats: isML ? ["markdown", "links"] : ["markdown"], onlyMainContent: true, waitFor: isML ? 5000 : 2000 };
       const firecrawlUrl = "https://api.firecrawl.dev/v1/scrape";
