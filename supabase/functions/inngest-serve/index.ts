@@ -426,19 +426,10 @@ async function scrapeUrlBatch(
         }
         allIndUrls = [...new Set(allIndUrls)];
         if (allIndUrls.length > 0) {
-          // For Kenlo individual URLs found in multi-listing, also try extract
           for (const iUrl of allIndUrls.slice(0, 8)) {
             if (scrapedUrlSet.has(iUrl.toLowerCase())) continue;
             scrapedUrlSet.add(iUrl.toLowerCase());
             listingsOpened++;
-            const isKenloChild = /kenlo\.com\.br\/imovel\//i.test(iUrl);
-            if (isKenloChild) {
-              try {
-                const eRes = await fetchWithRetry("https://api.firecrawl.dev/v2/scrape", { method: "POST", headers: { Authorization: `Bearer ${FIRECRAWL_API_KEY}`, "Content-Type": "application/json" }, body: JSON.stringify({ url: iUrl, formats: ["extract"], extract: { schema: KENLO_EXTRACT_SCHEMA, prompt: "Extraia os dados deste anúncio imobiliário brasileiro." }, waitFor: 10000, actions: [{ type: "wait", milliseconds: 8000 }] }) });
-                if (eRes.ok) { const eData = (await eRes.json()).data?.extract; if (eData?.price > 0 && eData?.area > 0) { scrapedPages.push({ url: iUrl, portal: item.portal, markdown: "", status: "ok", isMultiListing: false, isCondoTarget: condoSlug ? iUrl.toLowerCase().includes(condoSlug) : false, extractedData: eData }); continue; } }
-                else { await eRes.text(); }
-              } catch {}
-            }
             try { const iRes = await fetchWithRetry("https://api.firecrawl.dev/v1/scrape", { method: "POST", headers: { Authorization: `Bearer ${FIRECRAWL_API_KEY}`, "Content-Type": "application/json" }, body: JSON.stringify({ url: iUrl, formats: ["markdown"], onlyMainContent: true, waitFor: 2000 }) }); if (!iRes.ok) { await iRes.text(); continue; } const iMd = (await iRes.json()).data?.markdown || ""; if (iMd.length >= 100) scrapedPages.push({ url: iUrl, portal: item.portal, markdown: iMd, status: "ok", isMultiListing: false, isCondoTarget: condoSlug ? iUrl.toLowerCase().includes(condoSlug) : false }); } catch {}
           }
         }
@@ -458,32 +449,23 @@ async function scrapeUrlBatch(
 async function extractWithAI(
   scrapedPages: ScrapedPage[], property: PropertyData, LOVABLE_API_KEY: string,
 ): Promise<any[]> {
-  // Separate pages with pre-extracted data (Kenlo extract) from those needing AI
+  // Separate pages with pre-extracted data from those needing AI
   const preExtracted: any[] = [];
   const needsAI: ScrapedPage[] = [];
 
   for (const page of scrapedPages) {
     if (page.extractedData && page.extractedData.price && page.extractedData.area) {
-      // Convert pre-extracted data directly to comparable format
       const ed = page.extractedData;
       preExtracted.push({
-        title: ed.title || "Imóvel Kenlo",
-        price: ed.price,
-        area: ed.area,
-        bedrooms: ed.bedrooms || null,
-        suites: ed.suites || null,
-        parking_spots: ed.parking_spots || null,
-        bathrooms: ed.bathrooms || null,
-        address: ed.address || null,
-        neighborhood: ed.neighborhood || null,
-        city: ed.city || null,
-        condominium: ed.condominium || null,
-        external_id: ed.external_id || null,
-        source_url: page.url,
-        source_name: "Kenlo",
-        property_type: null,
-        construction_standard: null,
-        differentials: [],
+        title: ed.title || "Imóvel",
+        price: ed.price, area: ed.area,
+        bedrooms: ed.bedrooms || null, suites: ed.suites || null,
+        parking_spots: ed.parking_spots || null, bathrooms: ed.bathrooms || null,
+        address: ed.address || null, neighborhood: ed.neighborhood || null,
+        city: ed.city || null, condominium: ed.condominium || null,
+        external_id: ed.external_id || null, source_url: page.url,
+        source_name: page.portal?.name || "", property_type: null,
+        construction_standard: null, differentials: [],
         description_summary: ed.description || null,
       });
     } else {
@@ -492,7 +474,7 @@ async function extractWithAI(
   }
 
   if (preExtracted.length > 0) {
-    console.log(`[INNGEST][FASE 3] ${preExtracted.length} comparáveis pré-extraídos (Kenlo JSON)`);
+    console.log(`[INNGEST][FASE 3] ${preExtracted.length} comparáveis pré-extraídos (JSON)`);
   }
 
   // If no pages need AI extraction, return pre-extracted only
@@ -539,7 +521,7 @@ IMÓVEL DE REFERÊNCIA: Tipo: ${property.property_type || "?"}, Bairro: ${proper
 
     // URL fix + portal attribution
     const searchPats = [/vivareal\.com\.br\/venda\//, /vivareal\.com\.br\/aluguel\//, /vivareal\.com\.br\/condominio\//, /zapimoveis\.com\.br\/venda\//, /zapimoveis\.com\.br\/aluguel\//, /zapimoveis\.com\.br\/condominio\//, /imovelweb\.com\.br\/(apartamentos|casas|imoveis)-/, /olx\.com\.br\/imoveis\//];
-    const indPats = [/vivareal\.com\.br\/imovel\//, /zapimoveis\.com\.br\/imovel\//, /imovelweb\.com\.br\/propriedades\//, /olx\.com\.br\/d\/anuncio\//, /kenlo\.com\.br\/imovel\//];
+    const indPats = [/vivareal\.com\.br\/imovel\//, /zapimoveis\.com\.br\/imovel\//, /imovelweb\.com\.br\/propriedades\//, /olx\.com\.br\/d\/anuncio\//];
     for (const c of (extracted.comparables || [])) {
       const u = c.source_url || "";
       if (searchPats.some(p => p.test(u)) && !indPats.some(p => p.test(u)) && c.external_id) {
@@ -550,8 +532,7 @@ IMÓVEL DE REFERÊNCIA: Tipo: ${property.property_type || "?"}, Bairro: ${proper
         else if (pn.includes("imóvel web") || pn.includes("imovelweb")) c.source_url = `https://www.imovelweb.com.br/propriedades/${eid}`;
       }
       const su = (c.source_url || "").toLowerCase();
-      if (/kenlo\.com\.br/i.test(su)) c.source_name = "Kenlo";
-      else if (/vivareal\.com\.br/i.test(su)) c.source_name = "Viva Real";
+      if (/vivareal\.com\.br/i.test(su)) c.source_name = "Viva Real";
       else if (/zapimoveis\.com\.br/i.test(su)) c.source_name = "ZAP Imóveis";
       else if (/imovelweb\.com\.br/i.test(su)) c.source_name = "Imóvel Web";
       else if (/olx\.com\.br/i.test(su)) c.source_name = "OLX";
