@@ -1,28 +1,16 @@
 
 
-# Remover portais QuintoAndar e VIP Seven
+# Aumentar MAX_URLS de 25 para 40
 
-## O que será feito
-Remover completamente os portais QuintoAndar e VIP Seven do sistema — banco de dados e código das edge functions.
+## Alteração
 
-## Alterações
+### `supabase/functions/inngest-serve/index.ts`
+Alterar a constante `MAX_URLS` de `25` para `40` (~linha 763).
 
-### 1. Banco de dados (migração SQL)
-- Deletar registros de `tenant_portal_settings` que referenciam esses portais
-- Deletar os 2 registros de `portal_sources` (codes: `quintoandar`, `vipseven`)
-
-### 2. `supabase/functions/inngest-serve/index.ts`
-- Remover `quintoandar` e `vipseven` do `PORTAL_SITE_MAP`
-- Remover os `case "quintoandar"` e `case "vipseven"` de `buildPortalNativeUrl`
-- Remover entradas de `listingPatterns`
-
-### 3. `supabase/functions/analyze-market/index.ts`
-- Remover `quintoandar` e `vipseven` do `PORTAL_SITE_MAP`
-
-### 4. `supabase/functions/analyze-market-manus/index.ts`
-- Remover `quintoandar` e `vipseven` do mapa de URLs
+## Risco
+- Maior consumo de créditos Firecrawl por execução
+- Possível timeout da edge function (~55s) se o scraping de 40 URLs demorar — monitorar nos logs
 
 ## Escopo
-- 1 migração SQL
-- 3 edge functions editadas (remoção de linhas)
+- 1 linha alterada, redeploy da edge function
 
