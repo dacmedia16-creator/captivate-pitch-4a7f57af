@@ -739,7 +739,7 @@ async function processMarketAnalysis(
 
         // Use Firecrawl v2 for Kenlo (better JS rendering for SPAs)
         const firecrawlUrl = isKenlo ? "https://api.firecrawl.dev/v2/scrape" : "https://api.firecrawl.dev/v1/scrape";
-        const scrapeRes = await fetch(firecrawlUrl, {
+        const scrapeRes = await fetchWithRetry(firecrawlUrl, {
           method: "POST",
           headers: {
             Authorization: `Bearer ${FIRECRAWL_API_KEY}`,
