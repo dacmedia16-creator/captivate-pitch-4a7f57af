@@ -1,113 +1,86 @@
 
 
-# Diagnóstico e Plano: Web Scraping no Listing Studio AI
+# Fase 4: Migrar scraping para Inngest (Durable Execution)
 
-## O que já existe no projeto
-
-O projeto **já possui uma infraestrutura completa de web scraping** implementada e funcional:
-
-| Componente | Implementação atual |
-|---|---|
-| Edge Function | `analyze-market-deep` (1756 linhas) — scraping via Firecrawl, extração com IA, scoring, persistência |
-| Tabelas | `market_studies`, `market_study_comparables`, `market_study_raw_listings`, `market_study_executions`, `market_study_results`, `market_study_adjustments` |
-| RLS | Isolamento completo por `broker_id` + `tenant_id` em todas as tabelas |
-| Status tracking | `draft → processing → completed → failed` em `market_studies.status` |
-| UI | `MarketStudies.tsx` (lista), `MarketStudyResult.tsx` (detalhes), wizard em `AgentNewPresentation.tsx` |
-| Secrets | `FIRECRAWL_API_KEY` (connector), `MANUS_API_KEY` — nunca expostos no frontend |
-| Background | Edge function responde 202 + polling no frontend a cada 5s |
-| Logs | Console logs por fase (1A scrape nativo, 1B Google, FASE 2 extração, FASE 3 scoring) |
-
-### Fluxo atual (ponta a ponta)
+## Arquitetura
 
 ```text
-Usuário (wizard)
-  → Cria market_study + subject_property
-  → Chama edge function (Manus → Deep → Basic cascade)
-  → Edge function:
-      1. Scrape nativo dos portais (Firecrawl)
-      2. Fallback Google Search (Firecrawl)
-      3. Extração de dados via IA (Gemini)
-      4. Scoring de similaridade
-      5. Cálculo de ajustes
-      6. Persistência em market_study_comparables + results
-      7. Atualiza status para "completed"
-  → Frontend poll → exibe resultados
+ANTES:
+  Frontend → analyze-market-deep (edge function pesada, 1830 linhas)
+           → EdgeRuntime.waitUntil() para background
+           → polling market_studies.status
+
+DEPOIS:
+  Frontend → analyze-market-deep (edge function leve ~100 linhas)
+           → valida inputs, rate limit, envia evento via Inngest Gateway
+           → retorna 202
+
+  Inngest → inngest-serve (edge function, SDK handler)
+          → recebe evento "market-study/analyze.requested"
+          → executa processMarketAnalysis() com retry nativo do Inngest
+          → persiste dados, atualiza status
+
+  Frontend → sem mudança (continua polling market_studies.status)
 ```
 
-## Avaliação: O que falta?
+## O que muda
 
-A arquitetura já segue as boas práticas do Lovable. O que pode ser melhorado/adicionado:
+1. **`analyze-market-deep/index.ts`** — mantém validação, rate limiting, plan limits (Fases 1-2). Remove `processMarketAnalysis` e toda a lógica de scraping. Após validar, envia evento `market-study/analyze.requested` via gateway Inngest, retorna 202. Mantém fallback: se Inngest falhar ao enviar evento, executa inline (graceful degradation).
 
-| Aspecto | Status | Observação |
-|---|---|---|
-| Secrets no backend | OK | Firecrawl key via connector, Manus via secret |
-| Validação no backend | OK | Validação de inputs na edge function |
-| Isolamento multi-tenant | OK | RLS em todas as tabelas |
-| Rate limit | Parcial | Sem rate limit formal por usuário/plano |
-| Retry automático | Parcial | Cascade Manus→Deep→Basic, mas sem retry granular |
-| Timeout | OK | Firecrawl tem timeout configurado |
-| Logs | OK | Console logs por fase |
-| Limites por plano | Ausente | `subscription_plans` existe mas sem enforcement |
-| Job queue (Inngest) | Ausente | Usa edge function direta, sem job queue |
-| UI de acompanhamento dedicada | Parcial | Existe em `MarketStudies.tsx` mas sem detalhes de execução |
+2. **`inngest-serve/index.ts`** (novo) — Edge function com o SDK `inngest/deno`. Exporta serve handler com uma função `market-study-analyze` que:
+   - Recebe evento com `{ property, portals, filters, market_study_id, tenant_id }`
+   - Contém toda a lógica atual de `processMarketAnalysis` (1400+ linhas movidas)
+   - Retry nativo do Inngest (substitui `fetchWithRetry` parcialmente, mas mantém retry para Firecrawl)
+   - Atualiza `market_studies.status` para `completed`/`failed`
 
-## Recomendação
+3. **`supabase/config.toml`** — Adiciona bloco `[functions.inngest-serve]` com `verify_jwt = false` (Inngest precisa chamar sem JWT do usuário, usa signing key).
 
-**Não criar uma nova infraestrutura de scraping.** O sistema atual é robusto. Em vez disso, propor melhorias incrementais:
+## Compatibilidade
 
-### Fase 1 — Enforcement de limites por plano (2-3 arquivos)
-- Verificar `subscription_plans.max_presentations_per_month` antes de iniciar novo estudo
-- Criar tabela `tenant_usage` para tracking de uso mensal
-- Bloquear no frontend + validar na edge function
+- **Frontend**: Zero mudanças. Continua chamando `analyze-market-deep` e fazendo polling.
+- **Fase 1 (Limites)**: Validação permanece em `analyze-market-deep` ANTES de enviar evento.
+- **Fase 2 (Rate limit)**: Concurrency check permanece em `analyze-market-deep`.
+- **Fase 3 (UI Execuções)**: `MarketStudyExecutions.tsx` sem mudança — lê mesmas tabelas.
+- **Cascade Manus → Deep → Basic**: Sem mudança no frontend. Apenas `analyze-market-deep` que agora delega ao Inngest.
 
-### Fase 2 — Rate limiting e retry (edge function)
-- Adicionar rate limit por tenant (max N estudos simultâneos)
-- Retry automático com backoff exponencial para falhas de Firecrawl
-- Timeout global configurável
+## Arquivos
 
-### Fase 3 — UI de monitoramento de execuções (novo componente)
-- Painel com detalhes de cada execução (`market_study_executions`)
-- Logs por portal, URLs processadas, erros
-- Filtros por status e data
+| Arquivo | Ação |
+|---------|------|
+| `supabase/functions/inngest-serve/index.ts` | Criar — SDK serve + função durável com toda a lógica de scraping |
+| `supabase/functions/analyze-market-deep/index.ts` | Refatorar — manter validação/rate limit, enviar evento Inngest, fallback inline |
+| `supabase/config.toml` | Adicionar `[functions.inngest-serve]` verify_jwt = false |
 
-### Fase 4 — Job queue com Inngest (opcional)
-- Migrar execuções longas para Inngest (durable execution)
-- Permite agendamento, retry automático, observabilidade
-- Requer connector Inngest
+## Fluxo detalhado do evento
 
-## Pergunta ao usuário
+```text
+analyze-market-deep:
+  1. Valida inputs (property, portals)
+  2. Verifica FIRECRAWL_API_KEY, LOVABLE_API_KEY
+  3. Rate limit + plan limit (Fases 1-2)
+  4. Incrementa usage
+  5. POST https://connector-gateway.lovable.dev/inngest/e/
+     Body: { name: "market-study/analyze.requested", data: { property, portals, filters, market_study_id, tenant_id } }
+     Headers: Authorization: Bearer LOVABLE_API_KEY, X-Connection-Api-Key: INNGEST_API_KEY
+  6. Se sucesso → 202
+  7. Se falha → fallback: executa processMarketAnalysis inline (como hoje)
 
-Antes de prosseguir com a implementação, preciso entender:
+inngest-serve:
+  - Inngest function "market-study-analyze"
+  - Trigger: event "market-study/analyze.requested"
+  - Retries: 2 (padrão Inngest)
+  - Executa processMarketAnalysis com todos os dados do evento
+```
 
-**Você quer melhorar o sistema de scraping existente (market studies) com as fases acima, ou quer criar um sistema de scraping genérico para outros fins além de estudos de mercado imobiliário?**
+## Riscos e mitigações
 
-Se for genérico, descreva o caso de uso — quais sites, que dados, qual a frequência.
+- **Inngest down**: Fallback inline no `analyze-market-deep` garante que o sistema continua funcionando
+- **Edge function timeout**: Inngest tem timeout de 150s (vs 60s do edge function padrão) — mais margem
+- **Signing key**: SDK valida automaticamente via `INNGEST_SIGNING_KEY` no env
 
----
+## Sync com Inngest Dashboard
 
-## Checklist de testes (para o sistema atual)
-- [ ] Criar estudo de mercado com todos os portais selecionados
-- [ ] Verificar que Kenlo aparece nos resultados (round-robin)
-- [ ] Testar falha de Firecrawl (API down) — status deve ir para "failed"
-- [ ] Verificar RLS: broker A não vê estudos do broker B
-- [ ] Testar polling de status (processing → completed)
-- [ ] Recalcular estudo e verificar sync com apresentação
-
-## Riscos técnicos
-1. **Firecrawl rate limits** — muitos estudos simultâneos podem exceder cota
-2. **SPAs (Kenlo)** — scraping via Firecrawl pode não renderizar JS
-3. **Edge function timeout** — estudos com muitos portais podem ultrapassar 60s
-4. **Custo** — cada scrape consome créditos Firecrawl
-
-## Critérios de aceite
-- Estudo de mercado completa com status "completed" e ≥5 comparáveis
-- Dados persistidos com tenant isolation verificado
-- Secrets nunca expostos no frontend
-- UI mostra status em tempo real
-
-## Pontos de ajuste (custo/performance)
-- `MAX_URLS = 25` — reduzir para menos créditos Firecrawl
-- `MIN_PER_PORTAL = 3` — ajustar diversidade vs volume
-- Cascade Manus→Deep→Basic — desabilitar Manus para economizar
-- Polling interval (5s) — aumentar para reduzir queries
+Após deploy, o endpoint `inngest-serve` precisa ser sincronizado com o Inngest:
+- URL: `https://joqkvcyeypknbrlhizxb.supabase.co/functions/v1/inngest-serve`
+- Acessar essa URL no browser ou fazer sync via dashboard do Inngest
 
