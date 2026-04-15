@@ -1,89 +1,41 @@
 
 
-# Melhorar scraping do Kenlo com Firecrawl v2 JSON extraction
+# Fix: Indicador de progresso do estudo de mercado não funciona
 
 ## Problema
 
-O Kenlo é um portal SPA (Single Page Application) pesado em JavaScript. O scraping atual pega markdown, que frequentemente retorna < 1000 chars — conteúdo insuficiente para a IA extrair dados estruturados. Resultado: 0 comparáveis do Kenlo mesmo com ~17 URLs abertas.
+A mensagem retornada pelo edge function `analyze-market-deep` é `"Processing started via Inngest"`, mas o frontend em `AgentNewPresentation.tsx` compara com `"Processing started in background"`. Como as strings não coincidem, o polling nunca inicia e o stepper de fases nunca aparece.
+
+**Linha 217 do frontend:**
+```ts
+if (!deepError && deepResult?.message === "Processing started in background") {
+```
+
+**Linha 180 do edge function:**
+```ts
+JSON.stringify({ success: true, message: "Processing started via Inngest", ... })
+```
 
 ## Solução
 
-Usar o formato `json` do Firecrawl v2 com um schema definido para páginas do Kenlo. Em vez de depender do markdown (que precisa de renderização JS completa), o Firecrawl v2 usa LLM interno para extrair dados estruturados diretamente da página, mesmo com renderização parcial.
+Mudar a verificação no frontend para checar o `success: true` + ausência de `comparables` (resposta 202), em vez de depender de uma string exata de mensagem. Isso é mais robusto.
 
-## Mudanças
+## Mudança
 
-### 1. `supabase/functions/inngest-serve/index.ts` — `scrapeUrlBatch`
+### `src/pages/agent/AgentNewPresentation.tsx` (linha 217)
 
-Para URLs do Kenlo, mudar o request ao Firecrawl v2:
-
-**Antes** (linha ~402):
+Trocar:
 ```ts
-formats: ["markdown"], waitFor: 10000
-+ actions de scroll/wait
+if (!deepError && deepResult?.message === "Processing started in background") {
+```
+Por:
+```ts
+if (!deepError && deepResult?.success && !deepResult?.comparables?.length && deepResult?.market_study_id) {
 ```
 
-**Depois**:
-```ts
-// Para Kenlo individual listings: usar extract (JSON) do Firecrawl v2
-formats: ["extract"],
-extract: {
-  schema: {
-    type: "object",
-    properties: {
-      title: { type: "string" },
-      price: { type: "number", description: "Preço em reais, sem pontos" },
-      area: { type: "number", description: "Área total em m²" },
-      bedrooms: { type: "number" },
-      suites: { type: "number" },
-      parking_spots: { type: "number" },
-      bathrooms: { type: "number" },
-      address: { type: "string" },
-      neighborhood: { type: "string" },
-      city: { type: "string" },
-      condominium: { type: "string" },
-      external_id: { type: "string", description: "Código do imóvel" },
-      description: { type: "string" }
-    },
-    required: ["title", "price", "area"]
-  },
-  prompt: "Extraia os dados deste anúncio imobiliário brasileiro."
-}
-```
-
-- Se o Firecrawl v2 retornar `extract` com dados válidos (price > 0, area > 0), converter diretamente em comparável e **pular a fase de extração AI** para esse item — economizando tokens e tempo.
-- Manter fallback para markdown caso o extract falhe ou retorne dados incompletos.
-- Para URLs de listagem múltipla do Kenlo, continuar usando `["markdown", "links"]` pois precisamos dos links individuais.
-
-### 2. Adaptar `ScrapedPage` para carregar dados pré-extraídos
-
-Adicionar campo opcional `extractedData` ao type `ScrapedPage`:
-```ts
-interface ScrapedPage {
-  // ...existing fields
-  extractedData?: {  // Pre-extracted by Firecrawl v2 JSON
-    title?: string; price?: number; area?: number;
-    bedrooms?: number; suites?: number; parking_spots?: number;
-    address?: string; neighborhood?: string; condominium?: string;
-    external_id?: string;
-  };
-}
-```
-
-### 3. Adaptar `extractWithAI` (Fase 3)
-
-- Separar páginas com `extractedData` válido — essas viram comparáveis diretamente sem passar pela IA.
-- Apenas páginas sem `extractedData` vão para o prompt do Gemini.
-- Merge dos dois conjuntos no resultado final.
+Isso cobre tanto a resposta Inngest (`"Processing started via Inngest"`) quanto qualquer outra variante futura de processamento assíncrono.
 
 ## Escopo
-
-- 1 arquivo editado: `supabase/functions/inngest-serve/index.ts`
-- ~60 linhas modificadas em 3 funções (scrapeUrlBatch, ScrapedPage type, extractWithAI)
-- Sem migrations, sem mudanças no frontend
-
-## Benefícios
-
-- Kenlo passa a gerar comparáveis reais (Firecrawl LLM lida com JS-heavy pages melhor que markdown)
-- Menos tokens gastos no Gemini (páginas Kenlo pré-extraídas não vão para o prompt)
-- Mesma abordagem pode ser estendida a outros portais problemáticos no futuro
+- 1 arquivo, 1 linha editada
+- Sem migrations, sem mudanças no backend
 
