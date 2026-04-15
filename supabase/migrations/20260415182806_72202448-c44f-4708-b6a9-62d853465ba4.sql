@@ -1,0 +1,1 @@
+ALTER TABLE public.market_studies ADD COLUMN current_phase text DEFAULT NULL;
