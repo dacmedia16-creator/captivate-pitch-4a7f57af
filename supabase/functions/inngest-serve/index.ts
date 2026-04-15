@@ -760,7 +760,7 @@ const marketStudyAnalyze = inngest.createFunction(
     }
 
     // Prepare URLs for scraping — select top MAX_URLS, ensure min per portal
-    const MAX_URLS = 25, MIN_PER_PORTAL_VAL = 3;
+    const MAX_URLS = 40, MIN_PER_PORTAL_VAL = 3;
     const byPortal = new Map<string, UrlItem[]>();
     for (const item of urlData.urls) { const k = item.portal.code; if (!byPortal.has(k)) byPortal.set(k, []); byPortal.get(k)!.push(item); }
     const selectedUrlsSet = new Set<string>();
