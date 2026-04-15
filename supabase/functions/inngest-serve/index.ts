@@ -405,16 +405,8 @@ async function scrapeUrlBatch(
       let markdown = scrapeData.data?.markdown || scrapeData.markdown || "";
       const links: string[] = scrapeData.data?.links || scrapeData.links || [];
 
-      if (isKenlo && markdown.length < 1000) {
-        try {
-          const cacheRes = await fetchWithRetry("https://api.firecrawl.dev/v2/scrape", { method: "POST", headers: { Authorization: `Bearer ${FIRECRAWL_API_KEY}`, "Content-Type": "application/json" }, body: JSON.stringify({ url: `https://webcache.googleusercontent.com/search?q=cache:${encodeURIComponent(item.url)}`, formats: ["markdown"], onlyMainContent: true, waitFor: 3000 }) });
-          if (cacheRes.ok) { const cacheMd = ((await cacheRes.json()).data?.markdown || ""); if (cacheMd.length > markdown.length) markdown = cacheMd; }
-        } catch {}
-        if (markdown.length < 1000 && /\/imovel\//i.test(item.url)) {
-          const sm = item.url.match(/\/imovel\/([^/]+)\/([^/?#]+)/i);
-          if (sm) { const sp = sm[1].split("-"); markdown += `\n\n# ${sp[0]} em ${sp[1] || ""}\n- Código: ${sm[2]}\n- Fonte: Kenlo\n- URL: ${item.url}`; }
-        }
-      }
+
+
 
       if (!markdown || markdown.length < 100) { discardReasons.push({ url: item.url, portal: item.portal.name, reason: `Conteúdo insuficiente (${markdown.length} chars)` }); continue; }
       const lMd = markdown.toLowerCase();
