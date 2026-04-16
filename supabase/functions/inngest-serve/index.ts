@@ -822,6 +822,27 @@ const marketStudyAnalyze = inngest.createFunction(
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
     console.log(`[INNGEST] Starting analysis for study ${market_study_id}`);
 
+    // Guard: abort if study has been stuck processing for >15 min (already expired by DB function)
+    const shouldAbort = await step.run("check-timeout", async () => {
+      if (!market_study_id) return false;
+      const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+      const { data } = await sb.from("market_studies").select("status, updated_at").eq("id", market_study_id).single();
+      if (!data) return true; // study deleted
+      if (data.status === "failed" || data.status === "completed") return true; // already resolved
+      const updatedAt = new Date(data.updated_at).getTime();
+      const fifteenMin = 15 * 60 * 1000;
+      if (Date.now() - updatedAt > fifteenMin) {
+        console.log(`[INNGEST] Study ${market_study_id} expired (updated_at: ${data.updated_at}). Aborting.`);
+        await sb.from("market_studies").update({ status: "failed", current_phase: null }).eq("id", market_study_id);
+        return true;
+      }
+      return false;
+    });
+    if (shouldAbort) {
+      console.log(`[INNGEST] Aborting study ${market_study_id} — already resolved or expired.`);
+      return { comparables_count: 0, market_study_id, aborted: true };
+    }
+
     // Mark as processing
     await step.run("set-processing", async () => {
       if (!market_study_id) return;
