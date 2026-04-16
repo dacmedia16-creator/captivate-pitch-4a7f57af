@@ -504,7 +504,8 @@ async function extractWithAI(
   console.log(`[INNGEST][FASE 3] Extraindo de ${pagesToAI.length} páginas via IA...`);
 
   const hasML = pagesToAI.some(p => p.isMultiListing);
-  const combined = pagesToAI.map((p, i) => `--- ${p.isMultiListing ? "LISTAGEM MÚLTIPLA" : "Anúncio"} ${i + 1} (Portal: ${p.portal.name}, URL: ${p.url}) ---\n${p.markdown}`).join("\n\n");
+  const MAX_MD_CHARS = 8000;
+  const combined = pagesToAI.map((p, i) => `--- ${p.isMultiListing ? "LISTAGEM MÚLTIPLA" : "Anúncio"} ${i + 1} (Portal: ${p.portal.name}, URL: ${p.url}) ---\n${(p.markdown || "").slice(0, MAX_MD_CHARS)}`).join("\n\n");
   const mlInst = hasML ? `\n\nATENÇÃO - LISTAGENS MÚLTIPLAS: Blocos "LISTAGEM MÚLTIPLA" contêm VÁRIOS imóveis. Extraia CADA um individualmente com URL e external_id únicos.` : "";
 
   const sysPrompt = `Você é um perito avaliador imobiliário brasileiro. Extraia dados estruturados de CADA anúncio.
@@ -817,8 +818,8 @@ const marketStudyAnalyze = inngest.createFunction(
     }
 
     // Batch AI extraction: 5 pages per step.run() to stay within timeout
-    const AI_BATCH_SIZE = 5;
-    const MAX_AI_PAGES = 20;
+    const AI_BATCH_SIZE = 2;
+    const MAX_AI_PAGES = 15;
     let aiPages = pagesNeedingAI;
     if (aiPages.length > MAX_AI_PAGES) {
       aiPages = [
