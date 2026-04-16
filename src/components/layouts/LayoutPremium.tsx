@@ -1,5 +1,5 @@
 import { SectionData } from "./SectionRenderer";
-import { MarketPriceBarChart, MarketStats } from "@/components/charts/MarketCharts";
+import { MarketPriceBarChart, MarketPricePieChart, MarketStats } from "@/components/charts/MarketCharts";
 import { BrazilPresenceMap } from "@/components/charts/BrazilPresenceMap";
 import { Key, BarChart3, ClipboardCheck, FileText, CheckCircle } from "lucide-react";
 import { SlideTheme, ResolvedColors } from "./themes/theme.types";
