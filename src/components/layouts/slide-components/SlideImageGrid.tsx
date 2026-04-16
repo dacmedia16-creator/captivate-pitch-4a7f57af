@@ -12,7 +12,7 @@ export function SlideImageGrid({ images, gap = "2px" }: SlideImageGridProps) {
         src={images[0]}
         alt=""
         className="object-cover"
-        style={{ flex: 2, height: 420, minWidth: 0 }}
+        style={{ flex: 2, height: 520, minWidth: 0 }}
       />
       {images.length > 1 && (
         <div className="flex flex-col" style={{ flex: 1, gap }}>
