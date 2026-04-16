@@ -73,17 +73,23 @@ export default function AgentProfile() {
         supabase.from("broker_profiles").select("*").eq("user_id", user.id).maybeSingle(),
       ]);
       if (p) setProfile({ full_name: p.full_name ?? "", email: p.email ?? "", phone: p.phone ?? "", avatar_url: p.avatar_url });
-      if (b) setBroker({
-        creci: b.creci ?? "",
-        short_bio: b.short_bio ?? "",
-        years_in_market: b.years_in_market,
-        education: b.education ?? "",
-        specialties: b.specialties ?? "",
-        service_regions: b.service_regions ?? "",
-        vgv_summary: b.vgv_summary ?? "",
-        preferred_tone: b.preferred_tone ?? "",
-        preferred_layout: b.preferred_layout ?? "",
-      });
+      if (b) {
+        const bAny = b as any;
+        setBroker({
+          creci: b.creci ?? "",
+          short_bio: b.short_bio ?? "",
+          years_in_market: b.years_in_market,
+          education: b.education ?? "",
+          specialties: b.specialties ?? "",
+          service_regions: b.service_regions ?? "",
+          vgv_summary: b.vgv_summary ?? "",
+          preferred_tone: b.preferred_tone ?? "",
+          preferred_layout: b.preferred_layout ?? "",
+          portfolio_images: Array.isArray(bAny.portfolio_images) ? bAny.portfolio_images : [],
+          personal_results: Array.isArray(bAny.personal_results) ? bAny.personal_results : [],
+          personal_testimonials: Array.isArray(bAny.personal_testimonials) ? bAny.personal_testimonials : [],
+        });
+      }
       setLoading(false);
     })();
   }, [user]);
