@@ -435,11 +435,13 @@ export function LayoutExecutivo({ section, branding, theme, colors }: Props) {
   /* ═══════ RESULTS ═══════ */
   if (section.section_key === "results") {
     const portfolioImgs = (c.portfolio_images || []).filter((p: any) => p.image_url);
+    const heroItem = (c.items || [])[0];
+    const secondaryItems = (c.items || []).slice(1, 4);
     return (
       <div className="w-full h-full bg-white p-16" style={{ fontFamily: FONT }}>
         <div className="flex gap-10">
           <RedBar h={60} />
-          <div className="flex-1 space-y-8">
+          <div className="flex-1 space-y-6">
             <div>
               <SlideLabel color={accent}>Resultados</SlideLabel>
               <h2 className="slide-title mt-4" style={{ fontSize: theme.heading.titleSize, color: primary, textTransform }}>{section.title}</h2>
@@ -451,18 +453,36 @@ export function LayoutExecutivo({ section, branding, theme, colors }: Props) {
                 <p className="font-semibold" style={{ fontSize: "26px", color: primary }}>{c.broker_name}</p>
               </div>
             )}
-            <div className="flex gap-8">
-              {(c.items || []).slice(0, 4).map((item: any, i: number) => (
-                <div key={i} className="flex-1 p-6 text-center rounded-lg" style={{ backgroundColor: neutral }}>
-                  {item.metric_value && <p className="slide-metric" style={{ fontSize: "48px", color: accent }}>{item.metric_value}</p>}
-                  <p className="font-semibold mt-2" style={{ fontSize: "20px", color: primary }}>{item.title}</p>
-                </div>
-              ))}
-            </div>
+            {/* Hero metric */}
+            {heroItem && (
+              <div className="flex items-center gap-8 p-8 rounded-lg" style={{ backgroundColor: neutral }}>
+                {heroItem.metric_value && <p className="slide-metric" style={{ fontSize: "72px", color: accent }}>{heroItem.metric_value}</p>}
+                <p className="font-semibold" style={{ fontSize: "28px", color: primary }}>{heroItem.title}</p>
+              </div>
+            )}
+            {/* Secondary metrics */}
+            {secondaryItems.length > 0 && (
+              <div className="flex gap-6">
+                {secondaryItems.map((item: any, i: number) => (
+                  <div key={i} className="flex-1 p-5 text-center rounded-lg" style={{ backgroundColor: neutral }}>
+                    {item.metric_value && <p className="slide-metric" style={{ fontSize: "42px", color: accent }}>{item.metric_value}</p>}
+                    <p className="font-semibold mt-1" style={{ fontSize: "18px", color: primary }}>{item.title}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+            {/* Portfolio with overlay captions */}
             {portfolioImgs.length > 0 && (
-              <div className="flex gap-2">
+              <div className="flex gap-3">
                 {portfolioImgs.slice(0, 4).map((img: any, i: number) => (
-                  <img key={i} src={img.image_url} alt={img.caption || ""} className="flex-1 h-[160px] object-cover rounded-lg" style={{ minWidth: 0 }} />
+                  <div key={i} className="relative flex-1 overflow-hidden rounded-lg" style={{ minWidth: 0, height: "200px" }}>
+                    <img src={img.image_url} alt={img.caption || ""} className="w-full h-full object-cover" />
+                    {img.caption && (
+                      <div className="absolute inset-0 flex items-end" style={{ background: "linear-gradient(transparent 40%, rgba(0,0,0,0.7))" }}>
+                        <p className="p-3 font-bold" style={{ fontSize: "18px", color: "#ffffff" }}>{img.caption}</p>
+                      </div>
+                    )}
+                  </div>
                 ))}
               </div>
             )}

@@ -124,40 +124,57 @@ export function LayoutImpactoComercial({ section, branding, theme, colors }: Pro
   /* ═══════ RESULTS ═══════ */
   if (section.section_key === "results") {
     const portfolioImgs = (c.portfolio_images || []).filter((p: any) => p.image_url);
+    const heroItem = (c.items || [])[0];
+    const secondaryItems = (c.items || []).slice(1, 4);
     return (
       <div className="w-full h-full bg-white p-16" style={{ fontFamily: FONT }}>
         <SlideLabel color={accent} bold>Resultados comprovados</SlideLabel>
-        <h2 className="slide-title uppercase mt-4 mb-10" style={{ fontSize: theme.heading.titleSize, color: primary }}>{section.title}</h2>
-        <div className="flex gap-12">
-          {/* Left: broker info + metrics */}
-          <div className="flex-1">
-            {c.broker_name && (
-              <div className="flex items-center gap-5 mb-8">
-                {c.avatar_url && <img src={c.avatar_url} alt="" className="w-16 h-16 rounded-full object-cover border-2" style={{ borderColor: accent }} />}
-                <p className="font-bold uppercase tracking-wider" style={{ fontSize: "26px", color: primary }}>{c.broker_name}</p>
-              </div>
-            )}
-            <div className="grid grid-cols-2 gap-4">
-              {(c.items || []).slice(0, 4).map((item: any, i: number) => (
-                <div key={i} className="py-6 text-center" style={{ backgroundColor: primary + "08" }}>
-                  {item.metric_value && <p className="slide-metric" style={{ fontSize: "48px", color: accent }}>{item.metric_value}</p>}
-                  <p className="font-bold mt-2 uppercase tracking-[0.15em]" style={{ fontSize: "18px", color: primary }}>{item.title}</p>
+        <h2 className="slide-title uppercase mt-4 mb-8" style={{ fontSize: theme.heading.titleSize, color: primary }}>{section.title}</h2>
+        <div className="w-16 h-1.5 mb-8" style={{ backgroundColor: accent }} />
+        <div className="space-y-6">
+          {c.broker_name && (
+            <div className="flex items-center gap-5">
+              {c.avatar_url && <img src={c.avatar_url} alt="" className="w-16 h-16 rounded-full object-cover border-2" style={{ borderColor: accent }} />}
+              <p className="font-bold uppercase tracking-wider" style={{ fontSize: "26px", color: primary }}>{c.broker_name}</p>
+            </div>
+          )}
+          {/* Hero metric */}
+          {heroItem && (
+            <div className="flex items-center gap-8 p-8" style={{ backgroundColor: primary + "08" }}>
+              {heroItem.metric_value && <p className="slide-metric" style={{ fontSize: "72px", color: accent }}>{heroItem.metric_value}</p>}
+              <p className="font-bold uppercase tracking-[0.15em]" style={{ fontSize: "26px", color: primary }}>{heroItem.title}</p>
+            </div>
+          )}
+          {/* Secondary metrics */}
+          {secondaryItems.length > 0 && (
+            <div className="flex gap-4">
+              {secondaryItems.map((item: any, i: number) => (
+                <div key={i} className="flex-1 py-5 text-center" style={{ backgroundColor: primary + "08" }}>
+                  {item.metric_value && <p className="slide-metric" style={{ fontSize: "42px", color: accent }}>{item.metric_value}</p>}
+                  <p className="font-bold mt-1 uppercase tracking-[0.15em]" style={{ fontSize: "16px", color: primary }}>{item.title}</p>
                 </div>
               ))}
             </div>
-            {c.testimonials?.length > 0 && (
-              <div className="mt-8 py-6 border-t border-gray-100">
-                <p className="slide-body italic" style={{ color: textMuted }}>"{c.testimonials[0].content}"</p>
-                <p className="font-bold mt-3" style={{ fontSize: "22px", color: primary }}>{c.testimonials[0].author_name}</p>
-              </div>
-            )}
-          </div>
-          {/* Right: portfolio grid */}
+          )}
+          {/* Portfolio with overlay captions */}
           {portfolioImgs.length > 0 && (
-            <div className="w-[40%] grid grid-cols-2 gap-2">
+            <div className="flex gap-2">
               {portfolioImgs.slice(0, 4).map((img: any, i: number) => (
-                <img key={i} src={img.image_url} alt={img.caption || ""} className="w-full h-[180px] object-cover" />
+                <div key={i} className="relative flex-1 overflow-hidden" style={{ minWidth: 0, height: "200px" }}>
+                  <img src={img.image_url} alt={img.caption || ""} className="w-full h-full object-cover" />
+                  {img.caption && (
+                    <div className="absolute inset-0 flex items-end" style={{ background: "linear-gradient(transparent 40%, rgba(0,0,0,0.7))" }}>
+                      <p className="p-3 font-bold" style={{ fontSize: "18px", color: "#ffffff" }}>{img.caption}</p>
+                    </div>
+                  )}
+                </div>
               ))}
+            </div>
+          )}
+          {c.testimonials?.length > 0 && (
+            <div className="py-5 border-t border-gray-100">
+              <p className="slide-body italic" style={{ color: textMuted }}>"{c.testimonials[0].content}"</p>
+              <p className="font-bold mt-3" style={{ fontSize: "22px", color: primary }}>{c.testimonials[0].author_name}</p>
             </div>
           )}
         </div>
