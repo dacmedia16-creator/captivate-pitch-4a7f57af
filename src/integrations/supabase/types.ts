@@ -136,6 +136,9 @@ export type Database = {
           creci: string | null
           education: string | null
           id: string
+          personal_results: Json | null
+          personal_testimonials: Json | null
+          portfolio_images: Json | null
           preferred_layout: string | null
           preferred_tone: string | null
           service_regions: string | null
@@ -151,6 +154,9 @@ export type Database = {
           creci?: string | null
           education?: string | null
           id?: string
+          personal_results?: Json | null
+          personal_testimonials?: Json | null
+          portfolio_images?: Json | null
           preferred_layout?: string | null
           preferred_tone?: string | null
           service_regions?: string | null
@@ -166,6 +172,9 @@ export type Database = {
           creci?: string | null
           education?: string | null
           id?: string
+          personal_results?: Json | null
+          personal_testimonials?: Json | null
+          portfolio_images?: Json | null
           preferred_layout?: string | null
           preferred_tone?: string | null
           service_regions?: string | null
