@@ -142,13 +142,12 @@ Deno.serve(async (req) => {
         .from("presentation_sections")
         .select("section_key")
         .eq("presentation_id", pres.id)
-        .in("section_key", ["market_study_subject", "market_study_stats", "market_study_comparables"]);
+        .in("section_key", ["market_study_subject", "market_study_comparables"]);
 
       const existingKeys = new Set((existingSections || []).map((s: any) => s.section_key));
 
       const newSections = [
         { key: "market_study_subject", title: "Imóvel Avaliado", order: 11, content: subjectContent },
-        { key: "market_study_stats", title: "Estatísticas de Mercado", order: 12, content: statsContent },
         { key: "market_study_comparables", title: "Comparáveis de Mercado", order: 13, content: comparablesContent },
       ];
 

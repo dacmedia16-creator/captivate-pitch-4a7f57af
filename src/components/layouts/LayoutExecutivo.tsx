@@ -207,32 +207,7 @@ export function LayoutExecutivo({ section, branding, theme, colors }: Props) {
     );
   }
 
-  /* ═══════ MARKET STUDY — SLIDE 2: ESTATÍSTICAS ═══════ */
-  if (section.section_key === "market_study_stats" && c.status === "completed") {
-    const comps = c.comparables || [];
-    return (
-      <div className="w-full h-full bg-white p-16" style={{ fontFamily: FONT }}>
-        <SlideLabel color={accent}>Análise de mercado</SlideLabel>
-        <h2 className="slide-title mt-4 mb-8" style={{ fontSize: theme.heading.titleSize, color: primary, textTransform }}>Estatísticas de Mercado</h2>
-        <SlideDivider theme={theme} colors={colors} />
-        <div className="mt-8 flex gap-10 items-start">
-          <div className="flex-1">
-            <MarketStats avgPrice={c.avg_price} medianPrice={c.median_price} avgPricePerSqm={c.avg_price_per_sqm} totalComparables={c.comparables_count} primaryColor={primary} accentColor={accent} />
-            {c.owner_expected_price && (
-              <p className="mt-6" style={{ fontSize: "26px", color: textMuted }}>
-                Valor pretendido: <span className="font-bold" style={{ color: primary }}>R$ {Number(c.owner_expected_price).toLocaleString("pt-BR")}</span>
-              </p>
-            )}
-          </div>
-          {comps.length > 0 && (
-            <div style={{ width: "380px", flexShrink: 0 }}>
-              <MarketPricePieChart comparables={comps} primaryColor={primary} accentColor={accent} />
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  }
+  /* ═══════ MARKET STUDY — SLIDE "ESTATÍSTICAS" REMOVIDO ═══════ */
 
   /* ═══════ MARKET STUDY — SLIDE 3: COMPARÁVEIS ═══════ */
   if (section.section_key === "market_study_comparables" && c.status === "completed") {

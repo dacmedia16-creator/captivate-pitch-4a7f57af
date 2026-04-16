@@ -1,0 +1,1 @@
+DELETE FROM public.presentation_sections WHERE section_key = 'market_study_stats';

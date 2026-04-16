@@ -41,7 +41,6 @@ const SECTION_DEFINITIONS = [
   { key: "differentials", title: "Diferenciais", order: 9 },
   { key: "results", title: "Resultados", order: 10 },
   { key: "market_study_subject", title: "Imóvel Avaliado", order: 11 },
-  { key: "market_study_stats", title: "Estatísticas de Mercado", order: 12 },
   { key: "market_study_comparables", title: "Comparáveis de Mercado", order: 13 },
   { key: "pricing_scenarios", title: "Cenários de Preço", order: 14 },
   { key: "required_documentation", title: "Documentação Necessária", order: 15 },
@@ -240,28 +239,6 @@ export async function generatePresentationSections({ presentationId, tenantId, b
           };
         } else {
           content = { status: "pending", message: "O estudo de mercado será inserido aqui após processamento." };
-        }
-        break;
-      case "market_study_stats":
-        if (report) {
-          const comparablesForStats = comparables.map((comp: any) => ({
-            title: comp.title,
-            price: comp.price,
-            area: comp.area,
-            neighborhood: comp.neighborhood,
-            price_per_sqm: comp.price_per_sqm,
-          }));
-          content = {
-            status: "completed",
-            avg_price: report.avg_price,
-            median_price: report.median_price,
-            avg_price_per_sqm: report.avg_price_per_sqm,
-            comparables_count: comparables.length,
-            comparables: comparablesForStats,
-            owner_expected_price: presentation?.owner_expected_price || subjectProperty?.owner_expected_price,
-          };
-        } else {
-          content = { status: "pending" };
         }
         break;
       case "market_study_comparables":
