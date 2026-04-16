@@ -1,34 +1,28 @@
 
 
-# Gráfico de Pizza + Layout Melhorado no Slide de Estatísticas
+# Aumentar Fotos nos Slides
 
 ## O que muda
-Substituir o `MarketPriceBarChart` (barras verticais) por um **gráfico de pizza (PieChart)** mostrando a distribuição de preços dos comparáveis por faixa. Melhorar o layout geral do slide com métricas em cards e melhor distribuição espacial.
+Aumentar a altura das fotos em dois locais principais:
 
-## Passos
+1. **SlideImageGrid** (slide property_summary): altura de `420px` para `520px`
+2. **Portfolio no Results** (3 layouts): altura de `280px` para `360px`
 
-### 1. Criar componente `MarketPricePieChart` em `MarketCharts.tsx`
-- Usar `PieChart` + `Pie` + `Cell` do Recharts
-- Agrupar comparáveis em faixas de preço (ex: abaixo da média, na média, acima da média)
-- Cores: verde (abaixo), primary (na média), accent/vermelho (acima)
-- Labels com porcentagem e faixa
-- Tooltip com contagem e valores
+## Arquivos alterados
 
-### 2. Melhorar `MarketStats` 
-- Cada métrica em um card com fundo sutil, borda, e ícone
-- Layout mais espaçado e profissional
+### 1. `src/components/layouts/slide-components/SlideImageGrid.tsx`
+- Aumentar `height: 420` para `height: 520` na imagem principal
 
-### 3. Atualizar slide `market_study_stats` nos 3 layouts
-- Layout lado a lado: métricas + pie chart à direita
-- Substituir `MarketPriceBarChart` por `MarketPricePieChart`
-- Melhor uso do espaço vertical
+### 2. `src/components/layouts/LayoutExecutivo.tsx`
+- Portfolio images: `height: "280px"` para `height: "360px"`
 
-### Arquivos alterados
-- `src/components/charts/MarketCharts.tsx` — adicionar `MarketPricePieChart`, melhorar `MarketStats`
-- `src/components/layouts/LayoutExecutivo.tsx` — slide market_study_stats
-- `src/components/layouts/LayoutPremium.tsx` — slide market_study_stats
-- `src/components/layouts/LayoutImpactoComercial.tsx` — slide market_study_stats
+### 3. `src/components/layouts/LayoutPremium.tsx`
+- Portfolio images: `height: "280px"` para `height: "360px"`
 
-### Build error
-Os erros de deploy são transientes (transaction expired) e não relacionados ao código — serão resolvidos automaticamente no próximo deploy.
+### 4. `src/components/layouts/LayoutImpactoComercial.tsx`
+- Portfolio images: `height: "280px"` para `height: "360px"`
+
+## Impacto
+- Apenas visual, sem mudanças de dados ou schema
+- Fotos ficam mais visíveis e impactantes em todos os 3 temas
 
