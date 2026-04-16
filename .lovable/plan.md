@@ -1,47 +1,33 @@
 
 
-# Melhorar Slide de Resultados
+# Fix: Timeout na Fase de Scoring/Inserção do Inngest
 
-## O que muda
-Redesenhar o slide "Resultados" nos 3 layouts para ficar mais parecido com a referência: métrica principal em destaque (card com fundo claro), fotos do portfólio em grid horizontal com overlay de legenda/badge, e avatar+nome do corretor no topo.
+## Problema
+Após a extração AI (62 comparáveis), a edge function sofre timeout (`Http: connection closed before message completed`) **antes** de executar o `step.run("score-and-save")`. A função `scoreAndSave` faz tudo num único step: cleanup, scoring, insert comparables, insert adjustments, insert results, AI summary, sync presentations. Se o timeout ocorre entre steps, tudo se perde.
 
-## Mudanças por arquivo
+## Solução
+Quebrar o monolítico `scoreAndSave` em **4 steps independentes** dentro do Inngest function handler (linhas 977-994). Cada step sobrevive ao timeout da edge function porque o Inngest re-invoca a função e pula steps já completados.
 
-### 1. `src/components/layouts/LayoutExecutivo.tsx` — Seção `results` (linhas 435-478)
-- Avatar + nome do corretor no topo com estilo atual (já existe, manter)
-- **Métricas**: exibir o primeiro item como card hero centralizado (fonte grande, cor accent), e os demais como row secundária abaixo
-- **Portfólio**: cards com overlay escuro na parte inferior mostrando caption (ex: "VENDIDO em 15 dias") e tipo do imóvel, estilo similar à imagem de referência — 4 cards lado a lado, `h-[200px]`, `rounded-lg`, com gradiente overlay
-- **Depoimento**: manter abaixo como está
+### Arquivo: `supabase/functions/inngest-serve/index.ts`
 
-### 2. `src/components/layouts/LayoutPremium.tsx` — Seção `results`
-- Mesma lógica adaptada ao tema premium (fundo escuro)
+**Substituir linhas 977-994** (o bloco `score-and-save` único) por 4 steps:
 
-### 3. `src/components/layouts/LayoutImpactoComercial.tsx` — Seção `results`
-- Mesma lógica adaptada ao tema impacto
+1. **`step.run("score-filter")`** — Executa scoring de similaridade e filtragem dos comparáveis. Retorna `finalComparables` + `pricingAnalysis` + metadata. Sem I/O de banco.
 
-### 4. Nenhuma mudança em dados/geração
-Os dados (`personal_results`, `portfolio_images` com `caption`) já estão sendo passados corretamente no `useGeneratePresentation.ts`.
+2. **`step.run("db-insert-comparables")`** — Cleanup idempotente (delete old auto_firecrawl) + insert comparáveis + insert adjustments + update adjusted_price. Retorna IDs inseridos.
 
-## Detalhes do layout hero metric
+3. **`step.run("db-insert-results")`** — Insert `market_study_results` + chama `generate-market-summary` (AI summary, non-fatal). Marca estudo como `completed`.
 
-```text
-┌─────────────────────────────────────────────┐
-│ RESULTADOS                                  │
-│ Resultados                                  │
-│ ───                                         │
-│ [avatar] Carlos Lima                        │
-│                                             │
-│ ┌─────────────────────────────────────────┐ │
-│ │     60 Milhões Vencidos                 │ │
-│ │           + 200                          │ │
-│ └─────────────────────────────────────────┘ │
-│                                             │
-│ [img1 overlay] [img2 overlay] [img3] [img4] │
-│                                             │
-│ "Depoimento..."  — Autor                    │
-└─────────────────────────────────────────────┘
-```
+4. **`step.run("sync-presentations")`** — Sincroniza pricing_scenarios nas presentations vinculadas. Non-fatal.
 
-## Detalhes do overlay nas imagens de portfólio
-Cada imagem terá um gradiente `linear-gradient(transparent 40%, rgba(0,0,0,0.7))` na parte inferior, com a caption em branco (`font-bold`, `text-sm` no contexto do slide = ~20px).
+### Detalhes técnicos
+- Cada step cria seu próprio `createClient(supabaseUrl, serviceKey)` (padrão já usado nos outros steps)
+- Os dados entre steps são passados via return/variáveis locais (Inngest serializa entre invocações)
+- A lógica de scoring (linhas 644-706) sai do `scoreAndSave` para uma função pura `scoreComparables()` sem I/O
+- Manter `retries: 2` — agora cada step individual pode ser retentado
+
+### Impacto
+- Nenhuma mudança de schema ou frontend
+- A lógica permanece idêntica, apenas distribuída em steps menores
+- Cada step leva ~3-10s em vez de ~30s+ do monólito
 
