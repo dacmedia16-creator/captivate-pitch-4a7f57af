@@ -1,31 +1,38 @@
 
 
-# Atualizar apresentações já criadas com os 3 slides de estudo de mercado
+# Corrigir ordem: Cenários de Preço depois de Comparáveis
 
 ## Problema
-Existem 24 apresentações vinculadas a estudos de mercado concluídos que ainda não têm os 3 novos slides (`market_study_subject`, `market_study_stats`, `market_study_comparables`). O auto-sync atual só roda quando alguém abre o editor.
+Nas apresentações existentes, `pricing_scenarios` tem `sort_order=12` (anterior à mudança dos 3 slides), enquanto `market_study_comparables` tem 13. Resultado: cenários aparecem antes dos comparáveis.
 
 ## Solução
-Criar uma edge function `batch-sync-market-slides` que percorre todos os `market_study_id` únicos com status `completed` e chama a mesma lógica de sync para cada um. Depois, invocar a função uma vez.
 
-## Mudanças
+### 1. Migration SQL — corrigir dados existentes
+```sql
+UPDATE presentation_sections 
+SET sort_order = 14 
+WHERE section_key = 'pricing_scenarios';
 
-### 1. Nova edge function `supabase/functions/batch-sync-market-slides/index.ts`
-- Busca todos os `market_studies` com `status = 'completed'` que têm pelo menos uma apresentação vinculada
-- Para cada um, executa a mesma lógica do `syncMarketStudySections`:
-  - Busca `market_study_results`, `market_study_comparables` (approved), `market_study_subject_properties`
-  - Para cada apresentação vinculada, faz upsert das 3 seções + atualiza `pricing_scenarios`
-- Retorna contagem de apresentações atualizadas
-- Autenticação: verifica que o usuário é `super_admin` ou roda com service role key
+UPDATE presentation_sections 
+SET sort_order = 15 
+WHERE section_key = 'required_documentation';
 
-### 2. Botão no `AdminDashboard.tsx` (opcional)
-- Adicionar um botão "Sincronizar apresentações" no painel admin que invoca a edge function
-- Mostra loading + toast com resultado
+UPDATE presentation_sections 
+SET sort_order = 16 
+WHERE section_key = 'closing';
+```
+
+### 2. `syncMarketStudySections.ts` — garantir que o sync também atualiza o sort_order do pricing
+Adicionar no loop de sync uma atualização do `sort_order` de `pricing_scenarios` para 14 (já atualiza o content, basta incluir sort_order no update).
+
+### 3. `batch-sync-market-slides/index.ts` — mesma correção
+Incluir atualização do sort_order de `pricing_scenarios`, `required_documentation` e `closing` no batch sync.
 
 ## Arquivos
 
 | Arquivo | Mudança |
 |---------|---------|
-| `supabase/functions/batch-sync-market-slides/index.ts` | Nova edge function com lógica de batch sync |
-| `src/pages/admin/AdminDashboard.tsx` | Botão para disparar o batch sync |
+| DB (migration) | UPDATE sort_order de pricing/docs/closing |
+| `src/hooks/syncMarketStudySections.ts` | Atualizar sort_order do pricing_scenarios para 14 |
+| `supabase/functions/batch-sync-market-slides/index.ts` | Idem |
 
