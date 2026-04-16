@@ -8,6 +8,9 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ImageUploader } from "@/components/shared/ImageUploader";
+import { PortfolioSection } from "@/components/profile/PortfolioSection";
+import { PersonalResultsSection } from "@/components/profile/PersonalResultsSection";
+import { PersonalTestimonialsSection } from "@/components/profile/PersonalTestimonialsSection";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { UserCircle, Briefcase, Settings2, Save, Loader2 } from "lucide-react";
@@ -29,6 +32,9 @@ interface BrokerData {
   vgv_summary: string;
   preferred_tone: string;
   preferred_layout: string;
+  portfolio_images: any[];
+  personal_results: any[];
+  personal_testimonials: any[];
 }
 
 export default function AgentProfile() {
@@ -53,6 +59,9 @@ export default function AgentProfile() {
     vgv_summary: "",
     preferred_tone: "",
     preferred_layout: "",
+    portfolio_images: [],
+    personal_results: [],
+    personal_testimonials: [],
   });
 
   useEffect(() => {
@@ -64,17 +73,23 @@ export default function AgentProfile() {
         supabase.from("broker_profiles").select("*").eq("user_id", user.id).maybeSingle(),
       ]);
       if (p) setProfile({ full_name: p.full_name ?? "", email: p.email ?? "", phone: p.phone ?? "", avatar_url: p.avatar_url });
-      if (b) setBroker({
-        creci: b.creci ?? "",
-        short_bio: b.short_bio ?? "",
-        years_in_market: b.years_in_market,
-        education: b.education ?? "",
-        specialties: b.specialties ?? "",
-        service_regions: b.service_regions ?? "",
-        vgv_summary: b.vgv_summary ?? "",
-        preferred_tone: b.preferred_tone ?? "",
-        preferred_layout: b.preferred_layout ?? "",
-      });
+      if (b) {
+        const bAny = b as any;
+        setBroker({
+          creci: b.creci ?? "",
+          short_bio: b.short_bio ?? "",
+          years_in_market: b.years_in_market,
+          education: b.education ?? "",
+          specialties: b.specialties ?? "",
+          service_regions: b.service_regions ?? "",
+          vgv_summary: b.vgv_summary ?? "",
+          preferred_tone: b.preferred_tone ?? "",
+          preferred_layout: b.preferred_layout ?? "",
+          portfolio_images: Array.isArray(bAny.portfolio_images) ? bAny.portfolio_images : [],
+          personal_results: Array.isArray(bAny.personal_results) ? bAny.personal_results : [],
+          personal_testimonials: Array.isArray(bAny.personal_testimonials) ? bAny.personal_testimonials : [],
+        });
+      }
       setLoading(false);
     })();
   }, [user]);
@@ -101,7 +116,10 @@ export default function AgentProfile() {
         vgv_summary: broker.vgv_summary || null,
         preferred_tone: broker.preferred_tone || null,
         preferred_layout: broker.preferred_layout || null,
-      }, { onConflict: "user_id" });
+        portfolio_images: broker.portfolio_images,
+        personal_results: broker.personal_results,
+        personal_testimonials: broker.personal_testimonials,
+      } as any, { onConflict: "user_id" });
       if (bErr) throw bErr;
 
       toast.success("Perfil salvo com sucesso!");
@@ -244,6 +262,22 @@ export default function AgentProfile() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Portfólio e Resultados */}
+      <PortfolioSection
+        images={broker.portfolio_images}
+        onChange={(imgs) => setBroker((b) => ({ ...b, portfolio_images: imgs }))}
+      />
+
+      <PersonalResultsSection
+        results={broker.personal_results}
+        onChange={(results) => setBroker((b) => ({ ...b, personal_results: results }))}
+      />
+
+      <PersonalTestimonialsSection
+        testimonials={broker.personal_testimonials}
+        onChange={(testimonials) => setBroker((b) => ({ ...b, personal_testimonials: testimonials }))}
+      />
     </div>
   );
 }

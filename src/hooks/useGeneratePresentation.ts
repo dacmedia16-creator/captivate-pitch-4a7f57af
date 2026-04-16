@@ -196,9 +196,22 @@ export async function generatePresentationSections({ presentationId, tenantId, b
       case "differentials":
         content = { items: differentials || [] };
         break;
-      case "results":
-        content = { items: salesResults || [], testimonials: testimonials || [] };
+      case "results": {
+        const brokerAny = brokerProfile as any;
+        const personalResults = Array.isArray(brokerAny?.personal_results) && brokerAny.personal_results.length > 0
+          ? brokerAny.personal_results : null;
+        const personalTestimonials = Array.isArray(brokerAny?.personal_testimonials) && brokerAny.personal_testimonials.length > 0
+          ? brokerAny.personal_testimonials : null;
+        const portfolioImages = Array.isArray(brokerAny?.portfolio_images) ? brokerAny.portfolio_images : [];
+        content = {
+          items: personalResults || salesResults || [],
+          testimonials: personalTestimonials || testimonials || [],
+          portfolio_images: portfolioImages,
+          broker_name: profile?.full_name,
+          avatar_url: profile?.avatar_url,
+        };
         break;
+      }
       case "market_study_subject":
         if (report) {
           const subjectForSlideSubject = subjectProperty ? {
