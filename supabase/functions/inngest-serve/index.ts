@@ -120,7 +120,7 @@ async function fetchWithRetry(
 
 const PORTAL_SITE_MAP: Record<string, string> = {
   zap: "site:zapimoveis.com.br",
-  vivareal: "site:vivareal.com.br",
+  
   olx_venda: "site:olx.com.br/imoveis/venda",
   olx_aluguel: "site:olx.com.br/imoveis/aluguel",
   imovelweb: "site:imovelweb.com.br",
