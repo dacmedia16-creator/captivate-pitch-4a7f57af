@@ -22,6 +22,21 @@ export default function PresentationEditor() {
   const [localSections, setLocalSections] = useState<SectionData[]>([]);
   const [generatingAI, setGeneratingAI] = useState(false);
   const [exportingPDF, setExportingPDF] = useState(false);
+  const [resyncingMarket, setResyncingMarket] = useState(false);
+
+  const handleResyncMarket = async () => {
+    if (!presentation?.market_study_id) return;
+    setResyncingMarket(true);
+    try {
+      await syncMarketStudySections(presentation.market_study_id);
+      await queryClient.invalidateQueries({ queryKey: ["presentation-sections", id] });
+      toast.success("Dados de mercado atualizados!");
+    } catch (e: any) {
+      toast.error(e.message || "Erro ao atualizar mercado");
+    } finally {
+      setResyncingMarket(false);
+    }
+  };
 
   const userId = profile?.id;
   const tenantId = profile?.tenant_id;
@@ -171,6 +186,8 @@ export default function PresentationEditor() {
         onSave={() => saveMutation.mutate()} saving={saveMutation.isPending}
         onGenerateAI={handleGenerateAI} generatingAI={generatingAI}
         onExportPDF={handleExportPDF} exportingPDF={exportingPDF}
+        onResyncMarket={handleResyncMarket} resyncingMarket={resyncingMarket}
+        hasMarketStudy={!!presentation?.market_study_id}
       />
       <div className="flex flex-1 overflow-hidden">
         <SlidesSidebar sections={localSections} selectedId={selectedId} onSelect={setSelectedId} onToggleVisibility={toggleVisibility} />
