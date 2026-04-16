@@ -182,7 +182,7 @@ function buildPortalNativeUrl(property: PropertyData, portal: PortalInfo): strin
 
   switch (portal.code) {
     case "zap":
-      return `https://www.zapimoveis.com.br/${purposeSlug}/${typeSlug}/${state}+${city}+${neighborhood}/`;
+      return null; // ZAP não aceita o formato de URL com +, retorna showcase de RJ
     case "vivareal":
       return `https://www.vivareal.com.br/${purposeSlug}/${state}/${city}/${neighborhood}/${typeSlug}_residencial/`;
     case "olx":
