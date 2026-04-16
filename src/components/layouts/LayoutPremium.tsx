@@ -107,74 +107,124 @@ export function LayoutPremium({ section, branding, theme, colors }: Props) {
     );
   }
 
-  /* ═══════ MARKET STUDY ═══════ */
-  if (section.section_key === "market_study_placeholder" && c.status === "completed") {
+  /* ═══════ MARKET STUDY — SLIDE 1: IMÓVEL AVALIADO ═══════ */
+  if ((section.section_key === "market_study_subject" || section.section_key === "market_study_placeholder") && c.status === "completed") {
     const sp = c.subject_property;
+    return (
+      <div className="w-full h-full bg-white p-16" style={{ fontFamily: FONT }}>
+        <SlideLabel color={accent}>Análise de mercado</SlideLabel>
+        <h2 className="slide-title mt-4 mb-8" style={{ fontSize: theme.heading.titleSize, color: primary }}>Imóvel Avaliado</h2>
+        <SlideDivider theme={theme} colors={colors} />
+        {sp ? (
+          <div className="mt-8 space-y-8">
+            <div className="grid grid-cols-2 gap-x-16 gap-y-6" style={{ fontSize: "24px" }}>
+              {sp.property_type && <div><span style={{ color: colors.textLight }}>Tipo:</span> <span className="font-semibold" style={{ color: primary }}>{sp.property_type}</span></div>}
+              {sp.construction_standard && <div><span style={{ color: colors.textLight }}>Padrão construtivo:</span> <span className="font-semibold" style={{ color: primary }}>{sp.construction_standard}</span></div>}
+              {sp.conservation_state && <div><span style={{ color: colors.textLight }}>Estado de conservação:</span> <span className="font-semibold" style={{ color: primary }}>{sp.conservation_state}</span></div>}
+              {sp.property_age && <div><span style={{ color: colors.textLight }}>Idade:</span> <span className="font-semibold" style={{ color: primary }}>{sp.property_age}</span></div>}
+              {sp.neighborhood && <div><span style={{ color: colors.textLight }}>Bairro:</span> <span className="font-semibold" style={{ color: primary }}>{sp.neighborhood}</span></div>}
+              {sp.city && <div><span style={{ color: colors.textLight }}>Cidade:</span> <span className="font-semibold" style={{ color: primary }}>{sp.city}</span></div>}
+              {sp.condominium && <div><span style={{ color: colors.textLight }}>Condomínio:</span> <span className="font-semibold" style={{ color: primary }}>{sp.condominium}</span></div>}
+            </div>
+            <SlideDivider theme={theme} colors={colors} />
+            <SlideMetricRow
+              items={[
+                { label: "Área útil", value: sp.area_useful ? `${sp.area_useful}m²` : null },
+                { label: "Área construída", value: sp.area_built ? `${sp.area_built}m²` : null },
+                { label: "Quartos", value: sp.bedrooms },
+                { label: "Suítes", value: sp.suites },
+                { label: "Vagas", value: sp.parking_spots },
+                { label: "Banheiros", value: sp.bathrooms },
+              ]}
+              colors={colors}
+              metricSize="56px"
+            />
+            {sp.differentials?.length > 0 && (
+              <div className="flex flex-wrap gap-3">
+                {sp.differentials.map((d: any, i: number) => (
+                  <span key={i} className="px-5 py-2 rounded-full font-medium" style={{ fontSize: "20px", border: `1px solid ${accent}30`, color: accent }}>
+                    {typeof d === "string" ? d : d.label || d.name}
+                  </span>
+                ))}
+              </div>
+            )}
+            {sp.owner_expected_price && (
+              <p style={{ fontSize: "26px", color: textMuted }}>
+                Valor pretendido: <span className="font-bold" style={{ color: accent }}>R$ {Number(sp.owner_expected_price).toLocaleString("pt-BR")}</span>
+              </p>
+            )}
+            {c.executive_summary && <p className="leading-relaxed" style={{ fontSize: "22px", color: textMuted }}>{c.executive_summary}</p>}
+          </div>
+        ) : (
+          <p className="mt-8 italic" style={{ fontSize: "22px", color: "#D1D5DB" }}>Dados do imóvel não disponíveis</p>
+        )}
+      </div>
+    );
+  }
+
+  /* ═══════ MARKET STUDY — SLIDE 2: ESTATÍSTICAS ═══════ */
+  if (section.section_key === "market_study_stats" && c.status === "completed") {
+    const comps = c.comparables || [];
+    return (
+      <div className="w-full h-full bg-white p-16" style={{ fontFamily: FONT }}>
+        <SlideLabel color={accent}>Análise de mercado</SlideLabel>
+        <h2 className="slide-title mt-4 mb-8" style={{ fontSize: theme.heading.titleSize, color: primary }}>Estatísticas de Mercado</h2>
+        <SlideDivider theme={theme} colors={colors} />
+        <div className="mt-8">
+          <MarketStats avgPrice={c.avg_price} medianPrice={c.median_price} avgPricePerSqm={c.avg_price_per_sqm} totalComparables={c.comparables_count} primaryColor={primary} accentColor={accent} />
+        </div>
+        {c.owner_expected_price && (
+          <p className="mt-6" style={{ fontSize: "26px", color: colors.textLight }}>
+            Valor pretendido: <span className="font-bold" style={{ color: accent }}>R$ {Number(c.owner_expected_price).toLocaleString("pt-BR")}</span>
+          </p>
+        )}
+        {comps.length > 0 && (
+          <div className="mt-8">
+            <MarketPriceBarChart comparables={comps} ownerExpectedPrice={c.owner_expected_price} primaryColor={primary} accentColor={accent} />
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  /* ═══════ MARKET STUDY — SLIDE 3: COMPARÁVEIS ═══════ */
+  if (section.section_key === "market_study_comparables" && c.status === "completed") {
     const comps = c.comparables || [];
     return (
       <div className="w-full h-full bg-white p-16 overflow-hidden" style={{ fontFamily: FONT }}>
         <SlideLabel color={accent}>Análise de mercado</SlideLabel>
-        <h2 className="slide-title mt-4 mb-8" style={{ fontSize: theme.heading.titleSize, color: primary }}>{section.title}</h2>
+        <h2 className="slide-title mt-4 mb-8" style={{ fontSize: theme.heading.titleSize, color: primary }}>Comparáveis de Mercado</h2>
         <SlideDivider theme={theme} colors={colors} />
-
-        {sp && (
-          <div className="mt-6 p-6 rounded-xl" style={{ border: `1px solid ${accent}20` }}>
-            <p className="font-bold mb-3" style={{ fontSize: "22px", color: primary }}>Imóvel Avaliado</p>
-            <div className="flex flex-wrap gap-x-10 gap-y-2" style={{ fontSize: "20px", color: textMuted }}>
-              {sp.property_type && <span>{sp.property_type}</span>}
-              {sp.construction_standard && <span>Padrão: {sp.construction_standard}</span>}
-              {sp.conservation_state && <span>Conservação: {sp.conservation_state}</span>}
-              {sp.property_age && <span>Idade: {sp.property_age}</span>}
-              {sp.area_useful && <span>{sp.area_useful}m² útil</span>}
-              {sp.bedrooms && <span>{sp.bedrooms} quartos</span>}
-              {sp.suites && <span>{sp.suites} suítes</span>}
-              {sp.parking_spots && <span>{sp.parking_spots} vagas</span>}
-            </div>
-            {sp.differentials?.length > 0 && (
-              <p className="mt-2" style={{ fontSize: "18px", color: colors.textLight }}>
-                Diferenciais: {sp.differentials.map((d: any) => typeof d === "string" ? d : d.label || d.name).join(", ")}
-              </p>
-            )}
-          </div>
-        )}
-
-        <div className="mt-6">
-          <MarketStats avgPrice={c.avg_price} medianPrice={c.median_price} avgPricePerSqm={c.avg_price_per_sqm} totalComparables={comps.length || c.comparables_count} compact primaryColor={primary} accentColor={accent} />
-        </div>
-
-        {comps.length > 0 && (
+        {comps.length > 0 ? (
           <div className="mt-6">
-            <MarketPriceBarChart comparables={comps} ownerExpectedPrice={c.owner_expected_price} compact primaryColor={primary} accentColor={accent} />
-          </div>
-        )}
-
-        {comps.length > 0 && (
-          <div className="mt-6">
-            <table className="w-full" style={{ fontSize: "17px" }}>
+            <table className="w-full" style={{ fontSize: "18px" }}>
               <thead>
                 <tr style={{ color: primary, borderBottom: `2px solid ${accent}` }}>
-                  <th className="text-left py-2 font-bold">Comparável</th>
-                  <th className="text-right py-2 font-bold">Preço</th>
-                  <th className="text-right py-2 font-bold">m²</th>
-                  <th className="text-right py-2 font-bold">R$/m²</th>
-                  <th className="text-right py-2 font-bold">Score</th>
+                  <th className="text-left py-3 font-bold">Comparável</th>
+                  <th className="text-right py-3 font-bold">Preço</th>
+                  <th className="text-right py-3 font-bold">m²</th>
+                  <th className="text-right py-3 font-bold">R$/m²</th>
+                  <th className="text-right py-3 font-bold">Score</th>
                 </tr>
               </thead>
               <tbody>
-                {comps.slice(0, 8).map((comp: any, i: number) => (
+                {comps.map((comp: any, i: number) => (
                   <tr key={i} style={{ borderBottom: `1px solid ${neutral}`, color: textMuted }}>
-                    <td className="py-2 truncate max-w-[350px]">{comp.title || comp.neighborhood || "—"}</td>
-                    <td className="py-2 text-right font-medium" style={{ color: primary }}>
+                    <td className="py-3 truncate max-w-[400px]">{comp.title || comp.neighborhood || "—"}</td>
+                    <td className="py-3 text-right font-medium" style={{ color: primary }}>
                       {comp.price ? `R$ ${Number(comp.price).toLocaleString("pt-BR")}` : "—"}
                     </td>
-                    <td className="py-2 text-right">{comp.area || "—"}</td>
-                    <td className="py-2 text-right">{comp.price_per_sqm ? `R$ ${Number(comp.price_per_sqm).toLocaleString("pt-BR", { maximumFractionDigits: 0 })}` : "—"}</td>
-                    <td className="py-2 text-right">{comp.similarity_score ? `${Number(comp.similarity_score).toFixed(0)}%` : "—"}</td>
+                    <td className="py-3 text-right">{comp.area || "—"}</td>
+                    <td className="py-3 text-right">{comp.price_per_sqm ? `R$ ${Number(comp.price_per_sqm).toLocaleString("pt-BR", { maximumFractionDigits: 0 })}` : "—"}</td>
+                    <td className="py-3 text-right">{comp.similarity_score ? `${Number(comp.similarity_score).toFixed(0)}%` : "—"}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
+            <p className="mt-4 text-right" style={{ fontSize: "18px", color: colors.textLight }}>{comps.length} comparáveis analisados</p>
           </div>
+        ) : (
+          <p className="mt-8 italic" style={{ fontSize: "22px", color: "#D1D5DB" }}>Nenhum comparável disponível</p>
         )}
       </div>
     );

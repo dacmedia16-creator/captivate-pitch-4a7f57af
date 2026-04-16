@@ -5,7 +5,6 @@ import { supabase } from "@/integrations/supabase/client";
  * Call after recalculation or when market_study_results change.
  */
 export async function syncMarketStudySections(marketStudyId: string) {
-  // 1. Fetch latest results, approved comparables, subject property, and linked presentations
   const [resultRes, compsRes, presRes, subjectRes] = await Promise.all([
     supabase.from("market_study_results").select("*").eq("market_study_id", marketStudyId).single(),
     supabase.from("market_study_comparables").select("*").eq("market_study_id", marketStudyId).eq("is_approved", true),
@@ -20,26 +19,6 @@ export async function syncMarketStudySections(marketStudyId: string) {
 
   if (!report || presentations.length === 0) return;
 
-  // Build compact comparables array for slides
-  const comparablesForSlide = comparables.map((comp: any) => ({
-    title: comp.title,
-    price: comp.price,
-    area: comp.area,
-    bedrooms: comp.bedrooms,
-    suites: comp.suites,
-    parking_spots: comp.parking_spots,
-    bathrooms: comp.bathrooms,
-    neighborhood: comp.neighborhood,
-    condominium: comp.condominium,
-    conservation_state: comp.conservation_state,
-    construction_standard: comp.construction_standard,
-    similarity_score: comp.similarity_score,
-    adjusted_price: comp.adjusted_price,
-    price_per_sqm: comp.price_per_sqm,
-    source_name: comp.source_name,
-  }));
-
-  // Build subject property summary
   const subjectForSlide = subject ? {
     property_type: subject.property_type,
     construction_standard: subject.construction_standard,
@@ -59,19 +38,54 @@ export async function syncMarketStudySections(marketStudyId: string) {
     owner_expected_price: subject.owner_expected_price,
   } : null;
 
-  // 2. For each linked presentation, update the relevant sections
+  const comparablesForTable = comparables.map((comp: any) => ({
+    title: comp.title,
+    price: comp.price,
+    area: comp.area,
+    bedrooms: comp.bedrooms,
+    suites: comp.suites,
+    parking_spots: comp.parking_spots,
+    bathrooms: comp.bathrooms,
+    neighborhood: comp.neighborhood,
+    condominium: comp.condominium,
+    conservation_state: comp.conservation_state,
+    construction_standard: comp.construction_standard,
+    similarity_score: comp.similarity_score,
+    adjusted_price: comp.adjusted_price,
+    price_per_sqm: comp.price_per_sqm,
+    source_name: comp.source_name,
+  }));
+
+  const comparablesForStats = comparables.map((comp: any) => ({
+    title: comp.title,
+    price: comp.price,
+    area: comp.area,
+    neighborhood: comp.neighborhood,
+    price_per_sqm: comp.price_per_sqm,
+  }));
+
   for (const pres of presentations) {
-    const marketStudyContent = {
+    const subjectContent = {
+      status: "completed",
+      subject_property: subjectForSlide,
+      confidence_level: report.confidence_level,
+      executive_summary: report.executive_summary,
+    };
+
+    const statsContent = {
       status: "completed",
       avg_price: report.avg_price,
       median_price: report.median_price,
       avg_price_per_sqm: report.avg_price_per_sqm,
-      confidence_level: report.confidence_level,
-      executive_summary: report.executive_summary,
       comparables_count: comparables.length,
-      comparables: comparablesForSlide,
-      subject_property: subjectForSlide,
+      comparables: comparablesForStats,
       owner_expected_price: pres.owner_expected_price || subject?.owner_expected_price,
+    };
+
+    const comparablesContent = {
+      status: "completed",
+      comparables: comparablesForTable,
+      comparables_count: comparables.length,
     };
 
     const pricingScenariosContent = {
@@ -83,18 +97,40 @@ export async function syncMarketStudySections(marketStudyId: string) {
       ],
     };
 
-    // Update both sections in parallel
+    // Check if new sections exist; if not, insert them
+    const { data: existingSections } = await supabase
+      .from("presentation_sections")
+      .select("section_key")
+      .eq("presentation_id", pres.id)
+      .in("section_key", ["market_study_subject", "market_study_stats", "market_study_comparables"]);
+
+    const existingKeys = new Set((existingSections || []).map(s => s.section_key));
+
+    const newSections = [
+      { key: "market_study_subject", title: "Imóvel Avaliado", order: 11, content: subjectContent },
+      { key: "market_study_stats", title: "Estatísticas de Mercado", order: 12, content: statsContent },
+      { key: "market_study_comparables", title: "Comparáveis de Mercado", order: 13, content: comparablesContent },
+    ];
+
+    const toInsert = newSections
+      .filter(s => !existingKeys.has(s.key))
+      .map(s => ({
+        presentation_id: pres.id,
+        section_key: s.key,
+        title: s.title,
+        sort_order: s.order,
+        is_visible: true,
+        content: s.content as any,
+      }));
+
+    const toUpdate = newSections.filter(s => existingKeys.has(s.key));
+
     await Promise.all([
-      supabase
-        .from("presentation_sections")
-        .update({ content: marketStudyContent as any })
-        .eq("presentation_id", pres.id)
-        .eq("section_key", "market_study_placeholder"),
-      supabase
-        .from("presentation_sections")
-        .update({ content: pricingScenariosContent as any })
-        .eq("presentation_id", pres.id)
-        .eq("section_key", "pricing_scenarios"),
+      ...(toInsert.length > 0 ? [supabase.from("presentation_sections").insert(toInsert)] : []),
+      ...toUpdate.map(s =>
+        supabase.from("presentation_sections").update({ content: s.content as any }).eq("presentation_id", pres.id).eq("section_key", s.key)
+      ),
+      supabase.from("presentation_sections").update({ content: pricingScenariosContent as any }).eq("presentation_id", pres.id).eq("section_key", "pricing_scenarios"),
     ]);
   }
 
