@@ -1628,6 +1628,7 @@ export type Database = {
         Args: { _field: string; _tenant_id: string }
         Returns: boolean
       }
+      expire_stuck_studies: { Args: never; Returns: number }
       get_presentation_by_share_token: {
         Args: { _token: string }
         Returns: {

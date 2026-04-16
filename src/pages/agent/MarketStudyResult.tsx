@@ -33,6 +33,7 @@ export default function MarketStudyResult() {
   const [exportingPDF, setExportingPDF] = useState(false);
   const [creatingPresentation, setCreatingPresentation] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const [retrying, setRetrying] = useState(false);
 
   const { data: study, isLoading } = useQuery({
     queryKey: ["market-study", id],
@@ -48,7 +49,17 @@ export default function MarketStudyResult() {
     enabled: !!id,
     refetchInterval: (query) => {
       const d = query.state.data as any;
-      return d?.status === "processing" ? 5000 : false;
+      if (d?.status === "processing") {
+        // Auto-expire stuck studies: if updated_at > 15 min ago, call expire function
+        const updatedAt = d?.updated_at ? new Date(d.updated_at).getTime() : Date.now();
+        if (Date.now() - updatedAt > 15 * 60 * 1000) {
+          supabase.rpc("expire_stuck_studies" as any).then(() => {
+            queryClient.invalidateQueries({ queryKey: ["market-study", id] });
+          });
+        }
+        return 5000;
+      }
+      return false;
     },
   });
 
@@ -388,6 +399,115 @@ export default function MarketStudyResult() {
               </div>
             );
           })}
+        </div>
+      </div>
+    );
+  }
+
+  const isFailed = study?.status === "failed";
+
+  const handleRetry = async () => {
+    if (!study || !id) return;
+    setRetrying(true);
+    try {
+      const { data: subjectData } = await supabase
+        .from("market_study_subject_properties")
+        .select("*")
+        .eq("market_study_id", id)
+        .limit(1);
+      const subjectProp = subjectData?.[0];
+      if (!subjectProp) throw new Error("Imóvel avaliado não encontrado");
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Não autenticado");
+      const { data: profile } = await supabase.from("profiles").select("tenant_id").eq("id", user.id).single();
+      const tenantId = profile?.tenant_id;
+
+      const { data: portalSettings } = await supabase
+        .from("tenant_portal_settings")
+        .select("*, portal_sources(*)")
+        .eq("tenant_id", tenantId!)
+        .eq("is_enabled", true);
+
+      const portals = (portalSettings ?? []).map((ps: any) => ({
+        id: ps.portal_sources.id,
+        name: ps.portal_sources.name,
+        code: ps.portal_sources.code,
+      }));
+
+      if (portals.length === 0) {
+        const { data: globalPortals } = await supabase.from("portal_sources").select("*").eq("is_global", true);
+        portals.push(...(globalPortals ?? []).map((p: any) => ({ id: p.id, name: p.name, code: p.code })));
+      }
+
+      await supabase.from("market_studies").update({
+        status: "processing",
+        current_phase: "collecting_urls",
+        updated_at: new Date().toISOString(),
+      } as any).eq("id", id);
+
+      const propertyData = {
+        property_type: subjectProp.property_type || subjectProp.property_category,
+        neighborhood: subjectProp.neighborhood,
+        city: subjectProp.city,
+        condominium: subjectProp.condominium,
+        bedrooms: subjectProp.bedrooms?.toString(),
+        suites: subjectProp.suites?.toString(),
+        area_total: (subjectProp.area_useful || subjectProp.area_built)?.toString(),
+        area_built: subjectProp.area_built?.toString(),
+        area_land: subjectProp.area_land?.toString(),
+        owner_expected_price: subjectProp.owner_expected_price?.toString(),
+        property_standard: subjectProp.construction_standard,
+        property_purpose: subjectProp.purpose,
+        state: subjectProp.state,
+        parking_spots: subjectProp.parking_spots?.toString(),
+      };
+
+      const { error } = await supabase.functions.invoke("analyze-market-deep", {
+        body: {
+          property: propertyData,
+          portals,
+          filters: {},
+          market_study_id: id,
+          tenant_id: tenantId,
+        },
+      });
+
+      if (error) throw error;
+      queryClient.invalidateQueries({ queryKey: ["market-study", id] });
+      toast.success("Estudo reiniciado! Acompanhe o progresso aqui.");
+    } catch (err: any) {
+      toast.error("Erro ao reiniciar: " + (err.message || "erro"));
+      await supabase.from("market_studies").update({ status: "failed", current_phase: null } as any).eq("id", id);
+      queryClient.invalidateQueries({ queryKey: ["market-study", id] });
+    } finally {
+      setRetrying(false);
+    }
+  };
+
+  if (isFailed) {
+    return (
+      <div className="max-w-lg mx-auto py-16 space-y-8">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" onClick={() => navigate("/market-studies")}>
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <h1 className="text-2xl font-bold font-display">{study.title || "Estudo de Mercado"}</h1>
+        </div>
+        <div className="text-center space-y-4">
+          <div className="flex justify-center mb-4">
+            <div className="h-16 w-16 rounded-2xl bg-destructive/10 flex items-center justify-center">
+              <XCircle className="h-8 w-8 text-destructive" />
+            </div>
+          </div>
+          <h2 className="text-xl font-semibold">O estudo de mercado falhou</h2>
+          <p className="text-sm text-muted-foreground">
+            Houve um erro durante o processamento. Isso pode acontecer por timeout ou instabilidade nos portais imobiliários.
+          </p>
+          <Button onClick={handleRetry} disabled={retrying} className="gap-2">
+            {retrying ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+            Tentar novamente
+          </Button>
         </div>
       </div>
     );
