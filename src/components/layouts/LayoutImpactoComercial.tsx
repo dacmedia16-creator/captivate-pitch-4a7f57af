@@ -149,57 +149,59 @@ export function LayoutImpactoComercial({ section, branding, theme, colors }: Pro
     );
   }
 
-  /* ═══════ MARKET STUDY — SLIDE 1: IMÓVEL AVALIADO ═══════ */
+  /* ═══════ MARKET STUDY — SLIDE 1: PARECER DE AVALIAÇÃO ═══════ */
   if ((section.section_key === "market_study_subject" || section.section_key === "market_study_placeholder") && c.status === "completed") {
     const sp = c.subject_property;
+    const confidenceMap: Record<string, { label: string; color: string }> = {
+      high: { label: "ALTA", color: "#16A34A" },
+      medium: { label: "MÉDIA", color: "#D97706" },
+      low: { label: "BAIXA", color: "#DC2626" },
+    };
+    const conf = confidenceMap[c.confidence_level] || confidenceMap.medium;
+    const ownerPrice = sp?.owner_expected_price;
+    const marketPrice = c.suggested_market_price || c.avg_price;
+
     return (
-      <div className="w-full h-full bg-white p-16" style={{ fontFamily: FONT }}>
+      <div className="w-full h-full bg-white p-16 flex flex-col" style={{ fontFamily: FONT }}>
         <SlideLabel color={accent} bold>Análise de mercado</SlideLabel>
-        <h2 className="slide-title uppercase mt-4 mb-8" style={{ fontSize: theme.heading.titleSize, color: primary }}>Imóvel Avaliado</h2>
-        <div className="w-16 h-1.5 mb-8" style={{ backgroundColor: accent }} />
-        {sp ? (
-          <div className="space-y-8">
-            <div className="grid grid-cols-2 gap-x-16 gap-y-6" style={{ fontSize: "24px" }}>
-              {sp.property_type && <div><span style={{ color: colors.textLight }}>TIPO:</span> <span className="font-bold" style={{ color: primary }}>{sp.property_type}</span></div>}
-              {sp.construction_standard && <div><span style={{ color: colors.textLight }}>PADRÃO:</span> <span className="font-bold" style={{ color: primary }}>{sp.construction_standard}</span></div>}
-              {sp.conservation_state && <div><span style={{ color: colors.textLight }}>CONSERVAÇÃO:</span> <span className="font-bold" style={{ color: primary }}>{sp.conservation_state}</span></div>}
-              {sp.property_age && <div><span style={{ color: colors.textLight }}>IDADE:</span> <span className="font-bold" style={{ color: primary }}>{sp.property_age}</span></div>}
-              {sp.neighborhood && <div><span style={{ color: colors.textLight }}>BAIRRO:</span> <span className="font-bold" style={{ color: primary }}>{sp.neighborhood}</span></div>}
-              {sp.city && <div><span style={{ color: colors.textLight }}>CIDADE:</span> <span className="font-bold" style={{ color: primary }}>{sp.city}</span></div>}
-              {sp.condominium && <div><span style={{ color: colors.textLight }}>CONDOMÍNIO:</span> <span className="font-bold" style={{ color: primary }}>{sp.condominium}</span></div>}
-            </div>
-            <div className="w-16 h-1.5" style={{ backgroundColor: accent }} />
-            <SlideMetricRow
-              items={[
-                { label: "M² ÚTIL", value: sp.area_useful ? `${sp.area_useful}` : null },
-                { label: "M² CONSTR.", value: sp.area_built ? `${sp.area_built}` : null },
-                { label: "QUARTOS", value: sp.bedrooms },
-                { label: "SUÍTES", value: sp.suites },
-                { label: "VAGAS", value: sp.parking_spots },
-                { label: "BANHEIROS", value: sp.bathrooms },
-              ]}
-              colors={colors}
-              metricSize="56px"
-              labelTracking="0.25em"
-            />
-            {sp.differentials?.length > 0 && (
-              <div className="flex flex-wrap gap-3">
-                {sp.differentials.map((d: any, i: number) => (
-                  <span key={i} className="px-5 py-2 font-bold uppercase tracking-wider" style={{ fontSize: "18px", backgroundColor: accent + "15", color: accent }}>
-                    {typeof d === "string" ? d : d.label || d.name}
-                  </span>
-                ))}
+        <h2 className="slide-title uppercase mt-4 mb-6" style={{ fontSize: theme.heading.titleSize, color: primary }}>Parecer de Avaliação</h2>
+        <div className="w-16 h-1.5 mb-6" style={{ backgroundColor: accent }} />
+
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex flex-wrap gap-x-8 gap-y-2 uppercase tracking-wider" style={{ fontSize: "20px", color: textMuted }}>
+            {sp?.property_type && <span>{sp.property_type}</span>}
+            {sp?.construction_standard && <><span style={{ color: colors.textLight }}>·</span><span>{sp.construction_standard}</span></>}
+            {sp?.conservation_state && <><span style={{ color: colors.textLight }}>·</span><span>{sp.conservation_state}</span></>}
+            {sp?.property_age && <><span style={{ color: colors.textLight }}>·</span><span>{sp.property_age}</span></>}
+            {sp?.neighborhood && <><span style={{ color: colors.textLight }}>·</span><span>{sp.neighborhood}</span></>}
+          </div>
+          <span className="shrink-0 px-5 py-2 font-bold uppercase tracking-wider" style={{ fontSize: "18px", backgroundColor: conf.color + "15", color: conf.color }}>
+            Confiança {conf.label}
+          </span>
+        </div>
+
+        {(ownerPrice || marketPrice) && (
+          <div className="flex gap-8 mb-8">
+            {ownerPrice && (
+              <div className="flex-1 p-8" style={{ backgroundColor: primary + "08" }}>
+                <p className="uppercase tracking-[0.25em] mb-2" style={{ fontSize: "18px", color: colors.textLight }}>Valor pretendido</p>
+                <p className="font-bold" style={{ fontSize: "40px", color: primary }}>R$ {Number(ownerPrice).toLocaleString("pt-BR")}</p>
               </div>
             )}
-            {sp.owner_expected_price && (
-              <p style={{ fontSize: "26px", color: textMuted }}>
-                Valor pretendido: <span className="font-bold" style={{ color: accent }}>R$ {Number(sp.owner_expected_price).toLocaleString("pt-BR")}</span>
-              </p>
+            {marketPrice && (
+              <div className="flex-1 p-8" style={{ backgroundColor: accent + "10" }}>
+                <p className="uppercase tracking-[0.25em] mb-2" style={{ fontSize: "18px", color: colors.textLight }}>Valor sugerido de mercado</p>
+                <p className="font-bold" style={{ fontSize: "40px", color: accent }}>R$ {Number(marketPrice).toLocaleString("pt-BR")}</p>
+              </div>
             )}
-            {c.executive_summary && <p className="leading-relaxed border-l-4 pl-6" style={{ fontSize: "22px", color: textMuted, borderColor: accent }}>{c.executive_summary}</p>}
           </div>
-        ) : (
-          <p className="mt-8 italic" style={{ fontSize: "22px", color: "#D1D5DB" }}>Dados do imóvel não disponíveis</p>
+        )}
+
+        {c.executive_summary && (
+          <div className="flex-1 overflow-hidden">
+            <p className="font-bold uppercase tracking-wider mb-3" style={{ fontSize: "20px", color: primary }}>Resumo Executivo</p>
+            <p className="leading-relaxed border-l-4 pl-6" style={{ fontSize: "21px", color: textMuted, borderColor: accent, lineHeight: "1.7" }}>{c.executive_summary}</p>
+          </div>
         )}
       </div>
     );

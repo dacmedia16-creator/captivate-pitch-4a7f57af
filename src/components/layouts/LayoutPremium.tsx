@@ -107,56 +107,59 @@ export function LayoutPremium({ section, branding, theme, colors }: Props) {
     );
   }
 
-  /* ═══════ MARKET STUDY — SLIDE 1: IMÓVEL AVALIADO ═══════ */
+  /* ═══════ MARKET STUDY — SLIDE 1: PARECER DE AVALIAÇÃO ═══════ */
   if ((section.section_key === "market_study_subject" || section.section_key === "market_study_placeholder") && c.status === "completed") {
     const sp = c.subject_property;
+    const confidenceMap: Record<string, { label: string; color: string }> = {
+      high: { label: "Alta", color: "#16A34A" },
+      medium: { label: "Média", color: "#D97706" },
+      low: { label: "Baixa", color: "#DC2626" },
+    };
+    const conf = confidenceMap[c.confidence_level] || confidenceMap.medium;
+    const ownerPrice = sp?.owner_expected_price;
+    const marketPrice = c.suggested_market_price || c.avg_price;
+
     return (
-      <div className="w-full h-full bg-white p-16" style={{ fontFamily: FONT }}>
+      <div className="w-full h-full bg-white p-16 flex flex-col" style={{ fontFamily: FONT }}>
         <SlideLabel color={accent}>Análise de mercado</SlideLabel>
-        <h2 className="slide-title mt-4 mb-8" style={{ fontSize: theme.heading.titleSize, color: primary }}>Imóvel Avaliado</h2>
+        <h2 className="slide-title mt-4 mb-6" style={{ fontSize: theme.heading.titleSize, color: primary }}>Parecer de Avaliação</h2>
         <SlideDivider theme={theme} colors={colors} />
-        {sp ? (
-          <div className="mt-8 space-y-8">
-            <div className="grid grid-cols-2 gap-x-16 gap-y-6" style={{ fontSize: "24px" }}>
-              {sp.property_type && <div><span style={{ color: colors.textLight }}>Tipo:</span> <span className="font-semibold" style={{ color: primary }}>{sp.property_type}</span></div>}
-              {sp.construction_standard && <div><span style={{ color: colors.textLight }}>Padrão construtivo:</span> <span className="font-semibold" style={{ color: primary }}>{sp.construction_standard}</span></div>}
-              {sp.conservation_state && <div><span style={{ color: colors.textLight }}>Estado de conservação:</span> <span className="font-semibold" style={{ color: primary }}>{sp.conservation_state}</span></div>}
-              {sp.property_age && <div><span style={{ color: colors.textLight }}>Idade:</span> <span className="font-semibold" style={{ color: primary }}>{sp.property_age}</span></div>}
-              {sp.neighborhood && <div><span style={{ color: colors.textLight }}>Bairro:</span> <span className="font-semibold" style={{ color: primary }}>{sp.neighborhood}</span></div>}
-              {sp.city && <div><span style={{ color: colors.textLight }}>Cidade:</span> <span className="font-semibold" style={{ color: primary }}>{sp.city}</span></div>}
-              {sp.condominium && <div><span style={{ color: colors.textLight }}>Condomínio:</span> <span className="font-semibold" style={{ color: primary }}>{sp.condominium}</span></div>}
-            </div>
-            <SlideDivider theme={theme} colors={colors} />
-            <SlideMetricRow
-              items={[
-                { label: "Área útil", value: sp.area_useful ? `${sp.area_useful}m²` : null },
-                { label: "Área construída", value: sp.area_built ? `${sp.area_built}m²` : null },
-                { label: "Quartos", value: sp.bedrooms },
-                { label: "Suítes", value: sp.suites },
-                { label: "Vagas", value: sp.parking_spots },
-                { label: "Banheiros", value: sp.bathrooms },
-              ]}
-              colors={colors}
-              metricSize="56px"
-            />
-            {sp.differentials?.length > 0 && (
-              <div className="flex flex-wrap gap-3">
-                {sp.differentials.map((d: any, i: number) => (
-                  <span key={i} className="px-5 py-2 rounded-full font-medium" style={{ fontSize: "20px", border: `1px solid ${accent}30`, color: accent }}>
-                    {typeof d === "string" ? d : d.label || d.name}
-                  </span>
-                ))}
+
+        <div className="flex items-center justify-between mt-6 mb-6">
+          <div className="flex flex-wrap gap-x-8 gap-y-2" style={{ fontSize: "22px", color: textMuted }}>
+            {sp?.property_type && <span>{sp.property_type}</span>}
+            {sp?.construction_standard && <><span style={{ color: colors.textLight }}>·</span><span>{sp.construction_standard}</span></>}
+            {sp?.conservation_state && <><span style={{ color: colors.textLight }}>·</span><span>{sp.conservation_state}</span></>}
+            {sp?.property_age && <><span style={{ color: colors.textLight }}>·</span><span>{sp.property_age}</span></>}
+            {sp?.neighborhood && <><span style={{ color: colors.textLight }}>·</span><span>{sp.neighborhood}</span></>}
+          </div>
+          <span className="shrink-0 px-5 py-2 rounded-full font-bold" style={{ fontSize: "20px", backgroundColor: conf.color + "15", color: conf.color }}>
+            Confiança {conf.label}
+          </span>
+        </div>
+
+        {(ownerPrice || marketPrice) && (
+          <div className="flex gap-8 mb-8">
+            {ownerPrice && (
+              <div className="flex-1 p-8 rounded-xl" style={{ border: `1px solid ${accent}20` }}>
+                <p className="font-medium mb-2" style={{ fontSize: "20px", color: colors.textLight }}>Valor pretendido</p>
+                <p className="font-bold" style={{ fontSize: "40px", color: primary }}>R$ {Number(ownerPrice).toLocaleString("pt-BR")}</p>
               </div>
             )}
-            {sp.owner_expected_price && (
-              <p style={{ fontSize: "26px", color: textMuted }}>
-                Valor pretendido: <span className="font-bold" style={{ color: accent }}>R$ {Number(sp.owner_expected_price).toLocaleString("pt-BR")}</span>
-              </p>
+            {marketPrice && (
+              <div className="flex-1 p-8 rounded-xl" style={{ background: `linear-gradient(135deg, ${accent}08, ${accent}15)` }}>
+                <p className="font-medium mb-2" style={{ fontSize: "20px", color: colors.textLight }}>Valor sugerido de mercado</p>
+                <p className="font-bold" style={{ fontSize: "40px", color: accent }}>R$ {Number(marketPrice).toLocaleString("pt-BR")}</p>
+              </div>
             )}
-            {c.executive_summary && <p className="leading-relaxed" style={{ fontSize: "22px", color: textMuted }}>{c.executive_summary}</p>}
           </div>
-        ) : (
-          <p className="mt-8 italic" style={{ fontSize: "22px", color: "#D1D5DB" }}>Dados do imóvel não disponíveis</p>
+        )}
+
+        {c.executive_summary && (
+          <div className="flex-1 overflow-hidden">
+            <p className="font-bold mb-3" style={{ fontSize: "22px", color: primary }}>Resumo Executivo</p>
+            <p className="leading-relaxed" style={{ fontSize: "21px", color: textMuted, lineHeight: "1.7" }}>{c.executive_summary}</p>
+          </div>
         )}
       </div>
     );
