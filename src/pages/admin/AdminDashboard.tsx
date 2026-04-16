@@ -1,10 +1,13 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { MetricCard } from "@/components/shared/MetricCard";
 import { DataTable, Column } from "@/components/shared/DataTable";
 import { StatusBadge } from "@/components/shared/StatusBadge";
-import { Building2, Users, UserCircle, Presentation, BarChart3, FileText } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Building2, Users, UserCircle, Presentation, BarChart3, FileText, RefreshCw, Loader2 } from "lucide-react";
 import { format } from "date-fns";
+import { toast } from "sonner";
 
 interface TenantRow {
   id: string; name: string; slug: string; status: string; created_at: string;
@@ -12,6 +15,8 @@ interface TenantRow {
 }
 
 export default function AdminDashboard() {
+  const [syncing, setSyncing] = useState(false);
+
   const { data: tenantCount = 0 } = useQuery({ queryKey: ["admin-count-tenants"], queryFn: async () => { const { count } = await supabase.from("tenants").select("id", { count: "exact", head: true }); return count || 0; } });
   const { data: userCount = 0 } = useQuery({ queryKey: ["admin-count-users"], queryFn: async () => { const { count } = await supabase.from("profiles").select("id", { count: "exact", head: true }); return count || 0; } });
   const { data: brokerCount = 0 } = useQuery({ queryKey: ["admin-count-brokers"], queryFn: async () => { const { count } = await supabase.from("user_roles").select("id", { count: "exact", head: true }).eq("role", "broker"); return count || 0; } });
@@ -35,6 +40,19 @@ export default function AdminDashboard() {
     },
   });
 
+  const handleBatchSync = async () => {
+    setSyncing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("batch-sync-market-slides", { method: "POST" });
+      if (error) throw error;
+      toast.success(`Sincronização concluída! ${data?.updated || 0} apresentação(ões) atualizada(s).`);
+    } catch (err: any) {
+      toast.error("Erro ao sincronizar: " + (err.message || "erro desconhecido"));
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   const columns: Column<TenantRow>[] = [
     { key: "name", header: "Nome", render: (r) => <span className="font-medium">{r.name}</span> },
     { key: "slug", header: "Slug", render: (r) => <span className="text-muted-foreground">{r.slug}</span> },
@@ -46,9 +64,15 @@ export default function AdminDashboard() {
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Painel Global</h1>
-        <p className="text-muted-foreground mt-1 text-sm">Visão geral de toda a plataforma</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Painel Global</h1>
+          <p className="text-muted-foreground mt-1 text-sm">Visão geral de toda a plataforma</p>
+        </div>
+        <Button variant="outline" onClick={handleBatchSync} disabled={syncing}>
+          {syncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+          Sincronizar slides de mercado
+        </Button>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
