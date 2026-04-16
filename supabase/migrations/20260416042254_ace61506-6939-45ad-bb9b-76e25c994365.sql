@@ -1,0 +1,1 @@
+ALTER TABLE broker_profiles ADD CONSTRAINT broker_profiles_user_id_key UNIQUE (user_id);
