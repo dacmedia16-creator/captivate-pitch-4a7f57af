@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { Copy, Save, Monitor, FileDown, Share2, BookTemplate, Sparkles, Loader2 } from "lucide-react";
+import { Copy, Save, Monitor, FileDown, Share2, BookTemplate, Sparkles, Loader2, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { Separator } from "@/components/ui/separator";
 
@@ -15,11 +15,15 @@ interface EditorToolbarProps {
   generatingAI: boolean;
   onExportPDF: () => void;
   exportingPDF: boolean;
+  onResyncMarket?: () => void;
+  resyncingMarket?: boolean;
+  hasMarketStudy?: boolean;
 }
 
 export function EditorToolbar({
   presentationId, shareToken, onSaveAsTemplate, onDuplicate, onPresent, onSave, saving,
   onGenerateAI, generatingAI, onExportPDF, exportingPDF,
+  onResyncMarket, resyncingMarket, hasMarketStudy,
 }: EditorToolbarProps) {
   const copyShareLink = () => {
     if (shareToken) {
@@ -44,6 +48,12 @@ export function EditorToolbar({
           {generatingAI ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5 mr-1.5" />}
           {generatingAI ? "Gerando..." : "Gerar IA"}
         </Button>
+        {hasMarketStudy && onResyncMarket && (
+          <Button variant="ghost" size="sm" onClick={onResyncMarket} disabled={resyncingMarket} className="text-xs h-8">
+            {resyncingMarket ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5 mr-1.5" />}
+            {resyncingMarket ? "Atualizando..." : "Atualizar mercado"}
+          </Button>
+        )}
       </div>
       <div className="flex items-center gap-1">
         <Button variant="ghost" size="sm" onClick={copyShareLink} className="text-xs h-8">
