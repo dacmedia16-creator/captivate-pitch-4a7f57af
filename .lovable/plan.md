@@ -1,62 +1,68 @@
 
 
-# Corrigir estudo travado + timeout automático + botão retry
+# Enriquecer slide de Estudo de Mercado com todos os detalhes
 
-## 1. Corrigir estudo "Lessence" no banco
+## Problema atual
+1. **O slide de estudo de mercado nunca aparece** — o layout checa `c.comparables?.length > 0`, mas o conteúdo gerado não inclui o array `comparables` (só `comparables_count`).
+2. **Dados insuficientes** — não inclui informações do imóvel avaliado (estado de conservação, idade, padrão construtivo, diferenciais) nem detalhes dos comparáveis.
+3. **Apresentações existentes** — o `syncMarketStudySections` também não inclui esses dados, então nenhuma apresentação existente mostra o estudo.
 
-Usar o insert tool para executar:
-```sql
-UPDATE market_studies 
-SET status = 'failed', current_phase = NULL, updated_at = now() 
-WHERE id = '667b044b-822d-4361-87ba-82ab0bf8b5a8';
+## Plano
+
+### 1. Enriquecer o conteúdo da seção `market_study_placeholder`
+
+**Arquivos**: `src/hooks/useGeneratePresentation.ts` e `src/hooks/syncMarketStudySections.ts`
+
+Adicionar ao conteúdo:
+- **Subject property completo** (buscando de `market_study_subject_properties`): tipo, padrão, conservação, idade, área, quartos, diferenciais, condomínio, bairro, cidade, preço pretendido
+- **Array de comparáveis aprovados** com: título, preço, área, quartos, suítes, vagas, banheiros, condomínio, bairro, conservation_state, construction_standard, similarity_score, adjusted_price, price_per_sqm, differentials
+- **Preço pretendido do proprietário** (`owner_expected_price`)
+
+No `syncMarketStudySections`, buscar `market_study_subject_properties` e incluir os mesmos dados para que atualizações de estudo reflitam nas apresentações.
+
+### 2. Corrigir condição de render nos 3 layouts
+
+**Arquivos**: `LayoutExecutivo.tsx`, `LayoutPremium.tsx`, `LayoutImpactoComercial.tsx`
+
+Mudar a condição de:
+```
+c.comparables?.length > 0
+```
+Para:
+```
+c.status === "completed"
 ```
 
-## 2. Criar função de banco para timeout automático
+### 3. Redesenhar o slide de estudo de mercado (3 layouts)
 
-Migration SQL com uma função `expire_stuck_studies()` que marca como `failed` estudos em `processing` há mais de 15 minutos:
+O slide passará a mostrar:
 
-```sql
-CREATE OR REPLACE FUNCTION public.expire_stuck_studies()
-RETURNS integer
-LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
-DECLARE _count integer;
-BEGIN
-  UPDATE market_studies
-  SET status = 'failed', current_phase = NULL, updated_at = now()
-  WHERE status = 'processing'
-    AND updated_at < now() - interval '15 minutes';
-  GET DIAGNOSTICS _count = ROW_COUNT;
-  RETURN _count;
-END;
-$$;
-```
+**Bloco superior — Imóvel Avaliado:**
+- Tipo, padrão construtivo, estado de conservação, idade
+- Área, quartos, suítes, vagas, banheiros
+- Diferenciais do imóvel
 
-## 3. Chamar timeout no frontend (polling)
+**Bloco central — Estatísticas do Mercado:**
+- Métricas (preço médio, mediana, R$/m², nº comparáveis) — já existente via `MarketStats`
+- Gráfico de barras com preços dos comparáveis — já existente via `MarketPriceBarChart`
 
-Em `MarketStudyResult.tsx`, dentro do `refetchInterval` callback (que já roda a cada 5s para estudos em processing), adicionar verificação client-side: se `updated_at` é anterior a 15 minutos, chamar `supabase.rpc('expire_stuck_studies')` e invalidar a query. Isso garante que ao visualizar um estudo travado, ele é automaticamente marcado como failed.
+**Bloco inferior — Tabela resumida de comparáveis:**
+- Lista compacta com título, preço, área, quartos, score de similaridade
 
-## 4. Adicionar UI de estado "failed" + botão retry em MarketStudyResult.tsx
+### 4. Atualizar apresentações existentes
 
-Atualmente não existe tratamento para `status === 'failed'`. Adicionar bloco entre o `isProcessing` e o render principal:
+Criar uma migration ou script que, para cada apresentação com `market_study_id`, re-sincronize a seção `market_study_placeholder` com os dados completos. Isso será feito chamando o `syncMarketStudySections` atualizado via um RPC ou edge function de migração.
 
-- Ícone de erro (XCircle vermelho)
-- Mensagem "O estudo de mercado falhou"
-- Botão "Tentar novamente" que:
-  1. Busca subject property e portais do estudo
-  2. Atualiza status para `processing`
-  3. Chama `supabase.functions.invoke('analyze-market-deep', ...)` com os dados originais
-  4. O polling existente retoma automaticamente
-
-## 5. Adicionar timeout check no inngest-serve
-
-No início da função Inngest, antes de começar o processamento, verificar se o estudo já está em processing há mais de 15 minutos e abortar se necessário. Isso evita que retries do Inngest ressuscitem estudos já expirados.
+Alternativa mais simples: adicionar ao frontend um efeito que, ao abrir o editor, detecta se a seção está com `status: "pending"` mas o estudo já está `completed`, e dispara o sync automaticamente.
 
 ## Arquivos alterados
 
 | Arquivo | Mudança |
 |---------|---------|
-| DB (insert tool) | UPDATE do estudo Lessence |
-| DB (migration) | Função `expire_stuck_studies()` |
-| `src/pages/agent/MarketStudyResult.tsx` | UI failed + retry + auto-expire check |
-| `supabase/functions/inngest-serve/index.ts` | Guard de timeout no início |
+| `src/hooks/useGeneratePresentation.ts` | Buscar subject_properties + incluir comparáveis e dados completos na seção |
+| `src/hooks/syncMarketStudySections.ts` | Incluir subject_property, comparáveis, e todos os detalhes na sincronização |
+| `src/components/layouts/LayoutExecutivo.tsx` | Redesenhar slide market_study com seção de imóvel avaliado + tabela de comparáveis |
+| `src/components/layouts/LayoutPremium.tsx` | Mesmo redesenho adaptado ao tema premium |
+| `src/components/layouts/LayoutImpactoComercial.tsx` | Mesmo redesenho adaptado ao tema impacto |
+| `src/pages/agent/PresentationEditor.tsx` | Auto-sync: ao abrir, se seção está pending mas estudo completed, disparar sync |
 
