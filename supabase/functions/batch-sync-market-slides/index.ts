@@ -109,6 +109,8 @@ Deno.serve(async (req) => {
         subject_property: subjectForSlide,
         confidence_level: report.confidence_level,
         executive_summary: report.executive_summary,
+        avg_price: report.avg_price,
+        suggested_market_price: report.suggested_market_price,
       };
 
       const statsContent = {
