@@ -917,16 +917,62 @@ const marketStudyAnalyze = inngest.createFunction(
       return { comparables_count: 0, market_study_id };
     }
 
-    // Step 3: AI extraction — ~5-8s
+    // Step 3: AI extraction — batched in groups of 5 pages to avoid timeout
     if (market_study_id) {
       await step.run("phase-extracting", async () => {
         const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
         await sb.from("market_studies").update({ current_phase: "extracting" }).eq("id", market_study_id);
       });
     }
-    const rawComparables = await step.run("ai-extraction", async () => {
-      return await extractWithAI(allPages, property, LOVABLE_API_KEY!);
+
+    // Separate pre-extracted pages from those needing AI
+    const pagesNeedingAI = allPages.filter(p => !(p.extractedData && p.extractedData.price && p.extractedData.area));
+    const preExtractedPages = allPages.filter(p => p.extractedData && p.extractedData.price && p.extractedData.area);
+    const preExtractedComps = preExtractedPages.map(p => {
+      const ed = p.extractedData!;
+      return {
+        title: ed.title || "Imóvel", price: ed.price, area: ed.area,
+        bedrooms: ed.bedrooms || null, suites: ed.suites || null,
+        parking_spots: ed.parking_spots || null, bathrooms: ed.bathrooms || null,
+        address: ed.address || null, neighborhood: ed.neighborhood || null,
+        city: ed.city || null, condominium: ed.condominium || null,
+        external_id: ed.external_id || null, source_url: p.url,
+        source_name: p.portal?.name || "", property_type: null,
+        construction_standard: null, differentials: [],
+        description_summary: ed.description || null,
+      };
     });
+
+    if (preExtractedComps.length > 0) {
+      console.log(`[INNGEST][FASE 3] ${preExtractedComps.length} comparáveis pré-extraídos (JSON)`);
+    }
+
+    // Batch AI extraction: 5 pages per step.run() to stay within timeout
+    const AI_BATCH_SIZE = 5;
+    const MAX_AI_PAGES = 20;
+    let aiPages = pagesNeedingAI;
+    if (aiPages.length > MAX_AI_PAGES) {
+      aiPages = [
+        ...pagesNeedingAI.filter(p => p.isCondoTarget),
+        ...pagesNeedingAI.filter(p => !p.isCondoTarget && !p.isMultiListing),
+        ...pagesNeedingAI.filter(p => !p.isCondoTarget && p.isMultiListing),
+      ].slice(0, MAX_AI_PAGES);
+    }
+
+    console.log(`[INNGEST][FASE 3] ${aiPages.length} páginas para IA (em batches de ${AI_BATCH_SIZE})`);
+
+    const aiExtractedComps: any[] = [];
+    for (let i = 0; i < aiPages.length; i += AI_BATCH_SIZE) {
+      const batch = aiPages.slice(i, i + AI_BATCH_SIZE);
+      const batchResult = await step.run(`ai-extract-batch-${i}`, async () => {
+        return await extractWithAI(batch, property, LOVABLE_API_KEY!);
+      });
+      console.log(`[INNGEST][FASE 3] Batch ${i}: ${batchResult.length} comparáveis extraídos`);
+      aiExtractedComps.push(...batchResult);
+    }
+
+    const rawComparables = [...preExtractedComps, ...aiExtractedComps];
+    console.log(`[INNGEST][FASE 3] Total bruto: ${rawComparables.length} comparáveis (${preExtractedComps.length} pré + ${aiExtractedComps.length} IA)`);
 
     // Step 4: Score, filter, save to DB — ~3-5s
     if (market_study_id) {
