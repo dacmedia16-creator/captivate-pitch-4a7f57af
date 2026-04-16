@@ -270,7 +270,15 @@ export function LayoutImpactoComercial({ section, branding, theme, colors }: Pro
               <tbody>
                 {comps.map((comp: any, i: number) => (
                   <tr key={i} style={{ borderBottom: `1px solid ${primary}10`, color: textMuted }}>
-                    <td className="py-3 truncate max-w-[400px]">{comp.title || comp.neighborhood || "—"}</td>
+                    <td className="py-3 truncate max-w-[400px]">
+                      {comp.source_url ? (
+                        <a href={comp.source_url} target="_blank" rel="noopener noreferrer" className="hover:underline" style={{ color: accent }}>
+                          {comp.title || comp.neighborhood || "—"}
+                        </a>
+                      ) : (
+                        comp.title || comp.neighborhood || "—"
+                      )}
+                    </td>
                     <td className="py-3 text-right font-medium" style={{ color: primary }}>
                       {comp.price ? `R$ ${Number(comp.price).toLocaleString("pt-BR")}` : "—"}
                     </td>
