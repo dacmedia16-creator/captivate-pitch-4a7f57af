@@ -175,13 +175,7 @@ export function LayoutExecutivo({ section, branding, theme, colors }: Props) {
             </div>
           )}
           {/* Card "Sugerido de mercado" oculto a pedido */}
-          {diffPct != null && (
-            <div className="p-5 rounded-lg" style={{ backgroundColor: neutral }}>
-              <p className="font-medium mb-2 uppercase tracking-wider" style={{ fontSize: "13px", color: colors.textLight, fontWeight: 600 }}>Posicionamento</p>
-              <p className="font-bold" style={{ fontSize: "28px", color: diffColor }}>{diffLabel}</p>
-              <p className="mt-1" style={{ fontSize: "15px", color: textMuted }}>vs. valor de mercado</p>
-            </div>
-          )}
+          {/* Card "Posicionamento" oculto a pedido */}
         </div>
 
         {/* Executive summary */}
