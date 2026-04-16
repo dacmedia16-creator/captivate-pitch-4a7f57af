@@ -522,7 +522,18 @@ IMÓVEL DE REFERÊNCIA: Tipo: ${property.property_type || "?"}, Bairro: ${proper
 
   if (!aiRes.ok) { const e = await aiRes.text(); console.error(`[INNGEST][FASE 3] AI error: ${aiRes.status}`); throw new Error("AI extraction failed"); }
 
-  const tc = (await aiRes.json()).choices?.[0]?.message?.tool_calls?.[0];
+  let tc;
+  try {
+    const aiBody = await aiRes.text();
+    if (!aiBody || aiBody.length < 10) {
+      console.warn(`[INNGEST][FASE 3] AI retornou body vazio (${aiBody.length} chars)`);
+      return preExtracted;
+    }
+    tc = JSON.parse(aiBody).choices?.[0]?.message?.tool_calls?.[0];
+  } catch (parseErr) {
+    console.error(`[INNGEST][FASE 3] Falha ao parsear resposta da IA:`, parseErr);
+    return preExtracted;
+  }
   if (!tc) return preExtracted;
 
   try {
