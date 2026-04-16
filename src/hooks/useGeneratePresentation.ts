@@ -40,10 +40,12 @@ const SECTION_DEFINITIONS = [
   { key: "marketing_plan", title: "Plano de Marketing", order: 8 },
   { key: "differentials", title: "Diferenciais", order: 9 },
   { key: "results", title: "Resultados", order: 10 },
-  { key: "market_study_placeholder", title: "Estudo de Mercado", order: 11 },
-  { key: "pricing_scenarios", title: "Cenários de Preço", order: 12 },
-  { key: "required_documentation", title: "Documentação Necessária", order: 13 },
-  { key: "closing", title: "Fechamento", order: 14 },
+  { key: "market_study_subject", title: "Imóvel Avaliado", order: 11 },
+  { key: "market_study_stats", title: "Estatísticas de Mercado", order: 12 },
+  { key: "market_study_comparables", title: "Comparáveis de Mercado", order: 13 },
+  { key: "pricing_scenarios", title: "Cenários de Preço", order: 14 },
+  { key: "required_documentation", title: "Documentação Necessária", order: 15 },
+  { key: "closing", title: "Fechamento", order: 16 },
 ];
 
 /** Fetch market data from the official market_studies flow, with legacy fallback */
@@ -197,26 +199,9 @@ export async function generatePresentationSections({ presentationId, tenantId, b
       case "results":
         content = { items: salesResults || [], testimonials: testimonials || [] };
         break;
-      case "market_study_placeholder":
+      case "market_study_subject":
         if (report) {
-          const comparablesForSlide = comparables.map((comp: any) => ({
-            title: comp.title,
-            price: comp.price,
-            area: comp.area,
-            bedrooms: comp.bedrooms,
-            suites: comp.suites,
-            parking_spots: comp.parking_spots,
-            bathrooms: comp.bathrooms,
-            neighborhood: comp.neighborhood,
-            condominium: comp.condominium,
-            conservation_state: comp.conservation_state,
-            construction_standard: comp.construction_standard,
-            similarity_score: comp.similarity_score,
-            adjusted_price: comp.adjusted_price,
-            price_per_sqm: comp.price_per_sqm,
-            source_name: comp.source_name,
-          }));
-          const subjectForSlide = subjectProperty ? {
+          const subjectForSlideSubject = subjectProperty ? {
             property_type: subjectProperty.property_type,
             construction_standard: subjectProperty.construction_standard,
             conservation_state: subjectProperty.conservation_state,
@@ -236,18 +221,62 @@ export async function generatePresentationSections({ presentationId, tenantId, b
           } : null;
           content = {
             status: "completed",
-            avg_price: report.avg_price,
-            median_price: report.median_price,
-            avg_price_per_sqm: report.avg_price_per_sqm,
+            subject_property: subjectForSlideSubject,
             confidence_level: report.confidence_level,
             executive_summary: report.executive_summary || report.summary,
-            comparables_count: comparables.length,
-            comparables: comparablesForSlide,
-            subject_property: subjectForSlide,
-            owner_expected_price: presentation?.owner_expected_price || subjectProperty?.owner_expected_price,
           };
         } else {
           content = { status: "pending", message: "O estudo de mercado será inserido aqui após processamento." };
+        }
+        break;
+      case "market_study_stats":
+        if (report) {
+          const comparablesForStats = comparables.map((comp: any) => ({
+            title: comp.title,
+            price: comp.price,
+            area: comp.area,
+            neighborhood: comp.neighborhood,
+            price_per_sqm: comp.price_per_sqm,
+          }));
+          content = {
+            status: "completed",
+            avg_price: report.avg_price,
+            median_price: report.median_price,
+            avg_price_per_sqm: report.avg_price_per_sqm,
+            comparables_count: comparables.length,
+            comparables: comparablesForStats,
+            owner_expected_price: presentation?.owner_expected_price || subjectProperty?.owner_expected_price,
+          };
+        } else {
+          content = { status: "pending" };
+        }
+        break;
+      case "market_study_comparables":
+        if (report) {
+          const comparablesForTable = comparables.map((comp: any) => ({
+            title: comp.title,
+            price: comp.price,
+            area: comp.area,
+            bedrooms: comp.bedrooms,
+            suites: comp.suites,
+            parking_spots: comp.parking_spots,
+            bathrooms: comp.bathrooms,
+            neighborhood: comp.neighborhood,
+            condominium: comp.condominium,
+            conservation_state: comp.conservation_state,
+            construction_standard: comp.construction_standard,
+            similarity_score: comp.similarity_score,
+            adjusted_price: comp.adjusted_price,
+            price_per_sqm: comp.price_per_sqm,
+            source_name: comp.source_name,
+          }));
+          content = {
+            status: "completed",
+            comparables: comparablesForTable,
+            comparables_count: comparables.length,
+          };
+        } else {
+          content = { status: "pending" };
         }
         break;
       case "pricing_scenarios":

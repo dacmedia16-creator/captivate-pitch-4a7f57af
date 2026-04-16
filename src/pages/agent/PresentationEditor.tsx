@@ -61,10 +61,10 @@ export default function PresentationEditor() {
   const syncTriggered = useRef(false);
   useEffect(() => {
     if (syncTriggered.current || !presentation?.market_study_id || localSections.length === 0) return;
-    const marketSection = localSections.find(s => s.section_key === "market_study_placeholder");
-    if (!marketSection) return;
-    const content = marketSection.content as any;
-    if (content?.status === "completed" && content?.comparables?.length > 0) return;
+    // Check if new 3-slide sections exist and are completed
+    const subjectSection = localSections.find(s => s.section_key === "market_study_subject");
+    const hasNewSlides = subjectSection && (subjectSection.content as any)?.status === "completed";
+    if (hasNewSlides) return;
     
     syncTriggered.current = true;
     supabase.from("market_studies").select("status").eq("id", presentation.market_study_id).single()
