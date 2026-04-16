@@ -130,7 +130,9 @@ export async function syncMarketStudySections(marketStudyId: string) {
       ...toUpdate.map(s =>
         supabase.from("presentation_sections").update({ content: s.content as any }).eq("presentation_id", pres.id).eq("section_key", s.key)
       ),
-      supabase.from("presentation_sections").update({ content: pricingScenariosContent as any }).eq("presentation_id", pres.id).eq("section_key", "pricing_scenarios"),
+      supabase.from("presentation_sections").update({ content: pricingScenariosContent as any, sort_order: 14 }).eq("presentation_id", pres.id).eq("section_key", "pricing_scenarios"),
+      supabase.from("presentation_sections").update({ sort_order: 15 }).eq("presentation_id", pres.id).eq("section_key", "required_documentation"),
+      supabase.from("presentation_sections").update({ sort_order: 16 }).eq("presentation_id", pres.id).eq("section_key", "closing"),
     ]);
   }
 
