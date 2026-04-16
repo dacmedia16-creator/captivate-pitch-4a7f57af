@@ -93,6 +93,7 @@ Deno.serve(async (req) => {
       adjusted_price: comp.adjusted_price,
       price_per_sqm: comp.price_per_sqm,
       source_name: comp.source_name,
+      source_url: comp.source_url,
     }));
 
     const comparablesForStats = comparables.map((comp: any) => ({
