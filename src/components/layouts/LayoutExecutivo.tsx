@@ -432,6 +432,52 @@ export function LayoutExecutivo({ section, branding, theme, colors }: Props) {
     );
   }
 
+  /* ═══════ RESULTS ═══════ */
+  if (section.section_key === "results") {
+    const portfolioImgs = (c.portfolio_images || []).filter((p: any) => p.image_url);
+    return (
+      <div className="w-full h-full bg-white p-16" style={{ fontFamily: FONT }}>
+        <div className="flex gap-10">
+          <RedBar h={60} />
+          <div className="flex-1 space-y-8">
+            <div>
+              <SlideLabel color={accent}>Resultados</SlideLabel>
+              <h2 className="slide-title mt-4" style={{ fontSize: theme.heading.titleSize, color: primary, textTransform }}>{section.title}</h2>
+            </div>
+            <SlideDivider theme={theme} colors={colors} />
+            {c.broker_name && (
+              <div className="flex items-center gap-5">
+                {c.avatar_url && <img src={c.avatar_url} alt="" className="w-14 h-14 rounded-full object-cover border-2" style={{ borderColor: accent }} />}
+                <p className="font-semibold" style={{ fontSize: "26px", color: primary }}>{c.broker_name}</p>
+              </div>
+            )}
+            <div className="flex gap-8">
+              {(c.items || []).slice(0, 4).map((item: any, i: number) => (
+                <div key={i} className="flex-1 p-6 text-center rounded-lg" style={{ backgroundColor: neutral }}>
+                  {item.metric_value && <p className="slide-metric" style={{ fontSize: "48px", color: accent }}>{item.metric_value}</p>}
+                  <p className="font-semibold mt-2" style={{ fontSize: "20px", color: primary }}>{item.title}</p>
+                </div>
+              ))}
+            </div>
+            {portfolioImgs.length > 0 && (
+              <div className="flex gap-2">
+                {portfolioImgs.slice(0, 4).map((img: any, i: number) => (
+                  <img key={i} src={img.image_url} alt={img.caption || ""} className="flex-1 h-[160px] object-cover rounded-lg" style={{ minWidth: 0 }} />
+                ))}
+              </div>
+            )}
+            {c.testimonials?.length > 0 && (
+              <div className="pt-4 border-t" style={{ borderColor: neutral }}>
+                <p className="italic" style={{ fontSize: "22px", color: textMuted }}>"{c.testimonials[0].content}"</p>
+                <p className="font-bold mt-3" style={{ fontSize: "22px", color: primary }}>{c.testimonials[0].author_name}</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   /* ═══════ GENERIC ═══════ */
   return (
     <div className="w-full h-full bg-white p-16" style={{ fontFamily: FONT }}>
