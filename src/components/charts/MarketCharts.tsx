@@ -1,4 +1,4 @@
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ReferenceLine, ResponsiveContainer, ScatterChart, Scatter, ZAxis, Cell } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ReferenceLine, ResponsiveContainer, ScatterChart, Scatter, ZAxis, Cell, PieChart, Pie } from "recharts";
 
 const formatBRL = (value: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 }).format(value);
@@ -127,6 +127,67 @@ export function MarketScatterChart({ comparables, compact, primaryColor = "#1e3a
   );
 }
 
+/* ═══════ PIE CHART — Distribuição por faixa de preço ═══════ */
+
+interface MarketPieChartProps {
+  comparables: ComparableChartData[];
+  compact?: boolean;
+  primaryColor?: string;
+  accentColor?: string;
+}
+
+export function MarketPricePieChart({ comparables, compact, primaryColor = "#1e3a5f", accentColor = "#c9a84c" }: MarketPieChartProps) {
+  if (!comparables.length) return null;
+
+  const avg = comparables.reduce((s, c) => s + c.price, 0) / comparables.length;
+  const belowCount = comparables.filter(c => c.price < avg * 0.9).length;
+  const onCount = comparables.filter(c => c.price >= avg * 0.9 && c.price <= avg * 1.1).length;
+  const aboveCount = comparables.filter(c => c.price > avg * 1.1).length;
+
+  const data = [
+    { name: "Abaixo da média", value: belowCount, color: "#22c55e" },
+    { name: "Na média", value: onCount, color: primaryColor },
+    { name: "Acima da média", value: aboveCount, color: accentColor },
+  ].filter(d => d.value > 0);
+
+  const height = compact ? 180 : 260;
+
+  const renderLabel = ({ name, percent }: any) => `${name} (${(percent * 100).toFixed(0)}%)`;
+
+  return (
+    <div style={{ width: "100%", height }}>
+      <ResponsiveContainer>
+        <PieChart>
+          <Pie
+            data={data}
+            cx="50%"
+            cy="50%"
+            outerRadius={compact ? 60 : 90}
+            innerRadius={compact ? 30 : 45}
+            dataKey="value"
+            label={compact ? undefined : renderLabel}
+            labelLine={!compact}
+            stroke="none"
+            style={{ fontSize: 12, fontFamily: "Inter" }}
+          >
+            {data.map((entry, i) => (
+              <Cell key={i} fill={entry.color} />
+            ))}
+          </Pie>
+          {!compact && (
+            <Tooltip
+              formatter={(value: number, name: string) => [`${value} imóveis`, name]}
+              contentStyle={{ borderRadius: 4, border: "none", boxShadow: "0 4px 20px -4px rgba(0,0,0,0.12)", fontSize: 11, fontFamily: "Inter" }}
+            />
+          )}
+        </PieChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+/* ═══════ STATS CARDS ═══════ */
+
 interface MarketStatsProps {
   avgPrice?: number | null;
   medianPrice?: number | null;
@@ -137,7 +198,7 @@ interface MarketStatsProps {
   accentColor?: string;
 }
 
-export function MarketStats({ avgPrice, medianPrice, avgPricePerSqm, totalComparables, compact, primaryColor, accentColor }: MarketStatsProps) {
+export function MarketStats({ avgPrice, medianPrice, avgPricePerSqm, totalComparables, compact, primaryColor = "#1e3a5f", accentColor = "#9ca3af" }: MarketStatsProps) {
   const stats = [
     { label: "Preço Médio", value: avgPrice ? formatBRL(avgPrice) : "—" },
     { label: "Mediano", value: medianPrice ? formatBRL(medianPrice) : "—" },
@@ -146,11 +207,11 @@ export function MarketStats({ avgPrice, medianPrice, avgPricePerSqm, totalCompar
   ];
 
   return (
-    <div className={`flex ${compact ? "gap-6" : "gap-8"}`}>
+    <div className={`grid grid-cols-2 ${compact ? "gap-3" : "gap-4"}`}>
       {stats.map((s, i) => (
-        <div key={i} className="flex-1">
-          <p className="slide-label" style={{ color: accentColor || "#9ca3af" }}>{s.label}</p>
-          <p className={`slide-metric ${compact ? "text-base" : "text-lg"} mt-1`} style={{ color: primaryColor || "#1f2937" }}>{s.value}</p>
+        <div key={i} className="rounded-lg p-4" style={{ border: `1px solid ${primaryColor}15`, backgroundColor: `${primaryColor}06` }}>
+          <p className="slide-label" style={{ color: accentColor, fontSize: compact ? "11px" : "13px" }}>{s.label}</p>
+          <p className={`slide-metric mt-1 font-bold`} style={{ color: primaryColor, fontSize: compact ? "18px" : "24px" }}>{s.value}</p>
         </div>
       ))}
     </div>

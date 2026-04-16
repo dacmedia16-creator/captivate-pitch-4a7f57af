@@ -1,5 +1,5 @@
 import { SectionData } from "./SectionRenderer";
-import { MarketPriceBarChart, MarketStats } from "@/components/charts/MarketCharts";
+import { MarketPriceBarChart, MarketPricePieChart, MarketStats } from "@/components/charts/MarketCharts";
 import { BrazilPresenceMap } from "@/components/charts/BrazilPresenceMap";
 import { Key, BarChart3, ClipboardCheck, FileText, CheckCircle } from "lucide-react";
 import { SlideTheme, ResolvedColors } from "./themes/theme.types";
@@ -178,19 +178,21 @@ export function LayoutExecutivo({ section, branding, theme, colors }: Props) {
         <SlideLabel color={accent}>Análise de mercado</SlideLabel>
         <h2 className="slide-title mt-4 mb-8" style={{ fontSize: theme.heading.titleSize, color: primary, textTransform }}>Estatísticas de Mercado</h2>
         <SlideDivider theme={theme} colors={colors} />
-        <div className="mt-8">
-          <MarketStats avgPrice={c.avg_price} medianPrice={c.median_price} avgPricePerSqm={c.avg_price_per_sqm} totalComparables={c.comparables_count} primaryColor={primary} accentColor={accent} />
-        </div>
-        {c.owner_expected_price && (
-          <p className="mt-6" style={{ fontSize: "26px", color: textMuted }}>
-            Valor pretendido: <span className="font-bold" style={{ color: primary }}>R$ {Number(c.owner_expected_price).toLocaleString("pt-BR")}</span>
-          </p>
-        )}
-        {comps.length > 0 && (
-          <div className="mt-8">
-            <MarketPriceBarChart comparables={comps} ownerExpectedPrice={c.owner_expected_price} primaryColor={primary} accentColor={accent} />
+        <div className="mt-8 flex gap-10 items-start">
+          <div className="flex-1">
+            <MarketStats avgPrice={c.avg_price} medianPrice={c.median_price} avgPricePerSqm={c.avg_price_per_sqm} totalComparables={c.comparables_count} primaryColor={primary} accentColor={accent} />
+            {c.owner_expected_price && (
+              <p className="mt-6" style={{ fontSize: "26px", color: textMuted }}>
+                Valor pretendido: <span className="font-bold" style={{ color: primary }}>R$ {Number(c.owner_expected_price).toLocaleString("pt-BR")}</span>
+              </p>
+            )}
           </div>
-        )}
+          {comps.length > 0 && (
+            <div style={{ width: "380px", flexShrink: 0 }}>
+              <MarketPricePieChart comparables={comps} primaryColor={primary} accentColor={accent} />
+            </div>
+          )}
+        </div>
       </div>
     );
   }
