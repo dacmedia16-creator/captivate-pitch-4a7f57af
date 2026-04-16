@@ -584,6 +584,33 @@ IMÓVEL DE REFERÊNCIA: Tipo: ${property.property_type || "?"}, Bairro: ${proper
 }
 
 // ============================================================
+// Default weights (match market_study_settings DB defaults)
+// ============================================================
+const DEFAULT_SIM_WEIGHTS = {
+  same_condominium: 25, same_neighborhood: 20, same_type: 15,
+  area_range: 15, rooms_proximity: 10, same_standard: 10, same_profile: 5,
+};
+const DEFAULT_ADJ_WEIGHTS = {
+  pool: 4, gourmet_area: 2.5, master_suite: 2, extra_parking: 1.5,
+  better_conservation: 5, newer_building: 3, privileged_view: 4,
+  premium_location: 3, larger_land: 3,
+};
+
+const CONSERVATION_LEVELS: Record<string, number> = {
+  novo: 5, excelente: 4, bom: 3, regular: 2, "necessita reforma": 1, ruim: 1,
+};
+const STANDARD_LEVELS: Record<string, number> = {
+  "alto luxo": 5, alto: 4, medio: 3, "médio": 3, popular: 2, economico: 1, "econômico": 1,
+};
+
+function hasDiff(diffs: any, key: string): boolean {
+  if (!diffs) return false;
+  if (Array.isArray(diffs)) return diffs.some((d: string) => d.toLowerCase().includes(key));
+  if (typeof diffs === "object") return !!diffs[key];
+  return false;
+}
+
+// ============================================================
 // Step 4: scoreAndSave — Score, filter, persist to DB
 // ============================================================
 async function scoreAndSave(
@@ -596,6 +623,23 @@ async function scoreAndSave(
   const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
   const maxResults = Math.min(Number(filters.maxComparables) || 15, 20);
+
+  // Fetch tenant settings for dynamic weights
+  let simW = DEFAULT_SIM_WEIGHTS;
+  let adjW = DEFAULT_ADJ_WEIGHTS;
+  if (marketStudyId) {
+    try {
+      const { data: study } = await supabase.from("market_studies").select("tenant_id").eq("id", marketStudyId).single();
+      if (study?.tenant_id) {
+        const { data: settings } = await supabase.from("market_study_settings").select("similarity_weights, adjustment_weights").eq("tenant_id", study.tenant_id).limit(1);
+        if (settings?.[0]) {
+          simW = { ...DEFAULT_SIM_WEIGHTS, ...(settings[0].similarity_weights as any || {}) };
+          adjW = { ...DEFAULT_ADJ_WEIGHTS, ...(settings[0].adjustment_weights as any || {}) };
+          console.log("[INNGEST][FASE 3] Using tenant weights from market_study_settings");
+        }
+      }
+    } catch (e) { console.warn("[INNGEST][FASE 3] Failed to load tenant weights, using defaults:", e); }
+  }
 
   // Score + filter
   const baseArea = Number(property.area_total || property.area_built || property.area_land) || 100;
