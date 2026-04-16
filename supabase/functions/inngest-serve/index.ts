@@ -189,6 +189,10 @@ function buildPortalNativeUrl(property: PropertyData, portal: PortalInfo): strin
       return null; // OLX não suporta filtro por cidade via URL — usar apenas Google Search
     case "imovelweb":
       return `https://www.imovelweb.com.br/${typeSlug}-${purposeSlug}-${neighborhood}-${city}.html`;
+    case "chavesnamao": {
+      const purposeStr = isRental ? "alugar" : "comprar";
+      return `https://www.chavesnamao.com.br/${typeSlug}-para-${purposeStr}-${state}-${city}-${neighborhood}/`;
+    }
     default:
       return null;
   }
@@ -209,6 +213,7 @@ function extractIndividualListingUrls(links: string[], portalCode: string, markd
     zap: /zapimoveis\.com\.br\/imovel\//, vivareal: /vivareal\.com\.br\/imovel\//,
     olx: /olx\.com\.br\/d\/anuncio\//,
     imovelweb: /imovelweb\.com\.br\/propriedades\//,
+    chavesnamao: /chavesnamao\.com\.br\/imovel\//,
   };
   const pattern = listingPatterns[portalCode];
   if (!pattern) return [];
@@ -310,7 +315,7 @@ async function collectUrls(
       const scrapeData = await scrapeRes.json();
       const links: string[] = scrapeData.data?.links || scrapeData.links || [];
       const markdown: string = scrapeData.data?.markdown || scrapeData.markdown || "";
-      const listingPatterns: Record<string, RegExp> = { zap: /zapimoveis\.com\.br\/imovel\//, vivareal: /vivareal\.com\.br\/imovel\//, olx: /olx\.com\.br\/d\/anuncio\//, imovelweb: /imovelweb\.com\.br\/propriedades\// };
+      const listingPatterns: Record<string, RegExp> = { zap: /zapimoveis\.com\.br\/imovel\//, vivareal: /vivareal\.com\.br\/imovel\//, olx: /olx\.com\.br\/d\/anuncio\//, imovelweb: /imovelweb\.com\.br\/propriedades\//, chavesnamao: /chavesnamao\.com\.br\/imovel\// };
       const pattern = listingPatterns[portal.code];
       const listingUrls = pattern ? links.filter(l => pattern.test(l)) : [];
       console.log(`[INNGEST][FASE 1A] ${portal.name}: ${links.length} links, ${listingUrls.length} anúncios`);
