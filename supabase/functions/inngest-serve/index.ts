@@ -506,6 +506,8 @@ async function extractWithAI(
 
 REGRAS: Extraia EXATAMENTE os dados presentes. Preços "R$ 1.200.000" → 1200000. Áreas "120 m²" → 120.${mlInst}
 
+IMPORTANTE - LOCALIZAÇÃO: Sempre extraia o bairro (neighborhood) e a cidade (city) do anúncio. Procure no título, endereço, breadcrumb, e URL do anúncio. Em sites como ImovelWeb, o bairro geralmente aparece no título e na URL (ex: "parque-campolim" na URL = bairro "Parque Campolim"). Se não encontrar explicitamente mas o anúncio for do mesmo portal/região da busca, use o bairro e cidade de referência.
+
 IMÓVEL DE REFERÊNCIA: Tipo: ${property.property_type || "?"}, Bairro: ${property.neighborhood || "?"}, Cidade: ${property.city || "?"}, Cond: ${property.condominium || "?"}, Área: ${property.area_total || property.area_built || "?"} m², Quartos: ${property.bedrooms || "?"}, Suítes: ${property.suites || "?"}, Vagas: ${property.parking_spots || "?"}, Padrão: ${property.property_standard || "?"}, Preço: ${property.owner_expected_price ? "R$ " + Number(property.owner_expected_price).toLocaleString("pt-BR") : "?"}`;
 
   const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -545,6 +547,16 @@ IMÓVEL DE REFERÊNCIA: Tipo: ${property.property_type || "?"}, Bairro: ${proper
       else if (/imovelweb\.com\.br/i.test(su)) c.source_name = "Imóvel Web";
       else if (/olx\.com\.br/i.test(su)) c.source_name = "OLX";
       else if (/chavesnamao\.com\.br/i.test(su)) c.source_name = "Chaves na Mão";
+
+      // Infer city/neighborhood from search context when AI didn't extract them
+      if (!c.city && property.city) c.city = property.city;
+      if (!c.neighborhood && property.neighborhood) {
+        // Check if neighborhood appears in the URL slug
+        const neighSlug = (property.neighborhood || "").toLowerCase().replace(/\s+/g, "-");
+        if (neighSlug && su.includes(neighSlug)) {
+          c.neighborhood = property.neighborhood;
+        }
+      }
     }
 
     // Merge pre-extracted + AI-extracted
@@ -607,7 +619,7 @@ async function scoreAndSave(
     if (subD.length > 0 && compD.length > 0) { const sn2 = subD.map((d: string) => d.toLowerCase()), cn2 = compD.map((d: string) => d.toLowerCase()); const ol = sn2.filter((d: string) => cn2.some((cd: string) => cd.includes(d) || d.includes(cd))); const r = ol.length / sn2.length; if (r >= 0.5) score += 5; else if (r >= 0.25) score += 3; }
     if (c.city && property.city) { if (c.city.toLowerCase().includes(property.city.toLowerCase()) || property.city.toLowerCase().includes(c.city.toLowerCase())) score += 5; }
     const sim = Math.min(100, Math.round(score));
-    const minSim = (filters?.preferSameCondominium && property.condominium) ? 25 : 40;
+    const minSim = (filters?.preferSameCondominium && property.condominium) ? 25 : 30;
     if (sim < minSim) { localDiscards.push({ url: c.source_url || "?", portal: c.source_name || "?", reason: `Similaridade ${sim}/100` }); continue; }
     const pr2 = portalResults.find(p => p.portal_name === c.source_name || p.portal_code === c.source_name?.toLowerCase());
     if (pr2) pr2.urls_valid++;
