@@ -160,7 +160,7 @@ export function LayoutImpactoComercial({ section, branding, theme, colors }: Pro
           {portfolioImgs.length > 0 && (
             <div className="flex gap-4">
               {portfolioImgs.slice(0, 4).map((img: any, i: number) => (
-                <div key={i} className="relative flex-1 overflow-hidden rounded-xl" style={{ minWidth: 0, <div key={i} className="relative flex-1 overflow-hidden rounded-xl" style={{ minWidth: 0, height: "360px", boxShadow: "0 4px 20px rgba(0,0,0,0.12)" }}>, boxShadow: "0 4px 20px rgba(0,0,0,0.12)" }}>
+                <div key={i} className="relative flex-1 overflow-hidden rounded-xl" <div key={i} className="relative flex-1 overflow-hidden rounded-xl" style={{ minWidth: 0, height: "360px", boxShadow: "0 4px 20px rgba(0,0,0,0.12)" }}>={i} className="relative flex-1 overflow-hidden rounded-xl" style={{ minWidth: 0, height: "360px", boxShadow: "0 4px 20px rgba(0,0,0,0.12)" }}>, boxShadow: "0 4px 20px rgba(0,0,0,0.12)" }}>
                   <img src={img.image_url} alt={img.caption || ""} className="w-full h-full object-cover" />
                   <div className="absolute top-3 left-3 w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: accent, color: "#fff", fontSize: "16px", fontWeight: 700 }}>
                     {i + 1}
