@@ -5,14 +5,17 @@ import { supabase } from "@/integrations/supabase/client";
 import { WizardStepper } from "@/components/wizard/WizardStepper";
 import { SubjectPropertyForm, SubjectPropertyData } from "@/components/market-study/SubjectPropertyForm";
 import { ComparableReviewModal, ComparableFormData } from "@/components/market-study/ComparableReviewModal";
+import { EditComparableUrlDialog } from "@/components/market-study/EditComparableUrlDialog";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { calculateManualAnalysis, detectPortalFromUrl } from "@/hooks/useManualMarketAnalysis";
+import { validateListingUrl } from "@/lib/validateListingUrl";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
-  ChevronLeft, ChevronRight, Plus, Trash2, Pencil, ExternalLink,
+  ChevronLeft, ChevronRight, Plus, Trash2, Pencil, ExternalLink, Link as LinkIcon,
   AlertTriangle, Sparkles, Loader2, Check, Info,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -53,6 +56,8 @@ export default function NewMarketStudy() {
   const [comparables, setComparables] = useState<ComparableRow[]>([]);
   const [newUrl, setNewUrl] = useState("");
   const [reviewing, setReviewing] = useState<ComparableRow | null>(null);
+  const [editingUrl, setEditingUrl] = useState<ComparableRow | null>(null);
+  const [removing, setRemoving] = useState<ComparableRow | null>(null);
   const [savingSubject, setSavingSubject] = useState(false);
   const [aiReport, setAiReport] = useState<{ executive_summary?: string; justification?: string; insights?: any[] } | null>(null);
   const [generatingAI, setGeneratingAI] = useState(false);
@@ -64,9 +69,11 @@ export default function NewMarketStudy() {
     [comparables, subjectArea, subject.owner_expected_price],
   );
 
+  const hasInvalidUrl = comparables.some((c) => !validateListingUrl(c.source_url).valid);
+
   const canAdvance = () => {
     if (step === 0) return !!subject.property_category && !!subject.neighborhood && !!subject.city;
-    if (step === 1) return comparables.length >= 1;
+    if (step === 1) return comparables.length >= 1 && !hasInvalidUrl;
     if (step === 2) return analysis.used_count >= 1;
     return true;
   };
