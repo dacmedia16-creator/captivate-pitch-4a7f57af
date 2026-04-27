@@ -550,6 +550,7 @@ export type Database = {
       }
       market_study_comparables: {
         Row: {
+          added_at: string
           address: string | null
           adjusted_price: number | null
           area: number | null
@@ -557,6 +558,7 @@ export type Database = {
           bedrooms: number | null
           city: string | null
           condominium: string | null
+          condominium_fee: number | null
           conservation_state: string | null
           construction_standard: string | null
           created_at: string
@@ -564,10 +566,13 @@ export type Database = {
           external_id: string | null
           id: string
           image_url: string | null
+          iptu: number | null
           is_approved: boolean
+          is_complete: boolean | null
           listing_status: string | null
           market_study_id: string
           neighborhood: string | null
+          notes: string | null
           origin: string
           parking_spots: number | null
           price: number | null
@@ -582,6 +587,7 @@ export type Database = {
           title: string | null
         }
         Insert: {
+          added_at?: string
           address?: string | null
           adjusted_price?: number | null
           area?: number | null
@@ -589,6 +595,7 @@ export type Database = {
           bedrooms?: number | null
           city?: string | null
           condominium?: string | null
+          condominium_fee?: number | null
           conservation_state?: string | null
           construction_standard?: string | null
           created_at?: string
@@ -596,10 +603,13 @@ export type Database = {
           external_id?: string | null
           id?: string
           image_url?: string | null
+          iptu?: number | null
           is_approved?: boolean
+          is_complete?: boolean | null
           listing_status?: string | null
           market_study_id: string
           neighborhood?: string | null
+          notes?: string | null
           origin?: string
           parking_spots?: number | null
           price?: number | null
@@ -614,6 +624,7 @@ export type Database = {
           title?: string | null
         }
         Update: {
+          added_at?: string
           address?: string | null
           adjusted_price?: number | null
           area?: number | null
@@ -621,6 +632,7 @@ export type Database = {
           bedrooms?: number | null
           city?: string | null
           condominium?: string | null
+          condominium_fee?: number | null
           conservation_state?: string | null
           construction_standard?: string | null
           created_at?: string
@@ -628,10 +640,13 @@ export type Database = {
           external_id?: string | null
           id?: string
           image_url?: string | null
+          iptu?: number | null
           is_approved?: boolean
+          is_complete?: boolean | null
           listing_status?: string | null
           market_study_id?: string
           neighborhood?: string | null
+          notes?: string | null
           origin?: string
           parking_spots?: number | null
           price?: number | null
