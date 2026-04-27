@@ -153,21 +153,16 @@ export default function NewMarketStudy() {
 
   // ---------- Step 1: add comparable link ----------
   const handleAddLink = async () => {
-    const url = newUrl.trim();
-    if (!url) {
-      toast.error("Cole um link de anúncio");
-      return;
-    }
     if (!studyId) {
       toast.error("Salve o imóvel principal primeiro");
       return;
     }
-    try {
-      new URL(url);
-    } catch {
-      toast.error("Link inválido");
+    const result = validateListingUrl(newUrl);
+    if (!result.valid) {
+      toast.error(result.reason);
       return;
     }
+    const url = result.url;
     if (comparables.some((c) => c.source_url === url)) {
       toast.error("Esse link já foi adicionado");
       return;
@@ -193,6 +188,32 @@ export default function NewMarketStudy() {
     setComparables((prev) => [...prev, { id: data.id, source_url: url, source_name: portal }]);
     setNewUrl("");
     toast.success("Link adicionado. Clique em Revisar para preencher os dados.");
+  };
+
+  const handleEditUrl = async (id: string, rawUrl: string) => {
+    const result = validateListingUrl(rawUrl);
+    if (!result.valid) {
+      toast.error(result.reason);
+      return;
+    }
+    const url = result.url;
+    if (comparables.some((c) => c.id !== id && c.source_url === url)) {
+      toast.error("Esse link já foi adicionado em outro comparável");
+      return;
+    }
+    const portal = detectPortalFromUrl(url);
+    const { error } = await supabase
+      .from("market_study_comparables")
+      .update({ source_url: url, source_name: portal })
+      .eq("id", id);
+    if (error) {
+      toast.error("Erro ao atualizar link");
+      return;
+    }
+    setComparables((prev) =>
+      prev.map((c) => (c.id === id ? { ...c, source_url: url, source_name: portal } : c)),
+    );
+    toast.success("Link atualizado");
   };
 
   const handleRemoveComparable = async (id: string) => {
