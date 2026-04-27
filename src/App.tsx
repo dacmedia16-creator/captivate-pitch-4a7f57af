@@ -37,7 +37,7 @@ const AgentNewPresentation = lazy(() => import("@/pages/agent/AgentNewPresentati
 const AgentProfile = lazy(() => import("@/pages/agent/AgentProfile"));
 const MarketStudies = lazy(() => import("@/pages/agent/MarketStudies"));
 const MarketStudyResult = lazy(() => import("@/pages/agent/MarketStudyResult"));
-const MarketStudyExecutions = lazy(() => import("@/pages/agent/MarketStudyExecutions"));
+const NewMarketStudy = lazy(() => import("@/pages/agent/NewMarketStudy"));
 
 // Legacy redirect helper
 const LegacyStudyRedirect = () => {
@@ -87,8 +87,9 @@ const App = () => (
                 <Route path="/market-study" element={<Navigate to="/market-studies" replace />} />
                 <Route path="/market-study/:id" element={<LegacyStudyRedirect />} />
                 <Route path="/market-studies" element={<AppLayout><RoleGuard allowedRoles={["agent"]}><MarketStudies /></RoleGuard></AppLayout>} />
+                <Route path="/market-studies/new" element={<AppLayout><RoleGuard allowedRoles={["agent"]}><NewMarketStudy /></RoleGuard></AppLayout>} />
                 <Route path="/market-studies/:id" element={<AppLayout><RoleGuard allowedRoles={["agent"]}><MarketStudyResult /></RoleGuard></AppLayout>} />
-                <Route path="/market-studies/:id/executions" element={<AppLayout><RoleGuard allowedRoles={["agent"]}><MarketStudyExecutions /></RoleGuard></AppLayout>} />
+                <Route path="/market-studies/:id/executions" element={<Navigate to="/market-studies" replace />} />
 
                 {/* Public shared route */}
                 <Route path="/share/:token" element={<SharedPresentation />} />
