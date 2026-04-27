@@ -456,16 +456,24 @@ export default function NewMarketStudy() {
                             <Check className="h-3 w-3 mr-1" /> Completo
                           </Badge>
                         )}
+                        <Button size="sm" variant="outline" onClick={() => setEditingUrl(c)} title="Editar link">
+                          <LinkIcon className="h-3 w-3 mr-1" /> Editar link
+                        </Button>
                         <Button size="sm" variant="outline" onClick={() => setReviewing(c)}>
                           <Pencil className="h-3 w-3 mr-1" /> Revisar
                         </Button>
-                        <Button size="sm" variant="ghost" onClick={() => handleRemoveComparable(c.id)}>
+                        <Button size="sm" variant="ghost" onClick={() => setRemoving(c)} title="Remover">
                           <Trash2 className="h-3 w-3 text-destructive" />
                         </Button>
                       </div>
                     );
                   })}
                 </div>
+              )}
+              {hasInvalidUrl && (
+                <p className="text-xs text-destructive mt-3">
+                  Existe pelo menos um link inválido. Edite-o ou remova-o para avançar.
+                </p>
               )}
             </CardContent>
           </Card>
@@ -478,6 +486,28 @@ export default function NewMarketStudy() {
               onSave={handleSaveReview}
             />
           )}
+
+          {editingUrl && (
+            <EditComparableUrlDialog
+              open={!!editingUrl}
+              onOpenChange={(o) => !o && setEditingUrl(null)}
+              initialUrl={editingUrl.source_url}
+              onSave={(url) => handleEditUrl(editingUrl.id, url)}
+            />
+          )}
+
+          <ConfirmDialog
+            open={!!removing}
+            onOpenChange={(o) => !o && setRemoving(null)}
+            title="Remover comparável?"
+            description="Esta ação não pode ser desfeita. Os dados preenchidos para este link serão perdidos."
+            confirmLabel="Remover"
+            destructive
+            onConfirm={() => {
+              if (removing) handleRemoveComparable(removing.id);
+              setRemoving(null);
+            }}
+          />
         </div>
       )}
 
