@@ -5,14 +5,17 @@ import { supabase } from "@/integrations/supabase/client";
 import { WizardStepper } from "@/components/wizard/WizardStepper";
 import { SubjectPropertyForm, SubjectPropertyData } from "@/components/market-study/SubjectPropertyForm";
 import { ComparableReviewModal, ComparableFormData } from "@/components/market-study/ComparableReviewModal";
+import { EditComparableUrlDialog } from "@/components/market-study/EditComparableUrlDialog";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { calculateManualAnalysis, detectPortalFromUrl } from "@/hooks/useManualMarketAnalysis";
+import { validateListingUrl } from "@/lib/validateListingUrl";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
-  ChevronLeft, ChevronRight, Plus, Trash2, Pencil, ExternalLink,
+  ChevronLeft, ChevronRight, Plus, Trash2, Pencil, ExternalLink, Link as LinkIcon,
   AlertTriangle, Sparkles, Loader2, Check, Info,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -53,6 +56,8 @@ export default function NewMarketStudy() {
   const [comparables, setComparables] = useState<ComparableRow[]>([]);
   const [newUrl, setNewUrl] = useState("");
   const [reviewing, setReviewing] = useState<ComparableRow | null>(null);
+  const [editingUrl, setEditingUrl] = useState<ComparableRow | null>(null);
+  const [removing, setRemoving] = useState<ComparableRow | null>(null);
   const [savingSubject, setSavingSubject] = useState(false);
   const [aiReport, setAiReport] = useState<{ executive_summary?: string; justification?: string; insights?: any[] } | null>(null);
   const [generatingAI, setGeneratingAI] = useState(false);
@@ -64,9 +69,11 @@ export default function NewMarketStudy() {
     [comparables, subjectArea, subject.owner_expected_price],
   );
 
+  const hasInvalidUrl = comparables.some((c) => !validateListingUrl(c.source_url).valid);
+
   const canAdvance = () => {
     if (step === 0) return !!subject.property_category && !!subject.neighborhood && !!subject.city;
-    if (step === 1) return comparables.length >= 1;
+    if (step === 1) return comparables.length >= 1 && !hasInvalidUrl;
     if (step === 2) return analysis.used_count >= 1;
     return true;
   };
@@ -146,21 +153,16 @@ export default function NewMarketStudy() {
 
   // ---------- Step 1: add comparable link ----------
   const handleAddLink = async () => {
-    const url = newUrl.trim();
-    if (!url) {
-      toast.error("Cole um link de anúncio");
-      return;
-    }
     if (!studyId) {
       toast.error("Salve o imóvel principal primeiro");
       return;
     }
-    try {
-      new URL(url);
-    } catch {
-      toast.error("Link inválido");
+    const result = validateListingUrl(newUrl);
+    if (result.valid === false) {
+      toast.error(result.reason);
       return;
     }
+    const url = result.url;
     if (comparables.some((c) => c.source_url === url)) {
       toast.error("Esse link já foi adicionado");
       return;
@@ -186,6 +188,32 @@ export default function NewMarketStudy() {
     setComparables((prev) => [...prev, { id: data.id, source_url: url, source_name: portal }]);
     setNewUrl("");
     toast.success("Link adicionado. Clique em Revisar para preencher os dados.");
+  };
+
+  const handleEditUrl = async (id: string, rawUrl: string) => {
+    const result = validateListingUrl(rawUrl);
+    if (result.valid === false) {
+      toast.error(result.reason);
+      return;
+    }
+    const url = result.url;
+    if (comparables.some((c) => c.id !== id && c.source_url === url)) {
+      toast.error("Esse link já foi adicionado em outro comparável");
+      return;
+    }
+    const portal = detectPortalFromUrl(url);
+    const { error } = await supabase
+      .from("market_study_comparables")
+      .update({ source_url: url, source_name: portal })
+      .eq("id", id);
+    if (error) {
+      toast.error("Erro ao atualizar link");
+      return;
+    }
+    setComparables((prev) =>
+      prev.map((c) => (c.id === id ? { ...c, source_url: url, source_name: portal } : c)),
+    );
+    toast.success("Link atualizado");
   };
 
   const handleRemoveComparable = async (id: string) => {
@@ -428,16 +456,24 @@ export default function NewMarketStudy() {
                             <Check className="h-3 w-3 mr-1" /> Completo
                           </Badge>
                         )}
+                        <Button size="sm" variant="outline" onClick={() => setEditingUrl(c)} title="Editar link">
+                          <LinkIcon className="h-3 w-3 mr-1" /> Editar link
+                        </Button>
                         <Button size="sm" variant="outline" onClick={() => setReviewing(c)}>
                           <Pencil className="h-3 w-3 mr-1" /> Revisar
                         </Button>
-                        <Button size="sm" variant="ghost" onClick={() => handleRemoveComparable(c.id)}>
+                        <Button size="sm" variant="ghost" onClick={() => setRemoving(c)} title="Remover">
                           <Trash2 className="h-3 w-3 text-destructive" />
                         </Button>
                       </div>
                     );
                   })}
                 </div>
+              )}
+              {hasInvalidUrl && (
+                <p className="text-xs text-destructive mt-3">
+                  Existe pelo menos um link inválido. Edite-o ou remova-o para avançar.
+                </p>
               )}
             </CardContent>
           </Card>
@@ -450,6 +486,28 @@ export default function NewMarketStudy() {
               onSave={handleSaveReview}
             />
           )}
+
+          {editingUrl && (
+            <EditComparableUrlDialog
+              open={!!editingUrl}
+              onOpenChange={(o) => !o && setEditingUrl(null)}
+              initialUrl={editingUrl.source_url}
+              onSave={(url) => handleEditUrl(editingUrl.id, url)}
+            />
+          )}
+
+          <ConfirmDialog
+            open={!!removing}
+            onOpenChange={(o) => !o && setRemoving(null)}
+            title="Remover comparável?"
+            description="Esta ação não pode ser desfeita. Os dados preenchidos para este link serão perdidos."
+            confirmLabel="Remover"
+            destructive
+            onConfirm={() => {
+              if (removing) handleRemoveComparable(removing.id);
+              setRemoving(null);
+            }}
+          />
         </div>
       )}
 
