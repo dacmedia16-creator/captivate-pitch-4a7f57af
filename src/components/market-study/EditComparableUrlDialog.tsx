@@ -23,7 +23,7 @@ export function EditComparableUrlDialog({ open, onOpenChange, initialUrl, onSave
 
   const handleSubmit = async () => {
     const result = validateListingUrl(value);
-    if (!result.valid) {
+    if (result.valid === false) {
       toast.error(result.reason);
       return;
     }

@@ -158,7 +158,7 @@ export default function NewMarketStudy() {
       return;
     }
     const result = validateListingUrl(newUrl);
-    if (!result.valid) {
+    if (result.valid === false) {
       toast.error(result.reason);
       return;
     }
@@ -192,7 +192,7 @@ export default function NewMarketStudy() {
 
   const handleEditUrl = async (id: string, rawUrl: string) => {
     const result = validateListingUrl(rawUrl);
-    if (!result.valid) {
+    if (result.valid === false) {
       toast.error(result.reason);
       return;
     }
