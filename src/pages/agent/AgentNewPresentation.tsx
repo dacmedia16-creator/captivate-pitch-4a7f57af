@@ -139,12 +139,6 @@ export default function AgentNewPresentation() {
     presId: string, tenantId: string, userId: string,
     propData: PropertyData, mktData: MarketStudyData
   ) => {
-    if (mktData.selectedPortals.length === 0) return;
-
-    const { data: portalSources } = await supabase
-      .from("portal_sources").select("id, name, code")
-      .in("id", mktData.selectedPortals);
-
     // === 1. Create market_study (official flow) ===
     const { data: study, error: studyErr } = await supabase.from("market_studies").insert({
       broker_id: userId, tenant_id: tenantId,
