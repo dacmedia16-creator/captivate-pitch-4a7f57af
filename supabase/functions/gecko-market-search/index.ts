@@ -35,8 +35,12 @@ export function parseBRNumber(raw: string): number | null {
   let s = raw.replace(/[^\d.,]/g, "");
   if (s.includes(",")) {
     s = s.replace(/\./g, "").replace(",", ".");
-  } else if ((s.match(/\./g) || []).length > 1) {
-    s = s.replace(/\./g, "");
+  } else if (s.includes(".")) {
+    // No comma: dots are thousand separators if every segment after the first
+    // has exactly 3 digits (e.g. "850.000", "1.250.000"). Otherwise treat as decimal.
+    const parts = s.split(".");
+    const allThousands = parts.slice(1).every((p) => p.length === 3);
+    if (allThousands) s = parts.join("");
   }
   const n = Number(s);
   return isFinite(n) && n > 0 ? n : null;
@@ -56,16 +60,17 @@ export function extractSuites(text: string): number | null {
   return m ? Number(m[1]) : null;
 }
 export function extractParking(text: string): number | null {
-  const m = text.match(/(\d+)\s*(vagas?|garagens?)/i);
+  const m = text.match(/(\d+)\s*(vagas?|garage(?:m|ns))/i);
   return m ? Number(m[1]) : null;
 }
 export function extractArea(text: string): number | null {
-  // first occurrence of NN m²
-  const m = text.match(/(\d+(?:[.,]\d+)?)\s*m[²2]\b/i);
+  // first occurrence of NN m² or NN m2
+  const m = text.match(/(\d+(?:[.,]\d+)?)\s*m(?:²|2(?!\d))/i);
   if (!m) return null;
   const n = parseBRNumber(m[1]);
   return n && n >= 15 && n <= 5000 ? n : null;
 }
+
 export function extractPrice(text: string): number | null {
   // Try R$ patterns
   const matches = text.match(/R\$\s*([\d.,]+)/gi);
