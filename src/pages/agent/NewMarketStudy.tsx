@@ -153,6 +153,91 @@ export default function NewMarketStudy() {
     }
   };
 
+  // ---------- Step 1: Gecko automatic search ----------
+  const handleGeckoSearch = async () => {
+    if (!studyId) {
+      toast.error("Salve o imóvel principal primeiro");
+      return;
+    }
+    if (!subject.city || !subject.state) {
+      toast.error("Preencha cidade e UF na Etapa 0 antes de buscar.");
+      return;
+    }
+    setGeckoRunning(true);
+    setGeckoPhase("Iniciando busca...");
+    try {
+      const { data, error } = await supabase.functions.invoke("gecko-market-search", {
+        body: {
+          market_study_id: studyId,
+          subject: {
+            city: subject.city,
+            state: subject.state,
+            bedrooms: subject.bedrooms,
+            bathrooms: subject.bathrooms,
+            parking_spots: subject.parking_spots,
+            business_type: subject.purpose === "locacao" ? "rent" : "sale",
+          },
+          subject_area: subjectArea,
+          max_comparables: 10,
+        },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      // Poll study status
+      const interval = setInterval(async () => {
+        const { data: s } = await supabase
+          .from("market_studies")
+          .select("status, current_phase")
+          .eq("id", studyId)
+          .single();
+        if (s?.current_phase) setGeckoPhase(s.current_phase);
+        if (s?.status === "completed" || s?.status === "failed") {
+          clearInterval(interval);
+          // Refetch comparables
+          const { data: comps } = await supabase
+            .from("market_study_comparables")
+            .select("*")
+            .eq("market_study_id", studyId)
+            .order("created_at", { ascending: true });
+          setComparables((comps || []).map((c: any) => ({
+            id: c.id,
+            source_url: c.source_url,
+            source_name: c.source_name,
+            title: c.title,
+            property_type: c.property_type,
+            neighborhood: c.neighborhood,
+            city: c.city,
+            area: c.area,
+            bedrooms: c.bedrooms,
+            suites: c.suites,
+            bathrooms: c.bathrooms,
+            parking_spots: c.parking_spots,
+            price: c.price,
+            condominium_fee: c.condominium_fee,
+            iptu: c.iptu,
+            conservation_state: c.conservation_state,
+            notes: c.notes,
+          })));
+          setGeckoRunning(false);
+          setGeckoPhase(null);
+          if (s?.status === "completed") {
+            toast.success("Busca concluída! Revise os comparáveis encontrados.");
+          } else {
+            toast.error("Busca falhou: " + (s?.current_phase || "erro desconhecido"));
+          }
+        }
+      }, 3000);
+
+      // Safety timeout (5 min)
+      setTimeout(() => { clearInterval(interval); setGeckoRunning(false); setGeckoPhase(null); }, 5 * 60 * 1000);
+    } catch (err: any) {
+      toast.error("Erro: " + (err.message || "falha ao chamar GeckoAPI"));
+      setGeckoRunning(false);
+      setGeckoPhase(null);
+    }
+  };
+
   // ---------- Step 1: add comparable link ----------
   const handleAddLink = async () => {
     if (!studyId) {
