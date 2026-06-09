@@ -62,6 +62,8 @@ export default function NewMarketStudy() {
   const [aiReport, setAiReport] = useState<{ executive_summary?: string; justification?: string; insights?: any[] } | null>(null);
   const [generatingAI, setGeneratingAI] = useState(false);
   const [savingFinal, setSavingFinal] = useState(false);
+  const [geckoRunning, setGeckoRunning] = useState(false);
+  const [geckoPhase, setGeckoPhase] = useState<string | null>(null);
 
   const subjectArea = subject.area_useful || subject.area_built || subject.area_land || 0;
   const analysis = useMemo(
