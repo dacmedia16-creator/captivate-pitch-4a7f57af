@@ -1,115 +1,64 @@
-## Objetivo
+## Problema
 
-Religar o fluxo automático de pesquisa de mercado usando a **GeckoAPI** (`https://api.geckoapi.com.br/v1/extract`). O corretor preenche o imóvel avaliado e o sistema faz **PLP → PDP em cascata** no Zap Imóveis: busca a listagem, pega os top N anúncios e extrai cada um, gravando tudo direto em `market_study_comparables` + cálculo final em `market_study_results`.
+A `gecko-market-search` está completando mas todos os comparáveis ficam com `price`, `area`, `bedrooms`, `bathrooms`, `neighborhood` em `null` → `market_study_results` zera.
 
-Esse mesmo fluxo é exposto em **dois lugares**:
-1. Reativando o `creation_mode: "automatico"` em `AgentNewPresentation.tsx`.
-2. Como um novo botão **"Buscar automaticamente (Gecko)"** na Etapa 1 do wizard manual `/market-studies/new`, que pré-popula a lista de comparáveis (corretor ainda pode revisar/excluir antes de avançar).
+Causa: o parser `next_flight` da Gecko para Zap devolve `prices: null`, `address: null` e nenhum campo numérico estruturado. Só vem `title`, `description`, `formattedAddress`, `businessType`, `listingId`, `url`.
 
-## Credencial
+Além disso, a busca trouxe casas e apartamento de 69m² para uma busca por "3 quartos" em Sorocaba — a Gecko ignora os filtros estruturados que mandamos no body PLP.
 
-Secret global `GECKOAPI_TOKEN` (runtime secret no Lovable Cloud). Único token compartilhado por todos os tenants.
+## Fix — `supabase/functions/gecko-market-search/index.ts`
 
-## Backend — nova Edge Function `gecko-market-search`
+### 1. Reescrever `mapGeckoPdpToComparable` para extrair do texto
 
-Arquivo: `supabase/functions/gecko-market-search/index.ts` (com `_shared/cors.ts` se ainda não existir).
+Combinar `title + description + formattedAddress + url` em um único blob de texto e rodar regex:
 
-**Entrada (JSON):**
-```ts
-{
-  market_study_id: string,        // study já criado pelo frontend
-  subject: {
-    city: string,
-    state: string,                // UF
-    bedrooms?: number,
-    business_type: "sale"|"rent", // "sale" por padrão
-    min_price?: number, max_price?: number,
-    min_area?: number, max_area?: number,
-    keyword?: string,             // opcional, ex. "apartamento 2 quartos"
-  },
-  max_comparables?: number,       // default 10
-}
-```
+- **bedrooms**: `/(\d+)\s*(quartos?|dorm|dormit[óo]rios?)/i`
+- **bathrooms**: `/(\d+)\s*banheiros?/i`
+- **suites**: `/(\d+)\s*su[íi]tes?/i`
+- **parking_spots**: `/(\d+)\s*vagas?/i` ou `/(\d+)\s*garagem/i`
+- **area**: `/(\d+(?:[.,]\d+)?)\s*m[²2]/i` — primeiro match
+- **price**: tentar nesta ordem
+  1. `description`: `/R\$\s*([\d.\,]+)/i`
+  2. `title`: idem
+  3. campo `d.prices?.price` / `d.prices?.main` se algum dia vier preenchido
+  4. se ainda nulo, ler `__NEXT_DATA__` direto baixando a página: `fetch(url)` → regex `/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/` → JSON.parse → procurar `price` / `priceInfo.price` no objeto. Só se preço continuar nulo (fallback caro mas garante o número que faz tudo funcionar).
+- **property_type**: heurística no `title` — se contém "Apartamento" → `Apartamento`; "Casa de Condomínio" → `Casa de Condomínio`; "Casa" → `Casa`; senão usa `d.contractType`.
+- **neighborhood + city + state**: parsear `formattedAddress` com regex `/^(.+?)\s*-\s*(.+?),\s*(.+?)\s*-\s*([A-Z]{2})$/` (rua – bairro, cidade – UF).
+- **address**: `formattedAddress` inteiro.
+- **title**: `d.title` cru.
+- **image_url**: `d.images[0]` se existir (hoje vem array vazio, mas deixar pronto).
+- **external_id**: `d.listingId || d.listingExternalId`.
 
-**Pipeline:**
-1. Valida JWT (`getClaims`), valida `GECKOAPI_TOKEN`.
-2. Marca `market_studies.status = 'processing'`, `current_phase = 'Buscando anúncios no Zap'`.
-3. **POST PLP** Gecko → `target: "zapimoveis.com.br"`, `type: "plp"`, `page: 1`, monta query a partir do subject.
-4. Itera nos N primeiros resultados (default 10, cap 20):
-   - `current_phase = "Extraindo anúncio X/N"`
-   - **POST PDP** Gecko → `target: "zapimoveis.com.br"`, `type: "pdp"`, `url: <url>`.
-   - Normaliza payload em uma linha de `market_study_comparables` (campos: `source_url`, `source_name='Zap Imóveis'`, `origin='auto_gecko'`, `title`, `price`, `area`, `bedrooms`, `bathrooms`, `parking_spaces`, `neighborhood`, `city`, `state`, `condominium_fee`, `iptu`, `latitude`, `longitude`, `raw_data` JSON com payload original).
-   - Insere via service_role no `market_study_comparables`.
-   - Erros por anúncio são logados em `market_study_executions` mas não abortam a cascata.
-5. Após cascata: chama o cálculo (mesma lógica de `useManualMarketAnalysis`, portada para Deno em `_shared/market-calc.ts`) e grava `market_study_results` + `market_studies.status='completed'`.
-6. Em qualquer erro fatal: `status='failed'`, `current_phase='Erro: ...'`.
+Encapsular em helpers puros (`extractBedrooms(text)`, `extractArea(text)`, `extractPrice(text)`) para ficar testável.
 
-Resposta imediata: `202 { study_id, scheduled: true }` — o front faz polling do `market_studies.status` (igual ao padrão atual descrito em `market-study-architecture.md`).
+### 2. Filtrar comparáveis no lado do servidor
 
-**Erros da Gecko:**
-- 401/403 → "Token GeckoAPI inválido. Avise o admin."
-- 402 → "Sem créditos na GeckoAPI."
-- 429 → backoff 2s e 1 retry, depois falha.
-- 5xx → 1 retry com backoff.
+Após mapear cada PDP, **antes** de inserir, aplicar filtros do subject:
 
-## Frontend
+- **property_type** deve bater (Apartamento vs Casa). Match case-insensitive, com mapping curto: "Apartamento" só aceita títulos que começam com "Apartamento"; "Casa" aceita "Casa" e "Casa de Condomínio".
+- **bedrooms**: aceitar `subject.bedrooms ± 1`.
+- **city**: parsed da PLP, comparar com `subject.city` (normalizado, sem acento, lowercase).
+- Se faltar `price` ou `area`, descartar (não entra na média e não é inserido).
+- Cada rejeição é logada no console + gravada em `market_study_executions` (campo `notes`) para debug, mas a cascata continua.
 
-### A) Wizard manual — `src/pages/agent/NewMarketStudy.tsx` (Etapa 1)
+Para compensar as rejeições, **buscar PLP em 2 páginas** (page 1 e 2 da Gecko) antes de iterar, montando a lista candidata de até 30 URLs e parando quando atingir `max_comparables` aprovados.
 
-Acima do bloco "Cole o link", adicionar um card **"Buscar automaticamente"** com:
-- Bullet curto: "Usamos a GeckoAPI para buscar e extrair anúncios do Zap Imóveis com base no imóvel avaliado."
-- Botão `Buscar automaticamente no Zap Imóveis` (ícone `Sparkles`).
-- Ao clicar:
-  - Garante que Etapa 0 tem `city`, `state` e `bedrooms` (senão `toast.error`).
-  - Chama `supabase.functions.invoke("gecko-market-search", { body: {...} })`.
-  - Modal com progresso lendo `market_studies.current_phase` por polling a cada 3s.
-  - Quando `status='completed'`: refetch dos comparáveis e fecha modal; corretor segue revisando normalmente.
+### 3. Phase messages mais úteis
 
-Nenhuma quebra do fluxo manual existente — colar URL e "Sugerir com IA" continuam funcionando.
+- `"Buscando anúncios no Zap Imóveis (página 1/2)"`
+- `"Avaliando anúncio X/N (Y aprovados)"`
+- Ao final: se aprovados < 3, gravar `current_phase = "Concluído com poucos resultados (N anúncios)"` e ainda assim marcar `completed`.
 
-### B) Nova apresentação — `src/pages/agent/AgentNewPresentation.tsx`
+### 4. Não mudar nada no frontend nem no schema
 
-O modo `creation_mode: "automatico"` hoje cria um `market_study` e chama `analyze-market` (410). Trocar para:
-1. Criar `market_studies` + `market_study_subject_properties` como hoje.
-2. Chamar **`gecko-market-search`** com o subject (default 10 comparáveis, `business_type` herdado do imóvel).
-3. Polling de `market_studies.status` (5s, mesma lógica de hoje).
-4. Quando `completed`: ler `market_study_results` e popular as `presentation_sections` (já existe `syncMarketStudySections`).
-
-Remover qualquer referência a `analyze-market`, `analyze-market-deep`, `analyze-market-manus` no caminho desse modo automático.
-
-## Banco
-
-Nenhuma nova tabela. Apenas:
-- Adicionar `'auto_gecko'` como valor aceito em `market_study_comparables.origin` (se houver CHECK constraint; senão é string livre).
-
-## Secret
-
-Solicitar `GECKOAPI_TOKEN` via `add_secret` antes de qualquer deploy.
-
-## Detalhes técnicos (para devs)
-
-- **Edge function** `gecko-market-search`:
-  - `verify_jwt = true` (padrão), valida user, pega `tenant_id` via `profiles`.
-  - Usa `SUPABASE_SERVICE_ROLE_KEY` para inserts.
-  - `EdgeRuntime.waitUntil(...)` para rodar a cascata em background e responder 202 rápido.
-- **Mapeamento payload Gecko PDP → comparable:** confirmar shape exato no primeiro request real; encapsular em `mapGeckoPdpToComparable(payload)` para isolar.
-- **Cálculo:** portar `calculateManualAnalysis` (de `src/hooks/useManualMarketAnalysis.ts`) para `supabase/functions/_shared/market-calc.ts` para reuso server-side.
-- **Botão "Buscar automaticamente"** desabilitado se city/state vazios; mostra tooltip explicando.
-- **Limites:** cap em 20 comparáveis por busca para evitar gasto de créditos descontrolado.
-- **Custo visível:** mostrar no modal "Estimado: N+1 créditos GeckoAPI".
+`NewMarketStudy.tsx` e `AgentNewPresentation.tsx` já fazem polling e leem a tabela. Como agora os campos `price/area/bedrooms` vão estar preenchidos, o resultado calcula corretamente sem mudanças de cliente.
 
 ## Arquivos afetados
 
-- **Novo**: `supabase/functions/gecko-market-search/index.ts`
-- **Novo**: `supabase/functions/_shared/market-calc.ts` (port do `useManualMarketAnalysis`)
-- **Editado**: `src/pages/agent/NewMarketStudy.tsx` (botão + modal de progresso)
-- **Editado**: `src/pages/agent/AgentNewPresentation.tsx` (trocar `analyze-market` por `gecko-market-search`)
-- **Novo secret**: `GECKOAPI_TOKEN`
+- **Editado**: `supabase/functions/gecko-market-search/index.ts` (mapper, filtros, 2 páginas PLP, fallback `__NEXT_DATA__`).
 
-## Como testar
+## Teste
 
-1. Adicionar o secret `GECKOAPI_TOKEN`.
-2. Em `/market-studies/new`: preencher imóvel em Curitiba/PR, 2 quartos; clicar **Buscar automaticamente** → modal mostra "Buscando…", depois "Extraindo 1/10"… → ao terminar, lista da Etapa 1 vem preenchida com 10 anúncios do Zap.
-3. Avançar até a Etapa 4 e ver `market_study_results` com média/mediana/faixas.
-4. Em `/nova apresentação` modo Automático: criar; tela "Processando" agora avança normalmente até "Concluído" em vez de travar.
-5. Forçar token inválido → erro amigável no toast.
+1. Mesma busca anterior (Sorocaba/SP, 3 quartos, Apartamento) deve trazer apenas apartamentos de 3±1 quartos com preço e área preenchidos.
+2. `market_study_results` deve ter `avg_price_per_sqm > 0` e `confidence_level` não "low" se ≥5 aprovados.
+3. Log do console da edge function deve mostrar rejeições com motivo (`"rejected: tipo Casa != Apartamento"`).
