@@ -139,12 +139,6 @@ export default function AgentNewPresentation() {
     presId: string, tenantId: string, userId: string,
     propData: PropertyData, mktData: MarketStudyData
   ) => {
-    if (mktData.selectedPortals.length === 0) return;
-
-    const { data: portalSources } = await supabase
-      .from("portal_sources").select("id, name, code")
-      .in("id", mktData.selectedPortals);
-
     // === 1. Create market_study (official flow) ===
     const { data: study, error: studyErr } = await supabase.from("market_studies").insert({
       broker_id: userId, tenant_id: tenantId,
@@ -183,78 +177,40 @@ export default function AgentNewPresentation() {
       observations: propData.notes || null, purpose: propData.property_purpose || "venda",
     });
 
-    // === 2. Run scraping cascade ===
-    const portals = (portalSources || []).map((p: any) => ({ id: p.id, name: p.name, code: p.code }));
-    const analyzeBody = {
-      property: propData, portals,
-      filters: {
-        searchRadius: mktData.searchRadius, minArea: mktData.minArea, maxArea: mktData.maxArea,
-        minPrice: mktData.minPrice, maxPrice: mktData.maxPrice,
-        minComparables: mktData.minComparables, maxComparables: mktData.maxComparables,
-        preferSameCondominium: mktData.preferSameCondominium, maxListingAgeMonths: mktData.maxListingAgeMonths,
-      },
-      market_study_id: study.id,
-      tenant_id: tenantId,
-    };
-
-    let scrapedComparables: any[] = [];
-
-    // Cascade: Manus → Firecrawl Deep → Firecrawl Basic
+    // === 2. Run Gecko automatic search ===
     try {
-      console.log("Trying analyze-market-manus...");
-      const { data: manusResult, error: manusError } = await supabase.functions.invoke("analyze-market-manus", { body: analyzeBody });
-      if (!manusError && manusResult?.success && manusResult?.comparables?.length) {
-        scrapedComparables = manusResult.comparables;
-        toast.success(`Manus encontrou ${manusResult.comparables.length} comparáveis`);
-      } else {
-        throw new Error(manusError?.message || manusResult?.message || "No results");
-      }
-    } catch (manusErr) {
-      console.warn("Manus failed, trying Firecrawl deep...", manusErr);
-      try {
-        const { data: deepResult, error: deepError } = await supabase.functions.invoke("analyze-market-deep", { body: analyzeBody });
-        // 202 = background processing — edge function saves comparables directly to DB
-        if (!deepError && deepResult?.success && !deepResult?.comparables?.length && deepResult?.market_study_id) {
-          console.log("Market analysis running in background for study:", study.id);
-          toast.info("Estudo de mercado sendo processado em background...");
-          // Poll for completion
-          pollStudyStatus(study.id, presId, propData);
-          return;
-        }
-        // Sync mode — edge function already saved to DB if market_study_id was provided
-        if (!deepError && deepResult?.success && deepResult?.comparables?.length) {
-          scrapedComparables = deepResult.comparables;
-          toast.success(`${deepResult.research_metadata?.total_listings_found || 0} anúncios encontrados, ${deepResult.comparables.length} selecionados`);
-        } else {
-          throw new Error(deepError?.message || deepResult?.message || "No results");
-        }
-      } catch (deepErr) {
-        console.warn("Firecrawl deep failed, trying basic...", deepErr);
-        try {
-          const { data: basicResult, error: basicError } = await supabase.functions.invoke("analyze-market", { body: analyzeBody });
-          if (!basicError && basicResult?.success && basicResult?.comparables?.length) {
-            scrapedComparables = basicResult.comparables;
-          } else {
-            console.warn("All search methods failed.");
-            toast.warning("Não foi possível buscar comparáveis nos portais.");
-          }
-        } catch (basicErr) {
-          console.error("All methods failed:", basicErr);
-          toast.warning("Erro ao buscar comparáveis nos portais.");
-        }
-      }
-    }
+      const subjectArea = propData.area_useful
+        ? Number(propData.area_useful)
+        : propData.area_built
+          ? Number(propData.area_built)
+          : propData.area_total
+            ? Number(propData.area_total)
+            : 0;
 
-    // === 3. Edge function already saved comparables/adjustments/results to DB ===
-    // Just update presentation sections with results from DB
-    if (scrapedComparables.length > 0) {
-      await updatePresentationSectionsFromStudy(study.id, presId, propData);
-      toast.success("Estudo de mercado concluído!");
-    } else {
-      // No comparables from sync response — edge function may have saved to DB
-      console.log("No comparables returned from sync call, checking DB...");
+      const { error: geckoErr } = await supabase.functions.invoke("gecko-market-search", {
+        body: {
+          market_study_id: study.id,
+          subject: {
+            city: propData.city,
+            state: propData.state,
+            bedrooms: propData.bedrooms ? Number(propData.bedrooms) : undefined,
+            bathrooms: propData.bathrooms ? Number(propData.bathrooms) : undefined,
+            parking_spots: propData.parking_spots ? Number(propData.parking_spots) : undefined,
+            business_type: propData.property_purpose === "locacao" ? "rent" : "sale",
+          },
+          subject_area: subjectArea,
+          max_comparables: Number(mktData.maxComparables) || 10,
+        },
+      });
+      if (geckoErr) throw geckoErr;
+      toast.info("Buscando comparáveis no Zap Imóveis...");
+      pollStudyStatus(study.id, presId, propData);
+    } catch (err) {
+      console.error("Gecko search failed:", err);
+      toast.warning("Não foi possível iniciar a busca automática. Você pode adicionar comparáveis manualmente em /market-studies.");
     }
   };
+
 
   /** Polls study status every 5s until completed/failed, then updates presentation sections */
   const pollStudyStatus = async (studyId: string, presId: string, propData: PropertyData) => {

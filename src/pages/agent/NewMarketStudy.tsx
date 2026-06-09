@@ -62,6 +62,8 @@ export default function NewMarketStudy() {
   const [aiReport, setAiReport] = useState<{ executive_summary?: string; justification?: string; insights?: any[] } | null>(null);
   const [generatingAI, setGeneratingAI] = useState(false);
   const [savingFinal, setSavingFinal] = useState(false);
+  const [geckoRunning, setGeckoRunning] = useState(false);
+  const [geckoPhase, setGeckoPhase] = useState<string | null>(null);
 
   const subjectArea = subject.area_useful || subject.area_built || subject.area_land || 0;
   const analysis = useMemo(
@@ -148,6 +150,91 @@ export default function NewMarketStudy() {
       return null;
     } finally {
       setSavingSubject(false);
+    }
+  };
+
+  // ---------- Step 1: Gecko automatic search ----------
+  const handleGeckoSearch = async () => {
+    if (!studyId) {
+      toast.error("Salve o imóvel principal primeiro");
+      return;
+    }
+    if (!subject.city || !subject.state) {
+      toast.error("Preencha cidade e UF na Etapa 0 antes de buscar.");
+      return;
+    }
+    setGeckoRunning(true);
+    setGeckoPhase("Iniciando busca...");
+    try {
+      const { data, error } = await supabase.functions.invoke("gecko-market-search", {
+        body: {
+          market_study_id: studyId,
+          subject: {
+            city: subject.city,
+            state: subject.state,
+            bedrooms: subject.bedrooms,
+            bathrooms: subject.bathrooms,
+            parking_spots: subject.parking_spots,
+            business_type: subject.purpose === "locacao" ? "rent" : "sale",
+          },
+          subject_area: subjectArea,
+          max_comparables: 10,
+        },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      // Poll study status
+      const interval = setInterval(async () => {
+        const { data: s } = await supabase
+          .from("market_studies")
+          .select("status, current_phase")
+          .eq("id", studyId)
+          .single();
+        if (s?.current_phase) setGeckoPhase(s.current_phase);
+        if (s?.status === "completed" || s?.status === "failed") {
+          clearInterval(interval);
+          // Refetch comparables
+          const { data: comps } = await supabase
+            .from("market_study_comparables")
+            .select("*")
+            .eq("market_study_id", studyId)
+            .order("created_at", { ascending: true });
+          setComparables((comps || []).map((c: any) => ({
+            id: c.id,
+            source_url: c.source_url,
+            source_name: c.source_name,
+            title: c.title,
+            property_type: c.property_type,
+            neighborhood: c.neighborhood,
+            city: c.city,
+            area: c.area,
+            bedrooms: c.bedrooms,
+            suites: c.suites,
+            bathrooms: c.bathrooms,
+            parking_spots: c.parking_spots,
+            price: c.price,
+            condominium_fee: c.condominium_fee,
+            iptu: c.iptu,
+            conservation_state: c.conservation_state,
+            notes: c.notes,
+          })));
+          setGeckoRunning(false);
+          setGeckoPhase(null);
+          if (s?.status === "completed") {
+            toast.success("Busca concluída! Revise os comparáveis encontrados.");
+          } else {
+            toast.error("Busca falhou: " + (s?.current_phase || "erro desconhecido"));
+          }
+        }
+      }, 3000);
+
+      // Safety timeout (5 min)
+      setTimeout(() => { clearInterval(interval); setGeckoRunning(false); setGeckoPhase(null); }, 5 * 60 * 1000);
+    } catch (err: any) {
+      toast.error("Erro: " + (err.message || "falha ao chamar GeckoAPI"));
+      setGeckoRunning(false);
+      setGeckoPhase(null);
     }
   };
 
@@ -388,13 +475,45 @@ export default function NewMarketStudy() {
       {/* ========== Step 1 ========== */}
       {step === 1 && (
         <div className="space-y-4">
+          <Card className="glass-card border-primary/30">
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Sparkles className="h-5 w-5 text-primary" />
+                Buscar comparáveis automaticamente
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <p className="text-sm text-muted-foreground">
+                Usamos a GeckoAPI para buscar e extrair os top 10 anúncios do Zap Imóveis com base
+                na cidade, UF e quartos do imóvel avaliado. Você pode revisar e remover qualquer
+                resultado depois.
+              </p>
+              {geckoRunning ? (
+                <div className="flex items-center gap-2 p-3 rounded-lg bg-primary/10 border border-primary/30">
+                  <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                  <span className="text-sm">{geckoPhase || "Processando..."}</span>
+                </div>
+              ) : (
+                <Button onClick={handleGeckoSearch} className="gap-2" disabled={!subject.city || !subject.state}>
+                  <Sparkles className="h-4 w-4" /> Buscar no Zap Imóveis
+                </Button>
+              )}
+              {(!subject.city || !subject.state) && (
+                <p className="text-xs text-muted-foreground">
+                  Preencha cidade e UF na Etapa 0 para habilitar.
+                </p>
+              )}
+            </CardContent>
+          </Card>
+
           <Alert>
             <Info className="h-4 w-4" />
-            <AlertTitle>Adicionar comparáveis manualmente</AlertTitle>
+            <AlertTitle>Ou adicione manualmente</AlertTitle>
             <AlertDescription>
-              Esta análise é baseada em anúncios comparáveis que você informa manualmente. Não fazemos coleta automática em portais.
+              Cole abaixo os links dos anúncios que você quer usar como comparáveis.
             </AlertDescription>
           </Alert>
+
 
           <Card className="glass-card">
             <CardHeader><CardTitle className="text-lg">Cole o link do anúncio</CardTitle></CardHeader>
