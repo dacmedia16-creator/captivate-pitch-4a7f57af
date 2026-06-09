@@ -475,13 +475,45 @@ export default function NewMarketStudy() {
       {/* ========== Step 1 ========== */}
       {step === 1 && (
         <div className="space-y-4">
+          <Card className="glass-card border-primary/30">
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Sparkles className="h-5 w-5 text-primary" />
+                Buscar comparáveis automaticamente
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <p className="text-sm text-muted-foreground">
+                Usamos a GeckoAPI para buscar e extrair os top 10 anúncios do Zap Imóveis com base
+                na cidade, UF e quartos do imóvel avaliado. Você pode revisar e remover qualquer
+                resultado depois.
+              </p>
+              {geckoRunning ? (
+                <div className="flex items-center gap-2 p-3 rounded-lg bg-primary/10 border border-primary/30">
+                  <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                  <span className="text-sm">{geckoPhase || "Processando..."}</span>
+                </div>
+              ) : (
+                <Button onClick={handleGeckoSearch} className="gap-2" disabled={!subject.city || !subject.state}>
+                  <Sparkles className="h-4 w-4" /> Buscar no Zap Imóveis
+                </Button>
+              )}
+              {(!subject.city || !subject.state) && (
+                <p className="text-xs text-muted-foreground">
+                  Preencha cidade e UF na Etapa 0 para habilitar.
+                </p>
+              )}
+            </CardContent>
+          </Card>
+
           <Alert>
             <Info className="h-4 w-4" />
-            <AlertTitle>Adicionar comparáveis manualmente</AlertTitle>
+            <AlertTitle>Ou adicione manualmente</AlertTitle>
             <AlertDescription>
-              Esta análise é baseada em anúncios comparáveis que você informa manualmente. Não fazemos coleta automática em portais.
+              Cole abaixo os links dos anúncios que você quer usar como comparáveis.
             </AlertDescription>
           </Alert>
+
 
           <Card className="glass-card">
             <CardHeader><CardTitle className="text-lg">Cole o link do anúncio</CardTitle></CardHeader>
