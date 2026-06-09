@@ -21,56 +21,150 @@ interface SubjectInput {
   min_area?: number;
   max_area?: number;
   keyword?: string;
+  property_type?: string; // "Apartamento" | "Casa" | etc.
 }
 
-function pickNum(obj: any, keys: string[]): number | null {
-  for (const k of keys) {
-    const parts = k.split(".");
-    let v: any = obj;
-    for (const p of parts) {
-      v = v?.[p];
-      if (v == null) break;
+/* =================== Text helpers =================== */
+function normalize(s: string | null | undefined): string {
+  return (s || "").toString().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+}
+
+function parseBRNumber(raw: string): number | null {
+  if (!raw) return null;
+  // Brazilian: 1.234.567,89 -> 1234567.89
+  let s = raw.replace(/[^\d.,]/g, "");
+  if (s.includes(",")) {
+    s = s.replace(/\./g, "").replace(",", ".");
+  } else if ((s.match(/\./g) || []).length > 1) {
+    s = s.replace(/\./g, "");
+  }
+  const n = Number(s);
+  return isFinite(n) && n > 0 ? n : null;
+}
+
+function extractBedrooms(text: string): number | null {
+  const m = text.match(/(\d+)\s*(quartos?|dorm|dormit[óo]rios?)/i);
+  if (m) return Number(m[1]);
+  return null;
+}
+function extractBathrooms(text: string): number | null {
+  const m = text.match(/(\d+)\s*banheiros?/i);
+  return m ? Number(m[1]) : null;
+}
+function extractSuites(text: string): number | null {
+  const m = text.match(/(\d+)\s*su[íi]tes?/i);
+  return m ? Number(m[1]) : null;
+}
+function extractParking(text: string): number | null {
+  const m = text.match(/(\d+)\s*(vagas?|garagens?)/i);
+  return m ? Number(m[1]) : null;
+}
+function extractArea(text: string): number | null {
+  // first occurrence of NN m²
+  const m = text.match(/(\d+(?:[.,]\d+)?)\s*m[²2]\b/i);
+  if (!m) return null;
+  const n = parseBRNumber(m[1]);
+  return n && n >= 15 && n <= 5000 ? n : null;
+}
+function extractPrice(text: string): number | null {
+  // Try R$ patterns
+  const matches = text.match(/R\$\s*([\d.,]+)/gi);
+  if (matches) {
+    for (const raw of matches) {
+      const num = parseBRNumber(raw.replace(/R\$\s*/i, ""));
+      if (num && num >= 50000 && num <= 100_000_000) return num;
     }
-    if (v == null) continue;
-    const n = typeof v === "number" ? v : Number(String(v).replace(/[^\d.,-]/g, "").replace(/\.(?=\d{3}(\D|$))/g, "").replace(",", "."));
-    if (!isNaN(n) && n > 0) return n;
   }
   return null;
 }
 
-function pickStr(obj: any, keys: string[]): string | null {
-  for (const k of keys) {
-    const parts = k.split(".");
-    let v: any = obj;
-    for (const p of parts) {
-      v = v?.[p];
-      if (v == null) break;
-    }
-    if (typeof v === "string" && v.trim()) return v.trim();
+function parseFormattedAddress(addr: string | null): { address: string | null; neighborhood: string | null; city: string | null; state: string | null } {
+  if (!addr) return { address: null, neighborhood: null, city: null, state: null };
+  // "Rua X, 50 - Bairro, Cidade - UF"
+  const m = addr.match(/^(.+?)\s*-\s*(.+?),\s*(.+?)\s*-\s*([A-Z]{2})\s*$/);
+  if (m) {
+    return { address: addr, neighborhood: m[2].trim(), city: m[3].trim(), state: m[4].trim() };
   }
+  return { address: addr, neighborhood: null, city: null, state: null };
+}
+
+function detectPropertyType(title: string | null): string | null {
+  const t = normalize(title);
+  if (!t) return null;
+  if (t.startsWith("apartamento") || t.startsWith("apartamentos")) return "Apartamento";
+  if (t.includes("cobertura")) return "Cobertura";
+  if (t.startsWith("casa de condom") || t.startsWith("casas de condom")) return "Casa de Condomínio";
+  if (t.startsWith("casa") || t.startsWith("casas")) return "Casa";
+  if (t.includes("terreno") || t.includes("lote")) return "Terreno";
+  if (t.includes("studio") || t.includes("kitnet")) return "Studio";
+  if (t.includes("sobrado")) return "Sobrado";
   return null;
 }
 
-/** Best-effort mapper from Gecko PDP payload to a comparable row. */
+function typeMatches(subjectType: string | null | undefined, candidateType: string | null): boolean {
+  if (!subjectType) return true;
+  const s = normalize(subjectType);
+  const c = normalize(candidateType);
+  if (!c) return false;
+  if (s.startsWith("apart")) return c.startsWith("apart") || c.includes("cobertura") || c.includes("studio");
+  if (s.startsWith("casa")) return c.startsWith("casa") || c.includes("sobrado");
+  return s === c;
+}
+
+/* =================== Mapper =================== */
 function mapGeckoPdpToComparable(payload: any, fallbackUrl: string) {
   const d = payload?.data ?? payload?.result ?? payload ?? {};
+  const title: string | null = typeof d.title === "string" ? d.title : null;
+  const description: string | null = typeof d.description === "string" ? d.description : null;
+  const formattedAddress: string | null = typeof d.formattedAddress === "string" ? d.formattedAddress : null;
+  const url: string = (typeof d.url === "string" && d.url) || fallbackUrl;
+
+  const blob = [title, description, formattedAddress, url].filter(Boolean).join("\n");
+
+  // Try structured price first
+  let price: number | null = null;
+  const pricesObj = d.prices;
+  if (pricesObj && typeof pricesObj === "object") {
+    const candidates = [pricesObj.price, pricesObj.main, pricesObj.salePrice, pricesObj.rentPrice];
+    for (const c of candidates) {
+      const n = typeof c === "number" ? c : parseBRNumber(String(c ?? ""));
+      if (n && n >= 50000) { price = n; break; }
+    }
+  }
+  if (!price) price = extractPrice(blob);
+
+  const area = extractArea(title || "") || extractArea(blob);
+  const bedrooms = extractBedrooms(blob);
+  const bathrooms = extractBathrooms(blob);
+  const suites = extractSuites(blob);
+  const parking = extractParking(blob);
+  const addr = parseFormattedAddress(formattedAddress);
+  const propertyType = detectPropertyType(title);
+
+  const images = Array.isArray(d.images) ? d.images : [];
+  const image_url =
+    (typeof images[0] === "string" && images[0]) ||
+    (images[0]?.url) ||
+    null;
+
   return {
-    title: pickStr(d, ["title", "name", "headline", "listing.title"]),
-    price: pickNum(d, ["price", "total_price", "sale_price", "rent_price", "listing.price", "prices.price"]),
-    area: pickNum(d, ["area", "usable_area", "useful_area", "total_area", "private_area", "listing.area"]),
-    bedrooms: pickNum(d, ["bedrooms", "bedroom", "rooms", "listing.bedrooms"]),
-    bathrooms: pickNum(d, ["bathrooms", "bathroom", "listing.bathrooms"]),
-    parking_spots: pickNum(d, ["parking", "parking_spots", "garage", "vacancies", "listing.parking"]),
-    suites: pickNum(d, ["suites", "suite", "listing.suites"]),
-    condominium_fee: pickNum(d, ["condominium_fee", "condo_fee", "condoFee", "monthlyCondoFee"]),
-    iptu: pickNum(d, ["iptu", "yearly_iptu", "tax", "propertyTax"]),
-    neighborhood: pickStr(d, ["neighborhood", "address.neighborhood", "location.neighborhood", "district"]),
-    city: pickStr(d, ["city", "address.city", "location.city"]),
-    address: pickStr(d, ["address.street", "address.full", "fullAddress", "location.address"]),
-    property_type: pickStr(d, ["property_type", "type", "listing.type", "category"]),
-    image_url: pickStr(d, ["image", "image_url", "thumbnail", "images.0", "media.0.url", "photos.0"]),
-    external_id: pickStr(d, ["id", "external_id", "listing.id"]),
-    source_url: pickStr(d, ["url", "source_url", "listing.url"]) || fallbackUrl,
+    title,
+    price,
+    area,
+    bedrooms,
+    bathrooms,
+    suites,
+    parking_spots: parking,
+    condominium_fee: null as number | null,
+    iptu: null as number | null,
+    neighborhood: addr.neighborhood,
+    city: addr.city,
+    state: addr.state,
+    address: addr.address,
+    property_type: propertyType,
+    image_url,
+    external_id: (typeof d.listingId === "string" && d.listingId) || (typeof d.listingExternalId === "string" && d.listingExternalId) || null,
+    source_url: url,
     raw_data: d,
   };
 }
@@ -105,7 +199,7 @@ async function callGecko(token: string, body: Record<string, any>) {
   return { status: r.status, json };
 }
 
-/** ============ Stats (port of useManualMarketAnalysis) ============ */
+/* =================== Stats =================== */
 function median(vs: number[]) {
   if (!vs.length) return 0;
   const s = [...vs].sort((a, b) => a - b);
@@ -129,8 +223,6 @@ function computeResults(comps: { price: number | null; area: number | null }[], 
   }
   const avg = pp.reduce((a, b) => a + b, 0) / pp.length;
   const med = median(pp);
-  const p25 = percentile(pp, 0.25);
-  const p75 = percentile(pp, 0.75);
   const minP = Math.min(...pp);
   const maxP = Math.max(...pp);
   const area = subjectArea > 0 ? subjectArea : 0;
@@ -148,7 +240,7 @@ function computeResults(comps: { price: number | null; area: number | null }[], 
   };
 }
 
-/** ============ Pipeline ============ */
+/* =================== Pipeline =================== */
 async function runPipeline(opts: {
   supabase: any;
   token: string;
@@ -165,64 +257,107 @@ async function runPipeline(opts: {
       updated_at: new Date().toISOString(),
     }).eq("id", studyId);
 
+  const rejections: string[] = [];
+
   try {
-    await updatePhase("Buscando anúncios no Zap Imóveis", "processing");
+    await updatePhase("Buscando anúncios no Zap Imóveis (página 1)", "processing");
 
     const keyword =
       subject.keyword ||
-      [subject.bedrooms ? `apartamento ${subject.bedrooms} quartos` : "apartamento"].join(" ");
+      [subject.bedrooms ? `${subject.property_type || "apartamento"} ${subject.bedrooms} quartos` : (subject.property_type || "apartamento")].join(" ");
 
-    const plpBody: Record<string, any> = {
-      target: "zapimoveis.com.br",
-      type: "plp",
-      page: 1,
-      keyword,
-      city: subject.city,
-      state: subject.state,
-      businessType: subject.business_type || "sale",
+    const buildPlpBody = (page: number) => {
+      const b: Record<string, any> = {
+        target: "zapimoveis.com.br",
+        type: "plp",
+        page,
+        keyword,
+        city: subject.city,
+        state: subject.state,
+        businessType: subject.business_type || "sale",
+      };
+      if (subject.bedrooms) b.bedrooms = String(subject.bedrooms);
+      if (subject.bathrooms) b.bathrooms = String(subject.bathrooms);
+      if (subject.parking_spots) b.parkingSpots = String(subject.parking_spots);
+      if (subject.min_price) b.minPrice = subject.min_price;
+      if (subject.max_price) b.maxPrice = subject.max_price;
+      if (subject.min_area) b.minArea = subject.min_area;
+      if (subject.max_area) b.maxArea = subject.max_area;
+      return b;
     };
-    if (subject.bedrooms) plpBody.bedrooms = String(subject.bedrooms);
-    if (subject.bathrooms) plpBody.bathrooms = String(subject.bathrooms);
-    if (subject.parking_spots) plpBody.parkingSpots = String(subject.parking_spots);
-    if (subject.min_price) plpBody.minPrice = subject.min_price;
-    if (subject.max_price) plpBody.maxPrice = subject.max_price;
-    if (subject.min_area) plpBody.minArea = subject.min_area;
-    if (subject.max_area) plpBody.maxArea = subject.max_area;
 
-    const plp = await callGecko(token, plpBody);
-    if (plp.status >= 400) {
-      const msg = plp.status === 401 || plp.status === 403
+    // PLP page 1
+    const plp1 = await callGecko(token, buildPlpBody(1));
+    if (plp1.status >= 400) {
+      const msg = plp1.status === 401 || plp1.status === 403
         ? "Token GeckoAPI inválido. Avise o administrador."
-        : plp.status === 402
+        : plp1.status === 402
           ? "Sem créditos na GeckoAPI."
-          : `GeckoAPI PLP retornou ${plp.status}: ${JSON.stringify(plp.json).slice(0, 200)}`;
+          : `GeckoAPI PLP retornou ${plp1.status}: ${JSON.stringify(plp1.json).slice(0, 200)}`;
       await updatePhase(`Erro: ${msg}`, "failed");
       return;
     }
+    let urls = extractListingUrls(plp1.json);
 
-    const urls = extractListingUrls(plp.json).slice(0, Math.min(maxComparables, 20));
+    // PLP page 2 (best effort)
+    if (urls.length < maxComparables * 2) {
+      await updatePhase("Buscando anúncios no Zap Imóveis (página 2)");
+      try {
+        const plp2 = await callGecko(token, buildPlpBody(2));
+        if (plp2.status < 400) {
+          const more = extractListingUrls(plp2.json);
+          urls = Array.from(new Set([...urls, ...more]));
+        }
+      } catch (e) {
+        console.warn("PLP page 2 failed", e);
+      }
+    }
+
+    urls = urls.slice(0, 30);
     if (urls.length === 0) {
       await updatePhase("Nenhum anúncio encontrado na busca", "failed");
       return;
     }
 
-    // Iterate PDPs
-    const comparables: { price: number | null; area: number | null }[] = [];
+    const approvedComps: { price: number | null; area: number | null }[] = [];
+    let approvedCount = 0;
     let i = 0;
+    const cityNorm = normalize(subject.city);
+
     for (const url of urls) {
+      if (approvedCount >= maxComparables) break;
       i++;
-      await updatePhase(`Extraindo anúncio ${i}/${urls.length}`);
+      await updatePhase(`Avaliando anúncio ${i}/${urls.length} (${approvedCount} aprovados)`);
+
       try {
         const pdp = await callGecko(token, { target: "zapimoveis.com.br", type: "pdp", url });
         if (pdp.status >= 400) {
-          console.warn(`PDP ${i} failed status ${pdp.status}`);
+          rejections.push(`#${i} PDP status ${pdp.status}`);
           continue;
         }
         const mapped = mapGeckoPdpToComparable(pdp.json, url);
-        const pricePerSqm =
-          mapped.price && mapped.area && mapped.area > 0
-            ? Math.round(mapped.price / mapped.area)
-            : null;
+
+        // Filters
+        if (!mapped.price || !mapped.area) {
+          rejections.push(`#${i} sem preço/área`);
+          continue;
+        }
+        if (!typeMatches(subject.property_type, mapped.property_type)) {
+          rejections.push(`#${i} tipo ${mapped.property_type} != ${subject.property_type}`);
+          continue;
+        }
+        if (subject.bedrooms && mapped.bedrooms) {
+          if (Math.abs(mapped.bedrooms - subject.bedrooms) > 1) {
+            rejections.push(`#${i} quartos ${mapped.bedrooms} != ${subject.bedrooms}`);
+            continue;
+          }
+        }
+        if (mapped.city && cityNorm && normalize(mapped.city) !== cityNorm) {
+          rejections.push(`#${i} cidade ${mapped.city} != ${subject.city}`);
+          continue;
+        }
+
+        const pricePerSqm = Math.round(mapped.price / mapped.area);
 
         await supabase.from("market_study_comparables").insert({
           market_study_id: studyId,
@@ -249,15 +384,19 @@ async function runPipeline(opts: {
           is_approved: true,
         });
 
-        comparables.push({ price: mapped.price, area: mapped.area });
-      } catch (e) {
+        approvedComps.push({ price: mapped.price, area: mapped.area });
+        approvedCount++;
+      } catch (e: any) {
+        rejections.push(`#${i} erro: ${e?.message || e}`);
         console.error(`PDP ${i} error`, e);
       }
     }
 
+    console.log("Rejections:", rejections);
+
     await updatePhase("Calculando análise");
 
-    const r = computeResults(comparables, subjectArea);
+    const r = computeResults(approvedComps, subjectArea);
     await supabase.from("market_study_results").delete().eq("market_study_id", studyId);
     await supabase.from("market_study_results").insert({
       market_study_id: studyId,
@@ -270,10 +409,19 @@ async function runPipeline(opts: {
       price_range_min: r.conservative_min,
       price_range_max: r.aggressive_max,
       confidence_level: r.confidence,
-      research_metadata: { source: "gecko", target: "zapimoveis.com.br", listings_seen: urls.length, used: r.used },
+      research_metadata: {
+        source: "gecko",
+        target: "zapimoveis.com.br",
+        listings_seen: urls.length,
+        used: r.used,
+        rejections: rejections.slice(0, 20),
+      },
     });
 
-    await updatePhase(null, "completed");
+    const finalPhase = r.used < 3
+      ? `Concluído com poucos resultados (${r.used} anúncios válidos)`
+      : null;
+    await updatePhase(finalPhase, "completed");
   } catch (err: any) {
     console.error("Pipeline fatal", err);
     await updatePhase(`Erro: ${err?.message || "falha inesperada"}`, "failed");
@@ -323,7 +471,6 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
 
-    // Verify the study belongs to the caller (defense in depth)
     const { data: study } = await supabase
       .from("market_studies")
       .select("id, broker_id")
@@ -335,7 +482,13 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Fire background pipeline
+    // Clear previous auto_gecko comparables for re-runs
+    await supabase
+      .from("market_study_comparables")
+      .delete()
+      .eq("market_study_id", market_study_id)
+      .eq("origin", "auto_gecko");
+
     // @ts-ignore deno edge runtime
     EdgeRuntime.waitUntil(runPipeline({
       supabase,
