@@ -29,7 +29,7 @@ function normalize(s: string | null | undefined): string {
   return (s || "").toString().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
 }
 
-function parseBRNumber(raw: string): number | null {
+export function parseBRNumber(raw: string): number | null {
   if (!raw) return null;
   // Brazilian: 1.234.567,89 -> 1234567.89
   let s = raw.replace(/[^\d.,]/g, "");
@@ -42,31 +42,31 @@ function parseBRNumber(raw: string): number | null {
   return isFinite(n) && n > 0 ? n : null;
 }
 
-function extractBedrooms(text: string): number | null {
+export function extractBedrooms(text: string): number | null {
   const m = text.match(/(\d+)\s*(quartos?|dorm|dormit[óo]rios?)/i);
   if (m) return Number(m[1]);
   return null;
 }
-function extractBathrooms(text: string): number | null {
+export function extractBathrooms(text: string): number | null {
   const m = text.match(/(\d+)\s*banheiros?/i);
   return m ? Number(m[1]) : null;
 }
-function extractSuites(text: string): number | null {
+export function extractSuites(text: string): number | null {
   const m = text.match(/(\d+)\s*su[íi]tes?/i);
   return m ? Number(m[1]) : null;
 }
-function extractParking(text: string): number | null {
+export function extractParking(text: string): number | null {
   const m = text.match(/(\d+)\s*(vagas?|garagens?)/i);
   return m ? Number(m[1]) : null;
 }
-function extractArea(text: string): number | null {
+export function extractArea(text: string): number | null {
   // first occurrence of NN m²
   const m = text.match(/(\d+(?:[.,]\d+)?)\s*m[²2]\b/i);
   if (!m) return null;
   const n = parseBRNumber(m[1]);
   return n && n >= 15 && n <= 5000 ? n : null;
 }
-function extractPrice(text: string): number | null {
+export function extractPrice(text: string): number | null {
   // Try R$ patterns
   const matches = text.match(/R\$\s*([\d.,]+)/gi);
   if (matches) {
@@ -78,7 +78,7 @@ function extractPrice(text: string): number | null {
   return null;
 }
 
-function parseFormattedAddress(addr: string | null): { address: string | null; neighborhood: string | null; city: string | null; state: string | null } {
+export function parseFormattedAddress(addr: string | null): { address: string | null; neighborhood: string | null; city: string | null; state: string | null } {
   if (!addr) return { address: null, neighborhood: null, city: null, state: null };
   // "Rua X, 50 - Bairro, Cidade - UF"
   const m = addr.match(/^(.+?)\s*-\s*(.+?),\s*(.+?)\s*-\s*([A-Z]{2})\s*$/);
@@ -88,7 +88,7 @@ function parseFormattedAddress(addr: string | null): { address: string | null; n
   return { address: addr, neighborhood: null, city: null, state: null };
 }
 
-function detectPropertyType(title: string | null): string | null {
+export function detectPropertyType(title: string | null): string | null {
   const t = normalize(title);
   if (!t) return null;
   if (t.startsWith("apartamento") || t.startsWith("apartamentos")) return "Apartamento";
@@ -101,7 +101,7 @@ function detectPropertyType(title: string | null): string | null {
   return null;
 }
 
-function typeMatches(subjectType: string | null | undefined, candidateType: string | null): boolean {
+export function typeMatches(subjectType: string | null | undefined, candidateType: string | null): boolean {
   if (!subjectType) return true;
   const s = normalize(subjectType);
   const c = normalize(candidateType);
@@ -112,7 +112,7 @@ function typeMatches(subjectType: string | null | undefined, candidateType: stri
 }
 
 /* =================== Mapper =================== */
-function mapGeckoPdpToComparable(payload: any, fallbackUrl: string) {
+export function mapGeckoPdpToComparable(payload: any, fallbackUrl: string) {
   const d = payload?.data ?? payload?.result ?? payload ?? {};
   const title: string | null = typeof d.title === "string" ? d.title : null;
   const description: string | null = typeof d.description === "string" ? d.description : null;
